@@ -99,12 +99,19 @@ Result: Counter { count: 3 }
 
 ## Logging
 
-### Enable debug 
-```
-RUST_LOG=debug cargo run
-```
-
-### Enable info
+### info
 ```
 RUST_LOG=info cargo run
+```
+
+### warn
+
+Identify missing functions in the flow with warn.
+
+```
+RUST_LOG=warn cargo run
+```
+```
+ WARN  snurr::model > Missing function. Please register: Count 1
+ WARN  snurr::model > Missing function. Please register: equal to 3
 ```
