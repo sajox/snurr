@@ -1,6 +1,6 @@
 # Snurr
 
-Create and run the process flow from a BPMN 2.0 file created by https://demo.bpmn.io/new. This NOT a complete implementation of the BPMN 2.0 specification but may still be useful.
+Create and run the process flow from a BPMN 2.0 file created by https://demo.bpmn.io/new. This is NOT a complete implementation of the BPMN 2.0 specification but may still be useful.
 
 Take a look in the **tests** folder for example files.
 
