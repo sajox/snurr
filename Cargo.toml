@@ -1,0 +1,28 @@
+[package]
+name = "snurr"
+version = "0.1.0"
+edition = "2021"
+authors = ["sajox"]
+description = "Read BPMN 2.0 files and run the process flow"
+repository = "https://github.com/sajox"
+readme = "README.md"
+license = "MIT"
+keywords = ["BPMN", "process"]
+
+include = ["Cargo.toml", "LICENSE", "/src"]
+
+publish = false
+
+[[example]]
+name = "simple"
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+quick-xml = "0.31.0"
+log = "0.4"
+thiserror = "1.0"
+
+[dev-dependencies]
+pretty_env_logger = "0.5"
