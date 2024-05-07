@@ -30,7 +30,7 @@ pub struct Process {
     data: HashMap<String, Bpmn>,
     starts: HashMap<String, String>,
     main_start: String,
-    gateway_names: HashMap<String, HashMap<String, String>>,
+    output_names: HashMap<String, HashMap<String, String>>,
     boundary_events: HashMap<String, HashMap<Symbol, String>>,
 }
 
@@ -43,20 +43,18 @@ impl Process {
             .ok_or(Error::MissingProcessStart)?
             .clone();
 
-        // Collect all referencing gateway names
-        let mut gateway_names: HashMap<String, HashMap<String, String>> = HashMap::new();
+        // Collect all referencing output names
+        let mut output_names: HashMap<String, HashMap<String, String>> = HashMap::new();
         data.values().for_each(|bpmn| {
             if let Bpmn::SequenceFlow {
                 id,
-                name,
+                name: Some(name),
                 source_ref,
                 target_ref: _,
             } = bpmn
             {
-                let entry = gateway_names.entry(source_ref.to_string()).or_default();
-                if let Some(name) = name {
-                    entry.insert(name.to_string(), id.to_string());
-                }
+                let entry = output_names.entry(source_ref.to_string()).or_default();
+                entry.insert(name.to_string(), id.to_string());
             }
         });
 
@@ -87,13 +85,13 @@ impl Process {
             data,
             starts,
             main_start,
-            gateway_names,
+            output_names,
             boundary_events,
         })
     }
 
     fn name_lookup(&self, gateway_id: &str, name: &str) -> Option<&String> {
-        self.gateway_names
+        self.output_names
             .get(gateway_id)
             .and_then(|map| map.get(name))
     }
