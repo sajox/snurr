@@ -23,7 +23,7 @@ RUST_LOG=info cargo run --example simple
 - Exclusive gateway should return the selected flow. Only first is used if many.
 - Inclusive gateway can return many **name** or **id**.
 
-### Clone this project and reference it in your project cargo.toml
+### Reference Snurr in your cargo.toml
 ```toml
 [dependencies]
 snurr = { git = "https://github.com/sajox/Snurr.git", tag = "0.1.0" }
