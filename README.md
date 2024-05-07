@@ -26,7 +26,7 @@ RUST_LOG=info cargo run --example simple
 ### Clone this project and reference it in your project cargo.toml
 ```toml
 [dependencies]
-snurr = { path = "../snurr" }
+snurr = { git = "https://github.com/sajox/Snurr.git", tag = "0.1.0" }
 log = "0.4"
 pretty_env_logger = "0.5"
 ```
