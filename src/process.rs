@@ -19,12 +19,17 @@ use crate::{
 const STARTEVENT_PREFIX: &str = "start";
 type ExecuteResult<'a> = Result<&'a String, Error>;
 
+/// Process result from a process run.
 #[derive(Debug)]
 pub struct ProcessResult<T> {
+    /// Result produced by the task flow.
     pub result: T,
+
+    /// Trace from the process run
     pub trace: Vec<(BpmnType, String)>,
 }
 
+/// Process that contains information from the BPMN file
 #[derive(Debug)]
 pub struct Process {
     data: HashMap<String, Bpmn>,
@@ -35,6 +40,7 @@ pub struct Process {
 }
 
 impl Process {
+    /// Create new process and initialize it from the BPMN file path.
     pub fn new(path: impl AsRef<Path>) -> Result<Self, Error> {
         let (data, starts) = read_bpmn_file(path)?;
         let main_start = starts
@@ -102,6 +108,7 @@ impl Process {
             .and_then(|map| map.get(symbol))
     }
 
+    /// Replay a trace from a process run. It will be sequential.
     pub fn replay_trace<T>(handler: &Eventhandler<T>, data: T, trace: &[(BpmnType, String)]) -> T
     where
         T: std::fmt::Debug,
@@ -123,6 +130,7 @@ impl Process {
         Arc::try_unwrap(data).unwrap().into_inner().unwrap()
     }
 
+    /// Run the process and return the `ProcessResult` or an `Error`.
     pub fn run<T>(&self, handler: &Eventhandler<T>, data: T) -> Result<ProcessResult<T>, Error>
     where
         T: Send + Sync + std::fmt::Debug,
