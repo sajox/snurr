@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         input.lock().unwrap().count += 1;
         Ok(())
     });
-.
+
     handler.add_gateway("equal to 3", |input| {
         let result = if input.lock().unwrap().count == 3 {
             "YES"
