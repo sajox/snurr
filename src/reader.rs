@@ -47,18 +47,18 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                         }
                     }
                     BpmnType::SequenceFlow => {
-                        if let Ok((Some(id), diagram)) =
+                        if let Ok((Some(id), bpmn)) =
                             Bpmn::try_from((bpmn_type.clone(), collect_attributes(bs)))
-                                .map(|diagram| (diagram.id().cloned(), diagram))
+                                .map(|bpmn| (bpmn.id().cloned(), bpmn))
                         {
-                            bpmn_data.insert(id, diagram);
+                            bpmn_data.insert(id, bpmn);
                         }
                     }
                     _ => {
-                        if let Ok(diagram) =
+                        if let Ok(bpmn) =
                             Bpmn::try_from((bpmn_type.clone(), collect_attributes(bs)))
                         {
-                            temp.push(diagram);
+                            temp.push(bpmn);
                         }
                     }
                 }
@@ -80,18 +80,16 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                         }
                     }
                     _ => {
-                        if let Some((Some(id), diagram)) =
-                            temp.pop().map(|diagram| (diagram.id().cloned(), diagram))
+                        if let Some((Some(id), bpmn)) =
+                            temp.pop().map(|bpmn| (bpmn.id().cloned(), bpmn))
                         {
                             if bpmn_type == BpmnType::StartEvent {
-                                if let Some(parent_id) =
-                                    temp.last().and_then(|diagram| diagram.id())
-                                {
-                                    start_ids.insert(parent_id.to_string(), id.to_string());
+                                if let Some(parent_id) = temp.last().and_then(|bpmn| bpmn.id()) {
+                                    start_ids.insert(parent_id.into(), id.to_string());
                                 }
                             }
 
-                            bpmn_data.insert(id, diagram);
+                            bpmn_data.insert(id, bpmn);
                         }
                     }
                 }

@@ -35,8 +35,8 @@ pub struct Process {
     data: HashMap<String, Bpmn>,
     starts: HashMap<String, String>,
     main_start: String,
-    output_names: HashMap<String, HashMap<String, String>>,
-    boundary_events: HashMap<String, HashMap<Symbol, String>>,
+    gateway_ids: HashMap<String, HashMap<String, String>>,
+    activity_ids: HashMap<String, HashMap<Symbol, String>>,
 }
 
 impl Process {
@@ -47,10 +47,14 @@ impl Process {
             .values()
             .find(|start_id| start_id.to_lowercase().starts_with(STARTEVENT_PREFIX))
             .ok_or(Error::MissingProcessStart)?
-            .clone();
+            .into();
 
         // Collect all referencing output names
-        let mut output_names: HashMap<String, HashMap<String, String>> = HashMap::new();
+        let mut gateway_ids: HashMap<String, HashMap<String, String>> = HashMap::new();
+
+        // Collect all boundary symbols attached to an activity id
+        let mut activity_ids: HashMap<String, HashMap<Symbol, String>> = HashMap::new();
+
         data.values().for_each(|bpmn| {
             if let Bpmn::SequenceFlow {
                 id,
@@ -59,31 +63,31 @@ impl Process {
                 target_ref: _,
             } = bpmn
             {
-                let entry = output_names.entry(source_ref.to_string()).or_default();
-                entry.insert(name.to_string(), id.to_string());
+                if let Some(Bpmn::Gateway {
+                    gateway: _,
+                    id: _,
+                    name: _,
+                    default: _,
+                    outputs: _,
+                }) = data.get(source_ref)
+                {
+                    let entry = gateway_ids.entry(source_ref.into()).or_default();
+                    entry.insert(name.into(), id.into());
+                }
             }
-        });
 
-        // Collect all referencing boundarys
-        let mut boundary_events: HashMap<String, HashMap<Symbol, String>> = HashMap::new();
-        data.values().for_each(|bpmn| {
             if let Bpmn::Event {
                 event: BpmnType::BoundaryEvent,
-                symbol,
+                symbol: Some(symbol),
                 id,
                 name: _,
-                attached_to_ref,
+                attached_to_ref: Some(attached_to_ref),
                 cancel_activity: _,
                 output: _,
             } = bpmn
             {
-                if let Some(attached_to_ref) = attached_to_ref.as_ref() {
-                    let entry = boundary_events
-                        .entry(attached_to_ref.to_string())
-                        .or_default();
-                    // if no boundary symbol is set then use default.
-                    entry.insert(symbol.clone().unwrap_or_default(), id.clone());
-                }
+                let entry = activity_ids.entry(attached_to_ref.into()).or_default();
+                entry.insert(symbol.clone(), id.into());
             }
         });
 
@@ -91,19 +95,19 @@ impl Process {
             data,
             starts,
             main_start,
-            output_names,
-            boundary_events,
+            gateway_ids,
+            activity_ids,
         })
     }
 
     fn name_lookup(&self, gateway_id: &str, name: &str) -> Option<&String> {
-        self.output_names
+        self.gateway_ids
             .get(gateway_id)
             .and_then(|map| map.get(name))
     }
 
     fn boundary_lookup(&self, activity_id: &str, symbol: &Symbol) -> Option<&String> {
-        self.boundary_events
+        self.activity_ids
             .get(activity_id)
             .and_then(|map| map.get(symbol))
     }
@@ -149,11 +153,11 @@ impl Process {
         self.execute(&self.main_start, handler, data.clone(), sender)?;
 
         // When sender die, the recv handle terminates.
-        let traces = recv_handle.join().expect("oops! the child thread panicked");
+        let trace = recv_handle.join().expect("oops! the child thread panicked");
 
         Ok(ProcessResult {
             result: Arc::try_unwrap(data).unwrap().into_inner().unwrap(),
-            trace: traces,
+            trace,
         })
     }
 
@@ -172,7 +176,7 @@ impl Process {
             let bpmn = self
                 .data
                 .get(next_id)
-                .ok_or(Error::MissingId(next_id.to_string()))?;
+                .ok_or(Error::MissingId(next_id.into()))?;
 
             // We trace by name if exist. Id otherwise.
             let _ = sender.send((
@@ -211,16 +215,14 @@ impl Process {
                     name,
                     output,
                 } => {
-                    info!("{}: {}", aktivity, name.as_ref().unwrap_or(id));
+                    let name_or_id = name.as_ref().unwrap_or(id);
+                    info!("{}: {}", aktivity, name_or_id);
                     match aktivity {
                         BpmnType::Task => {
-                            let response =
-                                handler.run_task(name.as_ref().unwrap_or(id), data.clone());
+                            let response = handler.run_task(name_or_id, data.clone());
                             if let Err(symbol) = response {
                                 self.boundary_lookup(id, &symbol)
-                                    .ok_or(Error::MissingBoundary(
-                                        name.as_ref().unwrap_or(id).clone(),
-                                    ))?
+                                    .ok_or(Error::MissingBoundary(name_or_id.clone()))?
                             } else {
                                 output
                                     .as_ref()
@@ -246,9 +248,7 @@ impl Process {
                             }) = self.data.get(response_id)
                             {
                                 self.boundary_lookup(id, symbol)
-                                    .ok_or(Error::MissingBoundary(
-                                        name.as_ref().unwrap_or(id).clone(),
-                                    ))?
+                                    .ok_or(Error::MissingBoundary(name_or_id.clone()))?
                             } else {
                                 output
                                     .as_ref()
@@ -265,11 +265,11 @@ impl Process {
                     default,
                     outputs,
                 } => {
-                    info!("{}: {}", gateway, name.as_ref().unwrap_or(id));
+                    let name_or_id = name.as_ref().unwrap_or(id);
+                    info!("{}: {}", gateway, name_or_id);
                     match gateway {
                         BpmnType::ExclusiveGateway => {
                             if outputs.len() > 1 {
-                                let name_or_id = name.as_ref().unwrap_or(id);
                                 // Default to first outgoing if function is not set.
                                 let response = handler.run_gateway(name_or_id, data.clone());
                                 let response = response
@@ -277,7 +277,7 @@ impl Process {
                                     .copied()
                                     .or(default.as_deref())
                                     .or_else(|| outputs.first().map(|x| x.as_str()))
-                                    .ok_or(Error::MissingId(id.to_owned()))?;
+                                    .ok_or(Error::MissingId(id.into()))?;
 
                                 // look up name to id or just use answer
                                 self.name_lookup(id, response)
@@ -300,8 +300,7 @@ impl Process {
                             }
 
                             // Diverging gateway
-                            let mut response =
-                                handler.run_gateway(name.as_ref().unwrap_or(id), data.clone());
+                            let mut response = handler.run_gateway(name_or_id, data.clone());
                             // If empty. Add default or first output.
                             if response.is_empty() {
                                 if let Some(resp) = default.as_ref().or_else(|| outputs.first()) {
