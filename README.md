@@ -8,7 +8,7 @@ Create and run the process flow from a BPMN 2.0 file created by https://demo.bpm
 
 ```toml
 [dependencies]
-snurr = { git = "https://github.com/sajox/snurr.git", tag = "0.1.4" }
+snurr = { git = "https://github.com/sajox/snurr.git", tag = "0.1.5" }
 log = "0.4"
 pretty_env_logger = "0.5"
 ```
