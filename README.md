@@ -4,6 +4,10 @@ Create and run the process flow from a BPMN 2.0 file created by https://demo.bpm
 
 ## Example
 
+BPMN diagram used in example.
+
+![BPMN example](/assets/images/example.png)
+
 ### Usage
 
 ```toml
@@ -164,7 +168,9 @@ Only exclusive and inclusive gateways need to be registered. **Parallel gateways
 
 Register gateway by **name** (if it exist) or **id** and return the flow taken by **name** or **id**
 
-Exclusive gateway, one flow taken. If many is returned only first is used.
+##### Exclusive gateway
+
+Zero or one flow is returned. If many flows is returned only the first one is processed.
 
 ```rust
     handler.add_gateway("Name or id", |input| {
@@ -172,7 +178,9 @@ Exclusive gateway, one flow taken. If many is returned only first is used.
     });
 ```
 
-Inclusive gateway, many flows taken.
+##### Inclusive gateway
+
+Zero or more flows is returned and processed. Inclusive gateway should always have a default flow in the BPMN diagram.
 
 ```rust
     handler.add_gateway("Name or id", |input| {
@@ -180,9 +188,11 @@ Inclusive gateway, many flows taken.
     });
 ```
 
+##### Default flow
+
 To choose the default flow, then return an empty vector. 
 
-**Note** if no default path is defined then the first available is used. That to be able to test something without implementation.
+**Note** if no default flow is defined then the first available is used. That to be able to test something without implementation.
 
 ```rust
     handler.add_gateway("Name or id", |input| {
