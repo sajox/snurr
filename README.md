@@ -1,6 +1,10 @@
 # Snurr
 
-Create and run the process flow from a BPMN 2.0 file created by https://demo.bpmn.io/new. Add your own behavior with Rust code from a small API. Read the [Snurr documentation](#documentation) and explore the **tests** folder for more examples. 
+Create and run the process flow from a BPMN 2.0 file created by [BPMN Editor demo](https://demo.bpmn.io/new) . Add your own behavior with Rust code from a small API. Read the [Snurr documentation](#documentation) and explore the **tests** folder for more examples. 
+
+**_NOTE:_** To view or edit BPMN files in your project you can use the [BPMN Editor](https://github.com/bpmn-io/vs-code-bpmn-io) plugin in VS Code.   
+
+![Tasks](/assets/images/vscode-plugin-bpmnio.png)
 
 ## Example
 
