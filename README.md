@@ -195,19 +195,13 @@ To choose the default flow, then return an empty vector.
 Only interrupting boundary events is implemented and can be used on a task or a sub-process.
 
 Boundary symbols:
-- Blank
-- Message
-- Timer
-- Escalation
-- Conditional
-- Link
-- Error
-- Cancel
 - Compensation
+- Conditional
+- Error
+- Escalation
+- Message
 - Signal
-- Multiple
-- ParallelMultiple
-- Terminate
+- Timer
 
 Example with a task error boundary:
 
