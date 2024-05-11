@@ -1,6 +1,6 @@
 # Snurr
 
-Create and run the process flow from a BPMN 2.0 file created by https://demo.bpmn.io/new. This is NOT a complete implementation of the BPMN 2.0 specification. Read the [Snurr documentation](#documentation) and explore the **tests** folder for more examples.
+Create and run the process flow from a BPMN 2.0 file created by https://demo.bpmn.io/new. Add your own behavior with Rust code from a small API. Read the [Snurr documentation](#documentation) and explore the **tests** folder for more examples. 
 
 ## Example
 
@@ -87,6 +87,8 @@ RUST_LOG=info cargo run --example simple
 
 ## Documentation
 
+This is not a complete implementation of the BPMN 2.0 specification but a useful subset of it.
+
 ### Process
 
 Create a process by giving a path to a bpmn file. The created process do not mutate and can be run several times. The **process_result** contains the result and a trace.
@@ -133,7 +135,7 @@ Create an event handler for a specific type. The type is used as input to differ
 
 ### Tasks
 
-All tasks is used in the same way but may be used to indicate purpose.
+All tasks is used in the same way but the icon can be describing in the BPMN diagram. The input to a task is thread safe. In parallel flows you might need to consider when using and releasing the lock to the input.
 
 ![Tasks](/assets/images/tasks.png)
 
