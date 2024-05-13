@@ -121,12 +121,12 @@ impl Process {
         for (ty, id) in trace {
             match ty {
                 BpmnType::Task | BpmnType::SubProcess => {
-                    let _ = handler.run_task(id, data.clone());
+                    let _ = handler.run_task(id, Arc::clone(&data));
                 }
                 BpmnType::ExclusiveGateway
                 | BpmnType::InclusiveGateway
                 | BpmnType::ParallelGateway => {
-                    let _ = handler.run_gateway(id, data.clone());
+                    let _ = handler.run_gateway(id, Arc::clone(&data));
                 }
                 _ => {}
             }
@@ -150,7 +150,7 @@ impl Process {
             }
             trace
         });
-        self.execute(&self.main_start, handler, data.clone(), sender)?;
+        self.execute(&self.main_start, handler, Arc::clone(&data), sender)?;
 
         // When sender die, the recv handle terminates.
         let trace = recv_handle.join().expect("oops! the child thread panicked");
@@ -219,10 +219,10 @@ impl Process {
                     info!("{}: {}", aktivity, name_or_id);
                     match aktivity {
                         BpmnType::Task => {
-                            let response = handler.run_task(name_or_id, data.clone());
+                            let response = handler.run_task(name_or_id, Arc::clone(&data));
                             if let Err(symbol) = response {
                                 self.boundary_lookup(id, &symbol)
-                                    .ok_or(Error::MissingBoundary(name_or_id.clone()))?
+                                    .ok_or(Error::MissingBoundary(name_or_id.into()))?
                             } else {
                                 output
                                     .as_ref()
@@ -233,7 +233,7 @@ impl Process {
                             let response_id = self.execute(
                                 self.starts.get(next_id).ok_or(Error::MissingProcessStart)?,
                                 handler,
-                                data.clone(),
+                                Arc::clone(&data),
                                 sender.clone(),
                             )?;
 
@@ -248,7 +248,7 @@ impl Process {
                             }) = self.data.get(response_id)
                             {
                                 self.boundary_lookup(id, symbol)
-                                    .ok_or(Error::MissingBoundary(name_or_id.clone()))?
+                                    .ok_or(Error::MissingBoundary(name_or_id.into()))?
                             } else {
                                 output
                                     .as_ref()
@@ -271,7 +271,7 @@ impl Process {
                         BpmnType::ExclusiveGateway => {
                             if outputs.len() > 1 {
                                 // Default to first outgoing if function is not set.
-                                let response = handler.run_gateway(name_or_id, data.clone());
+                                let response = handler.run_gateway(name_or_id, Arc::clone(&data));
                                 let response = response
                                     .first()
                                     .copied()
@@ -300,7 +300,7 @@ impl Process {
                             }
 
                             // Diverging gateway
-                            let mut response = handler.run_gateway(name_or_id, data.clone());
+                            let mut response = handler.run_gateway(name_or_id, Arc::clone(&data));
                             // If empty. Add default or first output.
                             if response.is_empty() {
                                 if let Some(resp) = default.as_ref().or_else(|| outputs.first()) {
@@ -317,7 +317,12 @@ impl Process {
                                     })
                                 })
                                 .map(|outgoing| {
-                                    self.execute(outgoing, handler, data.clone(), sender.clone())
+                                    self.execute(
+                                        outgoing,
+                                        handler,
+                                        Arc::clone(&data),
+                                        sender.clone(),
+                                    )
                                 })
                                 .partition(Result::is_ok);
 
@@ -352,7 +357,7 @@ impl Process {
                                             self.execute(
                                                 outgoing,
                                                 handler,
-                                                data.clone(),
+                                                Arc::clone(&data),
                                                 sender.clone(),
                                             )
                                         })
