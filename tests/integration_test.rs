@@ -1,37 +1,34 @@
-use snurr::{Eventhandler, Process, Symbol, TaskCallback};
+use snurr::{Data, Eventhandler, Process, Symbol, TaskResult};
+
+const COUNT_1: &str = "Count 1";
+const COUNT_2: &str = "Count 2";
+const COUNT_3: &str = "Count 3";
+const COUNT_4: &str = "Count 4";
 
 #[derive(Debug, Default)]
 struct Counter {
     count: u32,
 }
 
-const FUNC_CNT_1: TaskCallback<Counter> = |input| {
-    input.lock().unwrap().count += 1;
-    Ok(())
-};
+fn func_cnt(value: u32) -> impl Fn(Data<Counter>) -> TaskResult {
+    move |input| {
+        input.lock().unwrap().count += value;
+        Ok(())
+    }
+}
 
-const FUNC_CNT_2: TaskCallback<Counter> = |input| {
-    input.lock().unwrap().count += 2;
-    Ok(())
-};
+fn func_error(_: Data<Counter>) -> TaskResult {
+    Err(Symbol::Error)
+}
 
-const FUNC_CNT_3: TaskCallback<Counter> = |input| {
-    input.lock().unwrap().count += 3;
-    Ok(())
-};
-
-const FUNC_CNT_4: TaskCallback<Counter> = |input| {
-    input.lock().unwrap().count += 4;
-    Ok(())
-};
-
-const FUNC_ERROR: TaskCallback<Counter> = |_| Err(Symbol::Error);
-const FUNC_TIMER: TaskCallback<Counter> = |_| Err(Symbol::Timer);
+fn func_timer(_: Data<Counter>) -> TaskResult {
+    Err(Symbol::Timer)
+}
 
 #[test]
 fn one_task() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_CNT_1);
+    handler.add_task(COUNT_1, func_cnt(1));
 
     let bpmn = Process::new("tests/files/one_task.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -42,8 +39,8 @@ fn one_task() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn two_task() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_CNT_1);
-    handler.add_task("Count 2", FUNC_CNT_2);
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_task(COUNT_2, func_cnt(2));
 
     let bpmn = Process::new("tests/files/two_task.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -54,8 +51,8 @@ fn two_task() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn subprocess() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_CNT_1);
-    handler.add_task("Count 2", FUNC_CNT_2);
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_task(COUNT_2, func_cnt(2));
 
     let bpmn = Process::new("tests/files/subprocess.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -66,8 +63,8 @@ fn subprocess() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn subprocess_message_end() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_CNT_1);
-    handler.add_task("Count 2", FUNC_CNT_2);
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_task(COUNT_2, func_cnt(2));
 
     let bpmn = Process::new("tests/files/subprocess_message_end.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -78,9 +75,9 @@ fn subprocess_message_end() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn subprocess_error_message_end() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_ERROR);
-    handler.add_task("Count 2", FUNC_CNT_2);
-    handler.add_task("Count 3", FUNC_CNT_3);
+    handler.add_task(COUNT_1, func_error);
+    handler.add_task(COUNT_2, func_cnt(2));
+    handler.add_task(COUNT_3, func_cnt(3));
 
     let bpmn = Process::new("tests/files/subprocess_error_message_end.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -91,9 +88,9 @@ fn subprocess_error_message_end() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn replay_process_trace() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_ERROR);
-    handler.add_task("Count 2", FUNC_CNT_2);
-    handler.add_task("Count 3", FUNC_CNT_3);
+    handler.add_task(COUNT_1, func_error);
+    handler.add_task(COUNT_2, func_cnt(2));
+    handler.add_task(COUNT_3, func_cnt(3));
 
     let bpmn = Process::new("tests/files/subprocess_error_message_end.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -106,9 +103,9 @@ fn replay_process_trace() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn exclusive_gateway_default_path() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_CNT_1);
-    handler.add_task("Count 2", FUNC_CNT_2);
-    handler.add_task("Count 3", FUNC_CNT_3);
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_task(COUNT_2, func_cnt(2));
+    handler.add_task(COUNT_3, func_cnt(3));
 
     // Empty response. Default path
     handler.add_gateway("CHOOSE", |_| vec![]);
@@ -122,10 +119,10 @@ fn exclusive_gateway_default_path() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn exclusive_gateway() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_CNT_1);
-    handler.add_task("Count 2", FUNC_CNT_2);
-    handler.add_task("Count 3", FUNC_CNT_3);
-    handler.add_gateway("CHOOSE", |_| vec!["YES"]);
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_task(COUNT_2, func_cnt(2));
+    handler.add_task(COUNT_3, func_cnt(3));
+    handler.add_gateway("CHOOSE", move |_| vec!["YES"]);
 
     let bpmn = Process::new("tests/files/exclusive_gateway.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -136,10 +133,10 @@ fn exclusive_gateway() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn exclusive_gateway_with_gateway_converge() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_CNT_1);
-    handler.add_task("Count 2", FUNC_CNT_2);
-    handler.add_task("Count 3", FUNC_CNT_3);
-    handler.add_task("Count 4", FUNC_CNT_4);
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_task(COUNT_2, func_cnt(2));
+    handler.add_task(COUNT_3, func_cnt(3));
+    handler.add_task(COUNT_4, func_cnt(4));
     handler.add_gateway("CHOOSE", |_| vec!["YES"]);
 
     let bpmn = Process::new("tests/files/exclusive_gateway_with_gateway_converge.bpmn")?;
@@ -151,10 +148,10 @@ fn exclusive_gateway_with_gateway_converge() -> Result<(), Box<dyn std::error::E
 #[test]
 fn exclusive_gateway_with_task_converge() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_CNT_1);
-    handler.add_task("Count 2", FUNC_CNT_2);
-    handler.add_task("Count 3", FUNC_CNT_3);
-    handler.add_task("Count 4", FUNC_CNT_4);
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_task(COUNT_2, func_cnt(2));
+    handler.add_task(COUNT_3, func_cnt(3));
+    handler.add_task(COUNT_4, func_cnt(4));
     handler.add_gateway("CHOOSE", |_| vec!["YES"]);
 
     let bpmn = Process::new("tests/files/exclusive_gateway_with_task_converge.bpmn")?;
@@ -166,9 +163,9 @@ fn exclusive_gateway_with_task_converge() -> Result<(), Box<dyn std::error::Erro
 #[test]
 fn inclusive_gateway_default_path() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_CNT_1);
-    handler.add_task("Count 2", FUNC_CNT_2);
-    handler.add_task("Count 3", FUNC_CNT_3);
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_task(COUNT_2, func_cnt(2));
+    handler.add_task(COUNT_3, func_cnt(3));
 
     // Empty response. Default path
     handler.add_gateway("CHOOSE", |_| vec![]);
@@ -182,9 +179,9 @@ fn inclusive_gateway_default_path() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn inclusive_gateway() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_CNT_1);
-    handler.add_task("Count 2", FUNC_CNT_2);
-    handler.add_task("Count 3", FUNC_CNT_3);
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_task(COUNT_2, func_cnt(2));
+    handler.add_task(COUNT_3, func_cnt(3));
 
     // Empty response. Default path
     handler.add_gateway("CHOOSE", |_| vec!["YES", "NO"]);
@@ -198,9 +195,9 @@ fn inclusive_gateway() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn inclusive_gateway_split_end() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_CNT_1);
-    handler.add_task("Count 2", FUNC_CNT_2);
-    handler.add_task("Count 3", FUNC_CNT_3);
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_task(COUNT_2, func_cnt(2));
+    handler.add_task(COUNT_3, func_cnt(3));
 
     // Empty response. Default path
     handler.add_gateway("Gateway_0jgakfl", |_| vec!["YES", "NO"]);
@@ -227,10 +224,10 @@ fn inclusive_gateway_no_output() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn parallell_gateway() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_CNT_1);
-    handler.add_task("Count 2", FUNC_CNT_2);
-    handler.add_task("Count 3", FUNC_CNT_3);
-    handler.add_task("Count 4", FUNC_CNT_4);
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_task(COUNT_2, func_cnt(2));
+    handler.add_task(COUNT_3, func_cnt(3));
+    handler.add_task(COUNT_4, func_cnt(4));
 
     // All paths is taken. No need to register gateway.
 
@@ -243,9 +240,9 @@ fn parallell_gateway() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn error_handling() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_ERROR);
-    handler.add_task("Count 2", FUNC_ERROR);
-    handler.add_task("Count 3", FUNC_CNT_3);
+    handler.add_task(COUNT_1, func_error);
+    handler.add_task(COUNT_2, func_error);
+    handler.add_task(COUNT_3, func_cnt(3));
 
     let bpmn = Process::new("tests/files/error_handling.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -256,9 +253,9 @@ fn error_handling() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn two_boundary_timer_thrown() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_TIMER);
-    handler.add_task("Count 2", FUNC_CNT_2);
-    handler.add_task("Count 3", FUNC_CNT_3);
+    handler.add_task(COUNT_1, func_timer);
+    handler.add_task(COUNT_2, func_cnt(2));
+    handler.add_task(COUNT_3, func_cnt(3));
 
     let bpmn = Process::new("tests/files/two_boundary.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -269,9 +266,9 @@ fn two_boundary_timer_thrown() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn two_boundary_error_thrown() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task("Count 1", FUNC_ERROR);
-    handler.add_task("Count 2", FUNC_CNT_2);
-    handler.add_task("Count 3", FUNC_CNT_3);
+    handler.add_task(COUNT_1, func_error);
+    handler.add_task(COUNT_2, func_cnt(2));
+    handler.add_task(COUNT_3, func_cnt(3));
 
     let bpmn = Process::new("tests/files/two_boundary.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;

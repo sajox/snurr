@@ -156,7 +156,10 @@ impl Process {
         let trace = recv_handle.join().expect("oops! the child thread panicked");
 
         Ok(ProcessResult {
-            result: Arc::try_unwrap(data).unwrap().into_inner().unwrap(),
+            result: Arc::into_inner(data)
+                .ok_or(Error::NoResult)?
+                .into_inner()
+                .map_err(|_| Error::NoResult)?,
             trace,
         })
     }

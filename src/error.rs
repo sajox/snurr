@@ -47,4 +47,7 @@ pub enum Error {
 
     #[error("bad direction type")]
     BadDirectionType,
+
+    #[error("couldn't extract result")]
+    NoResult,
 }
