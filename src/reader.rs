@@ -80,7 +80,6 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                 let bpmn_type: BpmnType = be.local_name().as_ref().into();
                 match bpmn_type {
                     BpmnType::Outgoing => {
-                        // We dont handle Incoming but may in the future.
                         if let Some((
                             Bpmn::Direction {
                                 direction: BpmnType::Outgoing,
