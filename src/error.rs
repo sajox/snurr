@@ -30,6 +30,9 @@ pub enum Error {
     #[error("file error")]
     File(#[from] quick_xml::Error),
 
+    #[error("io error")]
+    Io(#[from] std::io::Error),
+
     #[error("bad event type")]
     BadEventType,
 

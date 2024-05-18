@@ -1,6 +1,7 @@
 use log::info;
 use std::{
     collections::HashMap,
+    io::Write,
     path::Path,
     sync::{
         mpsc::{channel, Sender},
@@ -98,6 +99,65 @@ impl Process {
             gateway_ids,
             activity_ids,
         })
+    }
+
+    /// Generate code from all the task and gateways to the given file path.
+    /// No file is allowed to exist at the target location.
+    pub fn scaffold(&self, path: impl AsRef<Path>) -> Result<(), Error> {
+        let mut content = vec![];
+        content.push("pub fn create_handler<T>() -> Eventhandler<T> {".into());
+        content.push("    let mut handler: Eventhandler<T> = Eventhandler::default();".into());
+        for bpmn in self.data.values() {
+            match bpmn {
+                Bpmn::Activity {
+                    aktivity: BpmnType::Task,
+                    id,
+                    name,
+                    output: _,
+                } => content.push(format!(
+                    r#"    {}"{}"{}"#,
+                    "handler.add_task(",
+                    name.as_ref().unwrap_or(id),
+                    ", |input| Ok(()));"
+                )),
+                _ => continue,
+            };
+        }
+        for bpmn in self.data.values() {
+            match bpmn {
+                Bpmn::Gateway {
+                    gateway: BpmnType::ExclusiveGateway | BpmnType::InclusiveGateway,
+                    id,
+                    name,
+                    default: _,
+                    outputs: _,
+                } => {
+                    if let Some(map) = self.gateway_ids.get(id) {
+                        content.push(format!(
+                            "    // output names {:?}",
+                            map.keys().collect::<Vec<&String>>()
+                        ));
+                    }
+
+                    content.push(format!(
+                        r#"    {}"{}"{}"#,
+                        "handler.add_gateway(",
+                        name.as_ref().unwrap_or(id),
+                        ", |input| vec![]);"
+                    ));
+                }
+                _ => continue,
+            };
+        }
+        content.push("    handler\n}".into());
+
+        let mut file = std::fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(path)?;
+
+        file.write_all(content.join("\n").as_bytes())?;
+        Ok(())
     }
 
     fn name_lookup(&self, gateway_id: &str, name: &str) -> Option<&String> {

@@ -99,27 +99,47 @@ Create a process by giving a path to a bpmn file. The created process do not mut
 
 #### Usage
 
-Create and run process
+##### Create and run process
+
 ```rust
-    let bpmn = Process::new("example.bpmn")?;
+let bpmn = Process::new("example.bpmn")?;
 
-    // Inspect the created process
-    dbg!(&bpmn);
+// Inspect the created process
+dbg!(&bpmn);
 
-    let mut handler: ...
+let mut handler: ...
 
-    // Run the process
-    let process_result = bpmn.run(&handler, Counter::default())?;
+// Run the process
+let process_result = bpmn.run(&handler, Counter::default())?;
 ```
 
-Run the flow from a previous process run with Process::replay_trace
+##### Run the flow from a previous process run with Process::replay_trace
 
 ```rust
-    let bpmn = Process::new("example.bpmn")?;
-    let mut handler: ...
-    let process_result = ...
+let bpmn = Process::new("example.bpmn")?;
+let mut handler: ...
+let process_result = ...
 
-    let trace_result = Process::replay_trace(&handler, Counter::default(), &process_result.trace);
+let trace_result = Process::replay_trace(&handler, Counter::default(), &process_result.trace);
+```
+
+##### Generate code from all the task and gateways to the given file path with scaffold. Remove scaffold method after file is created.
+
+```rust
+let bpmn = Process::new("example.bpmn")?;
+bpmn.scaffold("scaffold.rs")?;
+```
+
+**scaffold.rs**
+
+```rust scaffold.rs
+pub fn create_handler<T>() -> Eventhandler<T> {
+    let mut handler: Eventhandler<T> = Eventhandler::default();
+    handler.add_task("Count 1", |input| Ok(()));
+    // output names ["NO", "YES"]
+    handler.add_gateway("equal to 3", |input| vec![]);
+    handler
+}
 ```
 
 ### Eventhandler
@@ -129,12 +149,12 @@ Create an event handler for a specific type. The type is used as input to differ
 #### Usage
 
 ```rust
-    #[derive(Debug, Default)]
-    struct Counter {
-        count: u32,
-    }
+#[derive(Debug, Default)]
+struct Counter {
+    count: u32,
+}
 
-    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+let mut handler: Eventhandler<Counter> = Eventhandler::default();
 ```
 
 ### Tasks
@@ -148,17 +168,17 @@ All tasks is used in the same way but the icon can be describing in the BPMN dia
 Register task by **name** (if it exist) or **id**. 
 
 ```rust
-    handler.add_task("Name or id", |input| {
-        Ok(())
-    });
+handler.add_task("Name or id", |input| {
+    Ok(())
+});
 ```
 
 If one or more boundarys exist on a task, then a boundary can be returned.
 
 ```rust
-    handler.add_task("Name or id", |input| {
-        Err(Symbol::Error)
-    });
+handler.add_task("Name or id", |input| {
+    Err(Symbol::Error)
+});
 ```
 
 ### Gateways
@@ -179,9 +199,9 @@ Register gateway by **name** (if it exist) or **id** and return the flow taken b
 Zero or one flow is returned. If many flows is returned only the first one is processed.
 
 ```rust
-    handler.add_gateway("Name or id", |input| {
-        vec!["YES"]
-    });
+handler.add_gateway("Name or id", |input| {
+    vec!["YES"]
+});
 ```
 
 ##### Inclusive gateway
@@ -189,9 +209,9 @@ Zero or one flow is returned. If many flows is returned only the first one is pr
 Zero or more flows is returned and processed. Inclusive gateway should always have a default flow in the BPMN diagram.
 
 ```rust
-    handler.add_gateway("Name or id", |input| {
-        vec!["YES", "NO", "MAYBE"]
-    });
+handler.add_gateway("Name or id", |input| {
+    vec!["YES", "NO", "MAYBE"]
+});
 ```
 
 ##### Default flow
@@ -201,9 +221,9 @@ To choose the default flow, then return an empty vector.
 **Note** if no default flow is defined then the first available is used. That to be able to test something without implementation.
 
 ```rust
-    handler.add_gateway("Name or id", |input| {
-        vec![]
-    });
+handler.add_gateway("Name or id", |input| {
+    vec![]
+});
 ```
  
 ### Boundary event
@@ -229,9 +249,9 @@ If one or more boundary's exist on a task, then a boundary can be returned.
 
 
 ```rust
-    handler.add_task("Name or id", |input| {
-        Err(Symbol::Error)
-    });
+handler.add_task("Name or id", |input| {
+    Err(Symbol::Error)
+});
 ```
 
 ### Subprocess
