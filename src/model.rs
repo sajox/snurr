@@ -134,7 +134,7 @@ impl<T> Eventhandler<T> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum BpmnType {
     StartEvent,
     EndEvent,
@@ -246,7 +246,7 @@ impl TryFrom<(BpmnType, HashMap<BpmnAttrib, String>)> for Bpmn {
                     .unwrap_or_default(),
             },
             BpmnType::StartEvent | BpmnType::EndEvent | BpmnType::BoundaryEvent => Bpmn::Event {
-                event: bpmn_type.clone(),
+                event: bpmn_type,
                 symbol: None,
                 id: attributes
                     .remove(&BpmnAttrib::Id)
@@ -257,7 +257,7 @@ impl TryFrom<(BpmnType, HashMap<BpmnAttrib, String>)> for Bpmn {
                 output: None,
             },
             BpmnType::Task | BpmnType::SubProcess => Bpmn::Activity {
-                aktivity: bpmn_type.clone(),
+                aktivity: bpmn_type,
                 id: attributes
                     .remove(&BpmnAttrib::Id)
                     .ok_or(Error::MissingId(bpmn_type.to_string()))?,
@@ -266,7 +266,7 @@ impl TryFrom<(BpmnType, HashMap<BpmnAttrib, String>)> for Bpmn {
             },
             BpmnType::ExclusiveGateway | BpmnType::ParallelGateway | BpmnType::InclusiveGateway => {
                 Bpmn::Gateway {
-                    gateway: bpmn_type.clone(),
+                    gateway: bpmn_type,
                     id: attributes
                         .remove(&BpmnAttrib::Id)
                         .ok_or(Error::MissingId(bpmn_type.to_string()))?,
@@ -291,7 +291,7 @@ impl TryFrom<(BpmnType, HashMap<BpmnAttrib, String>)> for Bpmn {
                 direction: bpmn_type,
                 text: None,
             },
-            _ => return Err(Error::BadDiagramType),
+            other => return Err(Error::MissingBpmnType(other.to_string())),
         };
         Ok(ty)
     }
@@ -457,27 +457,27 @@ impl From<&Bpmn> for BpmnType {
                 attached_to_ref: _,
                 cancel_activity: _,
                 output: _,
-            } => event.clone(),
+            } => *event,
             Bpmn::Activity {
                 aktivity,
                 id: _,
                 name: _,
                 output: _,
-            } => aktivity.clone(),
+            } => *aktivity,
             Bpmn::Gateway {
                 gateway,
                 id: _,
                 name: _,
                 default: _,
                 outputs: _,
-            } => gateway.clone(),
+            } => *gateway,
             Bpmn::SequenceFlow {
                 id: _,
                 name: _,
                 source_ref: _,
                 target_ref: _,
             } => BpmnType::SequenceFlow,
-            Bpmn::Direction { direction, text: _ } => direction.clone(),
+            Bpmn::Direction { direction, text: _ } => *direction,
         }
     }
 }

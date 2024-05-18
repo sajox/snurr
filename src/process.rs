@@ -397,7 +397,7 @@ impl Process {
                     info!("SequenceFlow: {}", name.as_ref().unwrap_or(id));
                     target_ref
                 }
-                _ => return Err(Error::BadDiagramType),
+                bpmn => return Err(Error::MissingBpmnType(BpmnType::from(bpmn).to_string())),
             }
         }
         // Return EndEvent Id

@@ -42,9 +42,6 @@ pub enum Error {
     #[error("bad gateway type")]
     BadGatewayType,
 
-    #[error("bad diagram type")]
-    BadDiagramType,
-
     #[error("bad direction type")]
     BadDirectionType,
 
