@@ -133,11 +133,13 @@ bpmn.scaffold("scaffold.rs")?;
 **scaffold.rs**
 
 ```rust scaffold.rs
-pub fn create_handler<T>() -> Eventhandler<T> {
-    let mut handler: Eventhandler<T> = Eventhandler::default();
+pub fn create_handler<T>() -> snurr::Eventhandler<T> {
+    let mut handler: snurr::Eventhandler<T> = snurr::Eventhandler::default();
     handler.add_task("Count 1", |input| Ok(()));
-    // output names ["NO", "YES"]
-    handler.add_gateway("equal to 3", |input| vec![]);
+
+    // "equal to 3" output id(s) ["Flow_1h0jtl6", "Flow_0rsqhpi"]
+    handler.add_gateway("equal to 3", |input| vec!["NO", "YES"]);
+
     handler
 }
 ```

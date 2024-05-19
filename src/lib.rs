@@ -7,6 +7,7 @@ mod error;
 mod model;
 mod process;
 mod reader;
+mod scaffold;
 
 pub use model::{Data, Eventhandler, Symbol, TaskResult};
 pub use process::{Process, ProcessResult};

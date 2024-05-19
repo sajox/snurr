@@ -1,7 +1,6 @@
 use log::info;
 use std::{
     collections::HashMap,
-    io::Write,
     path::Path,
     sync::{
         mpsc::{channel, Sender},
@@ -14,6 +13,7 @@ use crate::{
     error::Error,
     model::{Bpmn, BpmnType, Eventhandler},
     reader::read_bpmn_file,
+    scaffold::Scaffold,
     Data, Symbol,
 };
 
@@ -104,60 +104,42 @@ impl Process {
     /// Generate code from all the task and gateways to the given file path.
     /// No file is allowed to exist at the target location.
     pub fn scaffold(&self, path: impl AsRef<Path>) -> Result<(), Error> {
-        let mut content = vec![];
-        content.push("pub fn create_handler<T>() -> Eventhandler<T> {".into());
-        content.push("    let mut handler: Eventhandler<T> = Eventhandler::default();".into());
+        let mut scaffold = Scaffold::default();
         for bpmn in self.data.values() {
-            match bpmn {
-                Bpmn::Activity {
-                    aktivity: BpmnType::Task,
-                    id,
-                    name,
-                    output: _,
-                } => content.push(format!(
-                    r#"    {}"{}"{}"#,
-                    "handler.add_task(",
-                    name.as_ref().unwrap_or(id),
-                    ", |input| Ok(()));"
-                )),
-                _ => continue,
-            };
+            if let Bpmn::Activity {
+                aktivity: BpmnType::Task,
+                id,
+                name: _,
+                output: _,
+            } = bpmn
+            {
+                let symbols = if let Some(map) = self.activity_ids.get(id) {
+                    map.keys().collect::<Vec<&Symbol>>()
+                } else {
+                    Vec::new()
+                };
+                scaffold.add_task(bpmn, symbols);
+            }
+
+            if let Bpmn::Gateway {
+                gateway: BpmnType::ExclusiveGateway | BpmnType::InclusiveGateway,
+                id,
+                name: _,
+                default: _,
+                outputs: _,
+            } = bpmn
+            {
+                let names = if let Some(map) = self.gateway_ids.get(id) {
+                    let mut names = map.keys().collect::<Vec<&String>>();
+                    names.sort();
+                    names
+                } else {
+                    Vec::new()
+                };
+                scaffold.add_gateway(bpmn, names);
+            }
         }
-        for bpmn in self.data.values() {
-            match bpmn {
-                Bpmn::Gateway {
-                    gateway: BpmnType::ExclusiveGateway | BpmnType::InclusiveGateway,
-                    id,
-                    name,
-                    default: _,
-                    outputs: _,
-                } => {
-                    if let Some(map) = self.gateway_ids.get(id) {
-                        content.push(format!(
-                            "    // output names {:?}",
-                            map.keys().collect::<Vec<&String>>()
-                        ));
-                    }
-
-                    content.push(format!(
-                        r#"    {}"{}"{}"#,
-                        "handler.add_gateway(",
-                        name.as_ref().unwrap_or(id),
-                        ", |input| vec![]);"
-                    ));
-                }
-                _ => continue,
-            };
-        }
-        content.push("    handler\n}".into());
-
-        let mut file = std::fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(path)?;
-
-        file.write_all(content.join("\n").as_bytes())?;
-        Ok(())
+        scaffold.create(path)
     }
 
     fn name_lookup(&self, gateway_id: &str, name: &str) -> Option<&String> {
