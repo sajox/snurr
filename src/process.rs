@@ -126,17 +126,19 @@ impl Process {
                 id,
                 name: _,
                 default: _,
-                outputs: _,
+                outputs,
             } = bpmn
             {
-                let names = if let Some(map) = self.gateway_ids.get(id) {
-                    let mut names = map.keys().collect::<Vec<&String>>();
-                    names.sort();
-                    names
-                } else {
-                    Vec::new()
-                };
-                scaffold.add_gateway(bpmn, names);
+                if outputs.len() > 1 {
+                    let names = if let Some(map) = self.gateway_ids.get(id) {
+                        let mut names = map.keys().collect::<Vec<&String>>();
+                        names.sort();
+                        names
+                    } else {
+                        Vec::new()
+                    };
+                    scaffold.add_gateway(bpmn, names);
+                }
             }
         }
         scaffold.create(path)
