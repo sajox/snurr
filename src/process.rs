@@ -38,6 +38,7 @@ pub struct Process {
     main_start: String,
     gateway_ids: HashMap<String, HashMap<String, String>>,
     activity_ids: HashMap<String, HashMap<Symbol, String>>,
+    catch_events_ids: HashMap<String, HashMap<Symbol, String>>,
 }
 
 impl Process {
@@ -55,6 +56,9 @@ impl Process {
 
         // Collect all boundary symbols attached to an activity id
         let mut activity_ids: HashMap<String, HashMap<Symbol, String>> = HashMap::new();
+
+        // Collect all IntermediateCatchEvents
+        let mut catch_events_ids: HashMap<String, HashMap<Symbol, String>> = HashMap::new();
 
         data.values().for_each(|bpmn| {
             if let Bpmn::SequenceFlow {
@@ -90,6 +94,20 @@ impl Process {
                 let entry = activity_ids.entry(attached_to_ref.into()).or_default();
                 entry.insert(symbol.clone(), id.into());
             }
+
+            if let Bpmn::Event {
+                event: BpmnType::IntermediateCatchEvent,
+                symbol: Some(symbol),
+                id,
+                name: Some(name),
+                attached_to_ref: _,
+                cancel_activity: _,
+                output: _,
+            } = bpmn
+            {
+                let entry = catch_events_ids.entry(name.into()).or_default();
+                entry.insert(symbol.clone(), id.into());
+            }
         });
 
         Ok(Self {
@@ -98,6 +116,7 @@ impl Process {
             main_start,
             gateway_ids,
             activity_ids,
+            catch_events_ids,
         })
     }
 
@@ -153,6 +172,12 @@ impl Process {
     fn boundary_lookup(&self, activity_id: &str, symbol: &Symbol) -> Option<&String> {
         self.activity_ids
             .get(activity_id)
+            .and_then(|map| map.get(symbol))
+    }
+
+    fn catch_event_lookup(&self, throw_event_name: &str, symbol: &Symbol) -> Option<&String> {
+        self.catch_events_ids
+            .get(throw_event_name)
             .and_then(|map| map.get(symbol))
     }
 
@@ -237,7 +262,7 @@ impl Process {
             next_id = match bpmn {
                 Bpmn::Event {
                     event,
-                    symbol: _,
+                    symbol,
                     id,
                     name,
                     attached_to_ref: _,
@@ -248,10 +273,26 @@ impl Process {
                     match event {
                         BpmnType::StartEvent
                         | BpmnType::IntermediateCatchEvent
-                        | BpmnType::IntermediateThrowEvent
                         | BpmnType::BoundaryEvent => output
                             .as_ref()
                             .ok_or(Error::MissingOutput(event.to_string()))?,
+                        BpmnType::IntermediateThrowEvent => {
+                            // If no symbol is set then just follow output.
+                            if let None = symbol.as_ref() {
+                                output
+                                    .as_ref()
+                                    .ok_or(Error::MissingOutput(event.to_string()))?
+                            } else {
+                                let Some((name, symbol)) = name.as_ref().zip(symbol.as_ref())
+                                else {
+                                    return Err(Error::MissingNameIntermediateThrowEvent(
+                                        id.into(),
+                                    ));
+                                };
+                                self.catch_event_lookup(name, symbol)
+                                    .ok_or(Error::MissingIntermediateCatchEvent(name.into()))?
+                            }
+                        }
                         BpmnType::EndEvent => break,
                         _ => return Err(Error::BadEventType),
                     }

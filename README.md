@@ -227,6 +227,14 @@ handler.add_gateway("Name or id", |input| {
     vec![]
 });
 ```
+
+### Intermediate event
+
+An intermediate throw and catch event with same symbol need a matching name. Intermediate none events (no icon) don't to anything and just follow its output.
+
+Example with message intermediate throw and catch event:
+
+![Intermediate throw and catch event](/assets/images/intermediate_event.png)
  
 ### Boundary event
 

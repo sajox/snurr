@@ -53,7 +53,8 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                     | BpmnType::EscalationEventDefinition
                     | BpmnType::ConditionalEventDefinition
                     | BpmnType::SignalEventDefinition
-                    | BpmnType::CompensateEventDefinition => {
+                    | BpmnType::CompensateEventDefinition
+                    | BpmnType::LinkEventDefinition => {
                         if let Some(Bpmn::Event {
                             event: _,
                             symbol,

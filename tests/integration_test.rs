@@ -275,3 +275,16 @@ fn two_boundary_error_thrown() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(pr.result.count, 2);
     Ok(())
 }
+
+#[test]
+fn intermediate_event() -> Result<(), Box<dyn std::error::Error>> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_task(COUNT_2, func_cnt(2));
+    handler.add_task(COUNT_3, func_cnt(3));
+
+    let bpmn = Process::new("tests/files/intermediate_event.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 6);
+    Ok(())
+}

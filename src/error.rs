@@ -27,6 +27,12 @@ pub enum Error {
     #[error("missing boundary")]
     MissingBoundary(String),
 
+    #[error("missing name intermediate throw event")]
+    MissingNameIntermediateThrowEvent(String),
+
+    #[error("missing intermediate catch event")]
+    MissingIntermediateCatchEvent(String),
+
     #[error("file error")]
     File(#[from] quick_xml::Error),
 

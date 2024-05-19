@@ -26,6 +26,7 @@ const ESCALATION_EVENT_DEFINITION: &[u8] = b"escalationEventDefinition";
 const CONDITIONAL_EVENT_DEFINITION: &[u8] = b"conditionalEventDefinition";
 const SIGNAL_EVENT_DEFINITION: &[u8] = b"signalEventDefinition";
 const COMPENSATE_EVENT_DEFINITION: &[u8] = b"compensateEventDefinition";
+const LINK_EVENT_DEFINITION: &[u8] = b"linkEventDefinition";
 
 // Task
 const TASK: &[u8] = b"task";
@@ -159,6 +160,7 @@ pub enum BpmnType {
     ConditionalEventDefinition,
     SignalEventDefinition,
     CompensateEventDefinition,
+    LinkEventDefinition,
 }
 
 impl Display for BpmnType {
@@ -193,6 +195,7 @@ impl From<&[u8]> for BpmnType {
             CONDITIONAL_EVENT_DEFINITION => BpmnType::ConditionalEventDefinition,
             SIGNAL_EVENT_DEFINITION => BpmnType::SignalEventDefinition,
             COMPENSATE_EVENT_DEFINITION => BpmnType::CompensateEventDefinition,
+            LINK_EVENT_DEFINITION => BpmnType::LinkEventDefinition,
             _ => BpmnType::Ignore,
         }
     }
@@ -245,7 +248,11 @@ impl TryFrom<(BpmnType, HashMap<BpmnAttrib, String>)> for Bpmn {
                     .and_then(|s| s.parse::<bool>().ok())
                     .unwrap_or_default(),
             },
-            BpmnType::StartEvent | BpmnType::EndEvent | BpmnType::BoundaryEvent => Bpmn::Event {
+            BpmnType::StartEvent
+            | BpmnType::EndEvent
+            | BpmnType::BoundaryEvent
+            | BpmnType::IntermediateCatchEvent
+            | BpmnType::IntermediateThrowEvent => Bpmn::Event {
                 event: bpmn_type,
                 symbol: None,
                 id: attributes
@@ -519,6 +526,7 @@ impl TryFrom<BpmnType> for Symbol {
             BpmnType::ErrorEventDefinition => Symbol::Error,
             BpmnType::CompensateEventDefinition => Symbol::Compensation,
             BpmnType::SignalEventDefinition => Symbol::Signal,
+            BpmnType::LinkEventDefinition => Symbol::Link,
             _ => return Err(Error::BadSymbolType),
         };
         Ok(ty)
