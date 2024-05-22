@@ -34,7 +34,7 @@ let mut handler: Eventhandler<Counter> = Eventhandler::default();
 let process_result = bpmn.run(&handler, Counter::default())?;
 ```
 
-##### Run the flow from a previous process run with Process::replay_trace
+#### Run the flow from a previous process run with Process::replay_trace
 
 ```rust
 let trace_result = Process::replay_trace(&handler, Counter::default(), &process_result.trace);
