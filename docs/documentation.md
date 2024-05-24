@@ -147,7 +147,9 @@ handler.add_gateway("Name or id", |input| {
 
 ## Intermediate event
 
-An intermediate throw and catch event with same symbol need a matching name. Currently all throwing intermediate event behave as a **Link** and will be updated in the future. Intermediate none events (no icon) don't do anything and just follow its output.
+- Intermediate **none** events (no icon) don't do anything and just follow its output. 
+- **Link** (throw and catch need a matching name)
+- **Other symbols** don't do anything and just follow its output. (Some will be implemented in the future)
 
 Example with message Link throw and catch event:
 

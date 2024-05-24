@@ -270,27 +270,27 @@ impl Process {
                     output,
                 } => {
                     info!("{}: {}", event, name.as_ref().unwrap_or(id));
+                    let output = output
+                        .as_ref()
+                        .ok_or(Error::MissingOutput(event.to_string()));
                     match event {
                         BpmnType::StartEvent
                         | BpmnType::IntermediateCatchEvent
-                        | BpmnType::BoundaryEvent => output
-                            .as_ref()
-                            .ok_or(Error::MissingOutput(event.to_string()))?,
+                        | BpmnType::BoundaryEvent => output?,
                         BpmnType::IntermediateThrowEvent => {
                             // If no symbol is set then just follow output.
-                            if let None = symbol.as_ref() {
-                                output
-                                    .as_ref()
-                                    .ok_or(Error::MissingOutput(event.to_string()))?
+                            if symbol.as_ref().is_none() {
+                                output?
                             } else {
-                                let Some((name, symbol)) = name.as_ref().zip(symbol.as_ref())
-                                else {
-                                    return Err(Error::MissingNameIntermediateThrowEvent(
-                                        id.into(),
-                                    ));
-                                };
-                                self.catch_event_lookup(name, symbol)
-                                    .ok_or(Error::MissingIntermediateCatchEvent(name.into()))?
+                                match name.as_ref().zip(symbol.as_ref()) {
+                                    Some((name, symbol @ Symbol::Link)) => self
+                                        .catch_event_lookup(name, symbol)
+                                        .ok_or(Error::MissingIntermediateCatchEvent(name.into()))?,
+                                    Some((_, _)) => output?,
+                                    None => {
+                                        Err(Error::MissingNameIntermediateThrowEvent(id.into()))?
+                                    }
+                                }
                             }
                         }
                         BpmnType::EndEvent => break,

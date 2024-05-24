@@ -490,10 +490,8 @@ impl From<&Bpmn> for BpmnType {
 }
 
 /// BPMN Symbols
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Symbol {
-    #[default]
-    Blank,
     Message,
     Timer,
     Escalation,
