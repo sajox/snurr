@@ -247,6 +247,7 @@ impl TryFrom<(BpmnType, HashMap<BpmnAttrib, String>)> for Bpmn {
                     .remove(&BpmnAttrib::IsExecutable)
                     .and_then(|s| s.parse::<bool>().ok())
                     .unwrap_or_default(),
+                start_id: None,
             },
             BpmnType::StartEvent
             | BpmnType::EndEvent
@@ -270,6 +271,7 @@ impl TryFrom<(BpmnType, HashMap<BpmnAttrib, String>)> for Bpmn {
                     .ok_or(Error::MissingId(bpmn_type.to_string()))?,
                 name: attributes.remove(&BpmnAttrib::Name),
                 output: None,
+                start_id: None,
             },
             BpmnType::ExclusiveGateway | BpmnType::ParallelGateway | BpmnType::InclusiveGateway => {
                 Bpmn::Gateway {
@@ -309,6 +311,7 @@ pub(crate) enum Bpmn {
     Process {
         id: String,
         is_executable: bool,
+        start_id: Option<String>,
     },
     Event {
         event: BpmnType,
@@ -324,6 +327,9 @@ pub(crate) enum Bpmn {
         id: String,
         name: Option<String>,
         output: Option<String>,
+
+        // Only used by subprocess type
+        start_id: Option<String>,
     },
     Gateway {
         gateway: BpmnType,
@@ -347,103 +353,29 @@ pub(crate) enum Bpmn {
 impl Bpmn {
     pub(crate) fn id(&self) -> Option<&String> {
         match self {
-            Bpmn::Process {
-                id,
-                is_executable: _,
-            }
-            | Bpmn::Event {
-                event: _,
-                symbol: _,
-                id,
-                name: _,
-                attached_to_ref: _,
-                cancel_activity: _,
-                output: _,
-            }
-            | Bpmn::Activity {
-                aktivity: _,
-                id,
-                name: _,
-                output: _,
-            }
-            | Bpmn::Gateway {
-                gateway: _,
-                id,
-                name: _,
-                default: _,
-                outputs: _,
-            }
-            | Bpmn::SequenceFlow {
-                id,
-                name: _,
-                source_ref: _,
-                target_ref: _,
-            } => Some(id),
-            Bpmn::Direction {
-                direction: _,
-                text: _,
-            } => None,
+            Bpmn::Process { id, .. }
+            | Bpmn::Event { id, .. }
+            | Bpmn::Activity { id, .. }
+            | Bpmn::Gateway { id, .. }
+            | Bpmn::SequenceFlow { id, .. } => Some(id),
+            Bpmn::Direction { .. } => None,
         }
     }
 
     pub(crate) fn name(&self) -> Option<&String> {
         match self {
-            Bpmn::Event {
-                event: _,
-                symbol: _,
-                id: _,
-                name,
-                attached_to_ref: _,
-                cancel_activity: _,
-                output: _,
-            }
-            | Bpmn::Activity {
-                aktivity: _,
-                id: _,
-                name,
-                output: _,
-            }
-            | Bpmn::Gateway {
-                gateway: _,
-                id: _,
-                name,
-                default: _,
-                outputs: _,
-            }
-            | Bpmn::SequenceFlow {
-                id: _,
-                name,
-                source_ref: _,
-                target_ref: _,
-            } => name.as_ref(),
+            Bpmn::Event { name, .. }
+            | Bpmn::Activity { name, .. }
+            | Bpmn::Gateway { name, .. }
+            | Bpmn::SequenceFlow { name, .. } => name.as_ref(),
             _ => None,
         }
     }
 
     pub(crate) fn set_output(&mut self, text: String) {
         match self {
-            Bpmn::Event {
-                event: _,
-                symbol: _,
-                id: _,
-                name: _,
-                attached_to_ref: _,
-                cancel_activity: _,
-                output,
-            }
-            | Bpmn::Activity {
-                aktivity: _,
-                id: _,
-                name: _,
-                output,
-            } => *output = Some(text),
-            Bpmn::Gateway {
-                gateway: _,
-                id: _,
-                name: _,
-                default: _,
-                outputs,
-            } => outputs.push(text),
+            Bpmn::Event { output, .. } | Bpmn::Activity { output, .. } => *output = Some(text),
+            Bpmn::Gateway { outputs, .. } => outputs.push(text),
             _ => {}
         }
     }
@@ -452,38 +384,11 @@ impl Bpmn {
 impl From<&Bpmn> for BpmnType {
     fn from(value: &Bpmn) -> Self {
         match value {
-            Bpmn::Process {
-                id: _,
-                is_executable: _,
-            } => BpmnType::Process,
-            Bpmn::Event {
-                event,
-                symbol: _,
-                id: _,
-                name: _,
-                attached_to_ref: _,
-                cancel_activity: _,
-                output: _,
-            } => *event,
-            Bpmn::Activity {
-                aktivity,
-                id: _,
-                name: _,
-                output: _,
-            } => *aktivity,
-            Bpmn::Gateway {
-                gateway,
-                id: _,
-                name: _,
-                default: _,
-                outputs: _,
-            } => *gateway,
-            Bpmn::SequenceFlow {
-                id: _,
-                name: _,
-                source_ref: _,
-                target_ref: _,
-            } => BpmnType::SequenceFlow,
+            Bpmn::Process { .. } => BpmnType::Process,
+            Bpmn::Event { event, .. } => *event,
+            Bpmn::Activity { aktivity, .. } => *aktivity,
+            Bpmn::Gateway { gateway, .. } => *gateway,
+            Bpmn::SequenceFlow { .. } => BpmnType::SequenceFlow,
             Bpmn::Direction { direction, text: _ } => *direction,
         }
     }

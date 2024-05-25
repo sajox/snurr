@@ -61,6 +61,17 @@ fn subprocess() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
+fn subprocess_nested() -> Result<(), Box<dyn std::error::Error>> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+
+    let bpmn = Process::new("tests/files/subprocess_nested.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 3);
+    Ok(())
+}
+
+#[test]
 fn subprocess_message_end() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
     handler.add_task(COUNT_1, func_cnt(1));

@@ -41,13 +41,7 @@ impl<'a> Scaffold<'a> {
         // First all tasks
         for task in self.tasks.iter() {
             let Task {
-                bpmn:
-                    Bpmn::Activity {
-                        aktivity: _,
-                        id,
-                        name,
-                        output: _,
-                    },
+                bpmn: Bpmn::Activity { id, name, .. },
                 symbols,
             } = task
             else {
@@ -72,14 +66,9 @@ impl<'a> Scaffold<'a> {
         // Second all gateways
         for gateway in self.gateways.iter() {
             let Gateway {
-                bpmn:
-                    Bpmn::Gateway {
-                        gateway: _,
-                        id,
-                        name,
-                        default: _,
-                        outputs,
-                    },
+                bpmn: Bpmn::Gateway {
+                    id, name, outputs, ..
+                },
                 output_names: out_names,
             } = gateway
             else {

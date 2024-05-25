@@ -17,7 +17,6 @@ use crate::{
     Data, Symbol,
 };
 
-const STARTEVENT_PREFIX: &str = "start";
 type ExecuteResult<'a> = Result<&'a String, Error>;
 
 /// Process result from a process run.
@@ -34,8 +33,7 @@ pub struct ProcessResult<T> {
 #[derive(Debug)]
 pub struct Process {
     data: HashMap<String, Bpmn>,
-    starts: HashMap<String, String>,
-    main_start: String,
+    process_id: String,
     gateway_ids: HashMap<String, HashMap<String, String>>,
     activity_ids: HashMap<String, HashMap<Symbol, String>>,
     catch_events_ids: HashMap<String, HashMap<Symbol, String>>,
@@ -44,12 +42,22 @@ pub struct Process {
 impl Process {
     /// Create new process and initialize it from the BPMN file path.
     pub fn new(path: impl AsRef<Path>) -> Result<Self, Error> {
-        let (data, starts) = read_bpmn_file(path)?;
-        let main_start = starts
+        let data = read_bpmn_file(path)?;
+
+        // Find process to start
+        let process_id = data
             .values()
-            .find(|start_id| start_id.to_lowercase().starts_with(STARTEVENT_PREFIX))
-            .ok_or(Error::MissingProcessStart)?
-            .into();
+            .find(|bpmn| {
+                matches!(
+                    bpmn,
+                    Bpmn::Process {
+                        start_id: Some(_),
+                        ..
+                    }
+                )
+            })
+            .and_then(|a| a.id().cloned())
+            .ok_or(Error::MissingProcessStart)?;
 
         // Collect all referencing output names
         let mut gateway_ids: HashMap<String, HashMap<String, String>> = HashMap::new();
@@ -65,17 +73,10 @@ impl Process {
                 id,
                 name: Some(name),
                 source_ref,
-                target_ref: _,
+                ..
             } = bpmn
             {
-                if let Some(Bpmn::Gateway {
-                    gateway: _,
-                    id: _,
-                    name: _,
-                    default: _,
-                    outputs: _,
-                }) = data.get(source_ref)
-                {
+                if let Some(Bpmn::Gateway { .. }) = data.get(source_ref) {
                     let entry = gateway_ids.entry(source_ref.into()).or_default();
                     entry.insert(name.into(), id.into());
                 }
@@ -85,10 +86,8 @@ impl Process {
                 event: BpmnType::BoundaryEvent,
                 symbol: Some(symbol),
                 id,
-                name: _,
                 attached_to_ref: Some(attached_to_ref),
-                cancel_activity: _,
-                output: _,
+                ..
             } = bpmn
             {
                 let entry = activity_ids.entry(attached_to_ref.into()).or_default();
@@ -100,9 +99,7 @@ impl Process {
                 symbol: Some(symbol),
                 id,
                 name: Some(name),
-                attached_to_ref: _,
-                cancel_activity: _,
-                output: _,
+                ..
             } = bpmn
             {
                 let entry = catch_events_ids.entry(name.into()).or_default();
@@ -112,8 +109,7 @@ impl Process {
 
         Ok(Self {
             data,
-            starts,
-            main_start,
+            process_id,
             gateway_ids,
             activity_ids,
             catch_events_ids,
@@ -128,8 +124,7 @@ impl Process {
             if let Bpmn::Activity {
                 aktivity: BpmnType::Task,
                 id,
-                name: _,
-                output: _,
+                ..
             } = bpmn
             {
                 let symbols = if let Some(map) = self.activity_ids.get(id) {
@@ -143,9 +138,8 @@ impl Process {
             if let Bpmn::Gateway {
                 gateway: BpmnType::ExclusiveGateway | BpmnType::InclusiveGateway,
                 id,
-                name: _,
-                default: _,
                 outputs,
+                ..
             } = bpmn
             {
                 if outputs.len() > 1 {
@@ -219,7 +213,7 @@ impl Process {
             }
             trace
         });
-        self.execute(&self.main_start, handler, Arc::clone(&data), sender)?;
+        self.execute(&self.process_id, handler, Arc::clone(&data), sender)?;
 
         // When sender die, the recv handle terminates.
         let trace = recv_handle.join().expect("oops! the child thread panicked");
@@ -260,14 +254,16 @@ impl Process {
             ));
 
             next_id = match bpmn {
+                Bpmn::Process { start_id, .. } => {
+                    start_id.as_ref().ok_or(Error::MissingProcessStart)?
+                }
                 Bpmn::Event {
                     event,
                     symbol,
                     id,
                     name,
-                    attached_to_ref: _,
-                    cancel_activity: _,
                     output,
+                    ..
                 } => {
                     info!("{}: {}", event, name.as_ref().unwrap_or(id));
                     let output = output
@@ -302,6 +298,7 @@ impl Process {
                     id,
                     name,
                     output,
+                    start_id,
                 } => {
                     let name_or_id = name.as_ref().unwrap_or(id);
                     info!("{}: {}", aktivity, name_or_id);
@@ -319,7 +316,7 @@ impl Process {
                         }
                         BpmnType::SubProcess => {
                             let response_id = self.execute(
-                                self.starts.get(next_id).ok_or(Error::MissingProcessStart)?,
+                                start_id.as_ref().ok_or(Error::MissingProcessStart)?,
                                 handler,
                                 Arc::clone(&data),
                                 sender.clone(),
@@ -328,11 +325,7 @@ impl Process {
                             if let Some(Bpmn::Event {
                                 event: BpmnType::EndEvent,
                                 symbol: Some(symbol),
-                                id: _,
-                                name: _,
-                                attached_to_ref: _,
-                                cancel_activity: _,
-                                output: _,
+                                ..
                             }) = self.data.get(response_id)
                             {
                                 self.boundary_lookup(id, symbol)
@@ -476,8 +469,9 @@ impl Process {
                 Bpmn::SequenceFlow {
                     id,
                     name,
-                    source_ref: _,
+
                     target_ref,
+                    ..
                 } => {
                     info!("SequenceFlow: {}", name.as_ref().unwrap_or(id));
                     target_ref

@@ -7,7 +7,7 @@ use quick_xml::reader::Reader;
 use crate::error::Error;
 use crate::model::{Bpmn, BpmnAttrib, BpmnType};
 
-type ReaderResult = Result<(HashMap<String, Bpmn>, HashMap<String, String>), Error>;
+type ReaderResult = Result<HashMap<String, Bpmn>, Error>;
 
 // Read BPMN file and return ReaderResult containing a tuple with BPMN data and start ids.
 pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
@@ -16,7 +16,6 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
 
     let mut data: HashMap<String, Bpmn> = HashMap::new();
     let mut stack: Vec<Bpmn> = Vec::new();
-    let mut start_ids: HashMap<String, String> = HashMap::new();
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
@@ -55,22 +54,13 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                     | BpmnType::SignalEventDefinition
                     | BpmnType::CompensateEventDefinition
                     | BpmnType::LinkEventDefinition => {
-                        if let Some(Bpmn::Event {
-                            event: _,
-                            symbol,
-                            id: _,
-                            name: _,
-                            attached_to_ref: _,
-                            cancel_activity: _,
-                            output: _,
-                        }) = stack.last_mut()
-                        {
+                        if let Some(Bpmn::Event { symbol, .. }) = stack.last_mut() {
                             *symbol = bpmn_type.try_into().ok();
                         }
                     }
                     BpmnType::SequenceFlow => {
                         let bpmn = Bpmn::try_from((bpmn_type, collect_attributes(bs)))?;
-                        if let Some(id) = bpmn.id() {
+                        if let Bpmn::SequenceFlow { id, .. } = &bpmn {
                             data.insert(id.into(), bpmn);
                         }
                     }
@@ -83,8 +73,7 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                     BpmnType::Outgoing => {
                         if let Some((
                             Bpmn::Direction {
-                                direction: BpmnType::Outgoing,
-                                text: Some(out),
+                                text: Some(out), ..
                             },
                             parent,
                         )) = stack.pop().zip(stack.last_mut())
@@ -96,8 +85,24 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                         // Silently remove incoming as we dont handle it. Easy to add if support needed.
                         stack.pop();
                     }
-                    BpmnType::StartEvent
-                    | BpmnType::EndEvent
+                    BpmnType::StartEvent => {
+                        if let Some((bpmn, parent)) = stack.pop().zip(stack.last_mut()) {
+                            let Some(id) = bpmn.id() else {
+                                continue;
+                            };
+                            match parent {
+                                Bpmn::Process { start_id, .. } => *start_id = Some(id.clone()),
+                                Bpmn::Activity {
+                                    aktivity: BpmnType::SubProcess,
+                                    start_id,
+                                    ..
+                                } => *start_id = Some(id.clone()),
+                                _ => {}
+                            }
+                            data.insert(id.into(), bpmn);
+                        };
+                    }
+                    BpmnType::EndEvent
                     | BpmnType::BoundaryEvent
                     | BpmnType::IntermediateCatchEvent
                     | BpmnType::IntermediateThrowEvent
@@ -111,12 +116,6 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                             let Some(id) = bpmn.id() else {
                                 continue;
                             };
-
-                            if bpmn_type == BpmnType::StartEvent {
-                                if let Some(parent_id) = stack.last().and_then(|bpmn| bpmn.id()) {
-                                    start_ids.insert(parent_id.into(), id.into());
-                                }
-                            }
                             data.insert(id.into(), bpmn);
                         }
                     }
@@ -124,7 +123,7 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                 }
             }
             Ok(Event::Text(bt)) => {
-                if let Some(Bpmn::Direction { direction: _, text }) = stack.last_mut() {
+                if let Some(Bpmn::Direction { text, .. }) = stack.last_mut() {
                     *text = Some(bt.unescape()?.into_owned());
                 }
             }
@@ -135,7 +134,7 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
         buf.clear();
     }
 
-    Ok((data, start_ids))
+    Ok(data)
 }
 
 fn collect_attributes(bs: quick_xml::events::BytesStart<'_>) -> HashMap<BpmnAttrib, String> {
