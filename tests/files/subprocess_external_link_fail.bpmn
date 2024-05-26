@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="Process_1" isExecutable="false">
+    <bpmn:startEvent id="StartEvent_1" name="Start 1">
+      <bpmn:outgoing>Flow_07don5t</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:subProcess id="Activity_0gyqrps">
+      <bpmn:incoming>Flow_07don5t</bpmn:incoming>
+      <bpmn:outgoing>Flow_0dy0v7m</bpmn:outgoing>
+      <bpmn:startEvent id="Event_0xmk0un">
+        <bpmn:outgoing>Flow_0jcivow</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:intermediateThrowEvent id="Event_1mxupgx" name="Link 2">
+        <bpmn:incoming>Flow_0jcivow</bpmn:incoming>
+        <bpmn:linkEventDefinition id="LinkEventDefinition_18320rk" name="" />
+      </bpmn:intermediateThrowEvent>
+      <bpmn:sequenceFlow id="Flow_0jcivow" sourceRef="Event_0xmk0un" targetRef="Event_1mxupgx" />
+      <bpmn:textAnnotation id="TextAnnotation_03ozee9">
+        <bpmn:text>Throw Link from sub process to parent process</bpmn:text>
+      </bpmn:textAnnotation>
+      <bpmn:association id="Association_0u1m2tr" sourceRef="Event_1mxupgx" targetRef="TextAnnotation_03ozee9" />
+    </bpmn:subProcess>
+    <bpmn:sequenceFlow id="Flow_07don5t" sourceRef="StartEvent_1" targetRef="Activity_0gyqrps" />
+    <bpmn:intermediateCatchEvent id="Event_0f7rclv" name="Link 2">
+      <bpmn:outgoing>Flow_02p6tst</bpmn:outgoing>
+      <bpmn:linkEventDefinition id="LinkEventDefinition_0uvhrim" name="" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:endEvent id="Event_19ggrew" name="End 2">
+      <bpmn:incoming>Flow_02p6tst</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_02p6tst" sourceRef="Event_0f7rclv" targetRef="Event_19ggrew" />
+    <bpmn:endEvent id="Event_1cewzqz" name="End 1">
+      <bpmn:incoming>Flow_0dy0v7m</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_0dy0v7m" sourceRef="Activity_0gyqrps" targetRef="Event_1cewzqz" />
+    <bpmn:textAnnotation id="TextAnnotation_1evwrme">
+      <bpmn:text>Should not find this in parent process.</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Association_0jcsndj" sourceRef="Event_0f7rclv" targetRef="TextAnnotation_1evwrme" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_1">
+      <bpmndi:BPMNShape id="TextAnnotation_1evwrme_di" bpmnElement="TextAnnotation_1evwrme">
+        <dc:Bounds x="650" y="280" width="100" height="55" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_1">
+        <dc:Bounds x="382" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="384" y="185" width="33" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1cewzqz_di" bpmnElement="Event_1cewzqz">
+        <dc:Bounds x="1102" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1106" y="185" width="29" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1tyma04_di" bpmnElement="Event_0f7rclv">
+        <dc:Bounds x="610" y="362" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="613" y="405" width="30" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_19ggrew_di" bpmnElement="Event_19ggrew">
+        <dc:Bounds x="842" y="362" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="845" y="405" width="30" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0gyqrps_di" bpmnElement="Activity_0gyqrps" isExpanded="true">
+        <dc:Bounds x="490" y="30" width="480" height="240" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="TextAnnotation_03ozee9_di" bpmnElement="TextAnnotation_03ozee9">
+        <dc:Bounds x="770" y="90" width="180" height="50" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0xmk0un_di" bpmnElement="Event_0xmk0un">
+        <dc:Bounds x="530" y="142" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0tidwih_di" bpmnElement="Event_1mxupgx">
+        <dc:Bounds x="712" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="715" y="185" width="30" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Association_0u1m2tr_di" bpmnElement="Association_0u1m2tr">
+        <di:waypoint x="745" y="151" />
+        <di:waypoint x="770" y="136" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0jcivow_di" bpmnElement="Flow_0jcivow">
+        <di:waypoint x="566" y="160" />
+        <di:waypoint x="712" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_0jcsndj_di" bpmnElement="Association_0jcsndj">
+        <di:waypoint x="640" y="366" />
+        <di:waypoint x="666" y="335" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_07don5t_di" bpmnElement="Flow_07don5t">
+        <di:waypoint x="418" y="160" />
+        <di:waypoint x="490" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0dy0v7m_di" bpmnElement="Flow_0dy0v7m">
+        <di:waypoint x="970" y="160" />
+        <di:waypoint x="1102" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_02p6tst_di" bpmnElement="Flow_02p6tst">
+        <di:waypoint x="646" y="380" />
+        <di:waypoint x="842" y="380" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

@@ -311,3 +311,13 @@ fn two_process_pools() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(pr.result.count, 3);
     Ok(())
 }
+
+#[test]
+fn subprocess_external_link_fail() -> Result<(), Box<dyn std::error::Error>> {
+    let handler: Eventhandler<Counter> = Eventhandler::default();
+    let bpmn = Process::new("tests/files/subprocess_external_link_fail.bpmn")?;
+
+    let result = bpmn.run(&handler, Counter::default()).is_err();
+    assert!(result, "Expected an error");
+    Ok(())
+}
