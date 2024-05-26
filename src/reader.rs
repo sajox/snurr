@@ -34,18 +34,12 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                     | BpmnType::Outgoing
                     | BpmnType::Incoming
                     | BpmnType::ExclusiveGateway
-                    | BpmnType::Definitions
-                    | BpmnType::Process
-                    | BpmnType::SubProcess
                     | BpmnType::ParallelGateway
                     | BpmnType::InclusiveGateway => {
-                        if matches!(
-                            bpmn_type,
-                            BpmnType::Process | BpmnType::SubProcess | BpmnType::Definitions
-                        ) {
-                            process_stack.push(Default::default());
-                        }
-
+                        stack.push(Bpmn::try_from((bpmn_type, collect_attributes(bs)))?)
+                    }
+                    BpmnType::Definitions | BpmnType::Process | BpmnType::SubProcess => {
+                        process_stack.push(Default::default());
                         stack.push(Bpmn::try_from((bpmn_type, collect_attributes(bs)))?)
                     }
                     _ => {}
@@ -116,9 +110,6 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                         };
                     }
                     BpmnType::EndEvent
-                    | BpmnType::Definitions
-                    | BpmnType::Process
-                    | BpmnType::SubProcess
                     | BpmnType::BoundaryEvent
                     | BpmnType::IntermediateCatchEvent
                     | BpmnType::IntermediateThrowEvent
@@ -131,18 +122,22 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                                 continue;
                             };
 
-                            if matches!(
-                                bpmn_type,
-                                BpmnType::Process | BpmnType::SubProcess | BpmnType::Definitions
-                            ) {
-                                if let Some(popped) = process_stack.pop() {
-                                    if let Some(process) = process_stack.last_mut() {
-                                        process.insert(id.to_string(), bpmn);
-                                    }
-                                    data.insert(id, popped);
-                                }
-                            } else if let Some(process) = process_stack.last_mut() {
+                            if let Some(process) = process_stack.last_mut() {
                                 process.insert(id, bpmn);
+                            }
+                        }
+                    }
+                    BpmnType::Definitions | BpmnType::Process | BpmnType::SubProcess => {
+                        if let Some(bpmn) = stack.pop() {
+                            let Some(id) = bpmn.id().cloned() else {
+                                continue;
+                            };
+
+                            if let Some(process) = process_stack.pop() {
+                                if let Some(parent_process) = process_stack.last_mut() {
+                                    parent_process.insert(id.to_string(), bpmn);
+                                }
+                                data.insert(id, process);
                             }
                         }
                     }

@@ -17,6 +17,8 @@ use crate::{
     Data, Symbol,
 };
 
+const DEFINITIONS: &str = "Definitions";
+
 type ExecuteResult<'a> = Result<&'a String, Error>;
 
 /// Process result from a process run.
@@ -47,7 +49,7 @@ impl Process {
         // Find definitions to start
         let definitions_id = data
             .keys()
-            .find(|key| key.starts_with("Definitions"))
+            .find(|key| key.starts_with(DEFINITIONS))
             .ok_or(Error::MissingDefinitions)?
             .to_string();
 
