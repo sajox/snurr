@@ -299,3 +299,15 @@ fn intermediate_event() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(pr.result.count, 6);
     Ok(())
 }
+
+#[test]
+fn two_process_pools() -> Result<(), Box<dyn std::error::Error>> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_task(COUNT_2, func_cnt(2));
+
+    let bpmn = Process::new("tests/files/two_process_pools.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 3);
+    Ok(())
+}
