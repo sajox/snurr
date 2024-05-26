@@ -9,6 +9,15 @@ pub enum Error {
     #[error("missing process start")]
     MissingProcessStart,
 
+    #[error("missing process")]
+    MissingProcess,
+
+    #[error("missing definitions")]
+    MissingDefinitions,
+
+    #[error("missing sub process")]
+    MissingSubProcess,
+
     #[error("missing targetRef")]
     MissingTargetRef,
 

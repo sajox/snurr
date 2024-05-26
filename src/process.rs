@@ -32,8 +32,8 @@ pub struct ProcessResult<T> {
 /// Process that contains information from the BPMN file
 #[derive(Debug)]
 pub struct Process {
-    data: HashMap<String, Bpmn>,
-    process_id: String,
+    data: HashMap<String, HashMap<String, Bpmn>>,
+    definitions_id: String,
     gateway_ids: HashMap<String, HashMap<String, String>>,
     activity_ids: HashMap<String, HashMap<Symbol, String>>,
     catch_events_ids: HashMap<String, HashMap<Symbol, String>>,
@@ -44,20 +44,12 @@ impl Process {
     pub fn new(path: impl AsRef<Path>) -> Result<Self, Error> {
         let data = read_bpmn_file(path)?;
 
-        // Find process to start
-        let process_id = data
-            .values()
-            .find(|bpmn| {
-                matches!(
-                    bpmn,
-                    Bpmn::Process {
-                        start_id: Some(_),
-                        ..
-                    }
-                )
-            })
-            .and_then(|a| a.id().cloned())
-            .ok_or(Error::MissingProcessStart)?;
+        // Find definitions to start
+        let definitions_id = data
+            .keys()
+            .find(|key| key.starts_with("Definitions"))
+            .ok_or(Error::MissingDefinitions)?
+            .to_string();
 
         // Collect all referencing output names
         let mut gateway_ids: HashMap<String, HashMap<String, String>> = HashMap::new();
@@ -68,48 +60,50 @@ impl Process {
         // Collect all IntermediateCatchEvents
         let mut catch_events_ids: HashMap<String, HashMap<Symbol, String>> = HashMap::new();
 
-        data.values().for_each(|bpmn| {
-            if let Bpmn::SequenceFlow {
-                id,
-                name: Some(name),
-                source_ref,
-                ..
-            } = bpmn
-            {
-                if let Some(Bpmn::Gateway { .. }) = data.get(source_ref) {
-                    let entry = gateway_ids.entry(source_ref.into()).or_default();
-                    entry.insert(name.into(), id.into());
+        data.values().for_each(|process: &HashMap<String, Bpmn>| {
+            process.values().for_each(|bpmn| {
+                if let Bpmn::SequenceFlow {
+                    id,
+                    name: Some(name),
+                    source_ref,
+                    ..
+                } = bpmn
+                {
+                    if let Some(Bpmn::Gateway { .. }) = process.get(source_ref) {
+                        let entry = gateway_ids.entry(source_ref.into()).or_default();
+                        entry.insert(name.into(), id.into());
+                    }
                 }
-            }
 
-            if let Bpmn::Event {
-                event: BpmnType::BoundaryEvent,
-                symbol: Some(symbol),
-                id,
-                attached_to_ref: Some(attached_to_ref),
-                ..
-            } = bpmn
-            {
-                let entry = activity_ids.entry(attached_to_ref.into()).or_default();
-                entry.insert(symbol.clone(), id.into());
-            }
+                if let Bpmn::Event {
+                    event: BpmnType::BoundaryEvent,
+                    symbol: Some(symbol),
+                    id,
+                    attached_to_ref: Some(attached_to_ref),
+                    ..
+                } = bpmn
+                {
+                    let entry = activity_ids.entry(attached_to_ref.into()).or_default();
+                    entry.insert(symbol.clone(), id.into());
+                }
 
-            if let Bpmn::Event {
-                event: BpmnType::IntermediateCatchEvent,
-                symbol: Some(symbol),
-                id,
-                name: Some(name),
-                ..
-            } = bpmn
-            {
-                let entry = catch_events_ids.entry(name.into()).or_default();
-                entry.insert(symbol.clone(), id.into());
-            }
+                if let Bpmn::Event {
+                    event: BpmnType::IntermediateCatchEvent,
+                    symbol: Some(symbol),
+                    id,
+                    name: Some(name),
+                    ..
+                } = bpmn
+                {
+                    let entry = catch_events_ids.entry(name.into()).or_default();
+                    entry.insert(symbol.clone(), id.into());
+                }
+            });
         });
 
         Ok(Self {
             data,
-            process_id,
+            definitions_id,
             gateway_ids,
             activity_ids,
             catch_events_ids,
@@ -120,40 +114,45 @@ impl Process {
     /// No file is allowed to exist at the target location.
     pub fn scaffold(&self, path: impl AsRef<Path>) -> Result<(), Error> {
         let mut scaffold = Scaffold::default();
-        for bpmn in self.data.values() {
-            if let Bpmn::Activity {
-                aktivity: BpmnType::Task,
-                id,
-                ..
-            } = bpmn
-            {
-                let symbols = if let Some(map) = self.activity_ids.get(id) {
-                    map.keys().collect::<Vec<&Symbol>>()
-                } else {
-                    Vec::new()
-                };
-                scaffold.add_task(bpmn, symbols);
-            }
+        self.data
+            .values()
+            .for_each(|process: &HashMap<String, Bpmn>| {
+                process.values().for_each(|bpmn| {
+                    if let Bpmn::Activity {
+                        aktivity: BpmnType::Task,
+                        id,
+                        ..
+                    } = bpmn
+                    {
+                        let symbols = if let Some(map) = self.activity_ids.get(id) {
+                            map.keys().collect::<Vec<&Symbol>>()
+                        } else {
+                            Vec::new()
+                        };
+                        scaffold.add_task(bpmn, symbols);
+                    }
 
-            if let Bpmn::Gateway {
-                gateway: BpmnType::ExclusiveGateway | BpmnType::InclusiveGateway,
-                id,
-                outputs,
-                ..
-            } = bpmn
-            {
-                if outputs.len() > 1 {
-                    let names = if let Some(map) = self.gateway_ids.get(id) {
-                        let mut names = map.keys().collect::<Vec<&String>>();
-                        names.sort();
-                        names
-                    } else {
-                        Vec::new()
-                    };
-                    scaffold.add_gateway(bpmn, names);
-                }
-            }
-        }
+                    if let Bpmn::Gateway {
+                        gateway: BpmnType::ExclusiveGateway | BpmnType::InclusiveGateway,
+                        id,
+                        outputs,
+                        ..
+                    } = bpmn
+                    {
+                        if outputs.len() > 1 {
+                            let names = if let Some(map) = self.gateway_ids.get(id) {
+                                let mut names = map.keys().collect::<Vec<&String>>();
+                                names.sort();
+                                names
+                            } else {
+                                Vec::new()
+                            };
+                            scaffold.add_gateway(bpmn, names);
+                        }
+                    }
+                });
+            });
+
         scaffold.create(path)
     }
 
@@ -213,7 +212,32 @@ impl Process {
             }
             trace
         });
-        self.execute(&self.process_id, handler, Arc::clone(&data), sender)?;
+
+        // Run every process specified in the diagram
+        for (_, bpmn) in self
+            .data
+            .get(&self.definitions_id)
+            .ok_or(Error::MissingDefinitions)?
+            .iter()
+        {
+            if let Bpmn::Process {
+                id,
+                start_id: Some(start_id),
+                ..
+            } = bpmn
+            {
+                self.execute(
+                    start_id,
+                    self.data.get(id).ok_or(Error::MissingProcess)?,
+                    handler,
+                    Arc::clone(&data),
+                    sender.clone(),
+                )?;
+            }
+        }
+
+        // We have one left because we clone() every sender in the loop.
+        drop(sender);
 
         // When sender die, the recv handle terminates.
         let trace = recv_handle.join().expect("oops! the child thread panicked");
@@ -230,6 +254,7 @@ impl Process {
     fn execute<'a, T>(
         &'a self,
         start_id: &'a String,
+        process_data: &'a HashMap<String, Bpmn>,
         handler: &Eventhandler<T>,
         data: Data<T>,
         sender: Sender<(BpmnType, String)>,
@@ -239,8 +264,7 @@ impl Process {
     {
         let mut next_id = start_id;
         loop {
-            let bpmn = self
-                .data
+            let bpmn = process_data
                 .get(next_id)
                 .ok_or(Error::MissingId(next_id.into()))?;
 
@@ -315,8 +339,11 @@ impl Process {
                             }
                         }
                         BpmnType::SubProcess => {
+                            let sub_process_data =
+                                self.data.get(id).ok_or(Error::MissingSubProcess)?;
                             let response_id = self.execute(
                                 start_id.as_ref().ok_or(Error::MissingProcessStart)?,
+                                sub_process_data,
                                 handler,
                                 Arc::clone(&data),
                                 sender.clone(),
@@ -326,7 +353,7 @@ impl Process {
                                 event: BpmnType::EndEvent,
                                 symbol: Some(symbol),
                                 ..
-                            }) = self.data.get(response_id)
+                            }) = sub_process_data.get(response_id)
                             {
                                 self.boundary_lookup(id, symbol)
                                     .ok_or(Error::MissingBoundary(name_or_id.into()))?
@@ -400,6 +427,7 @@ impl Process {
                                 .map(|outgoing| {
                                     self.execute(
                                         outgoing,
+                                        process_data,
                                         handler,
                                         Arc::clone(&data),
                                         sender.clone(),
@@ -437,6 +465,7 @@ impl Process {
                                         s.spawn(|| {
                                             self.execute(
                                                 outgoing,
+                                                process_data,
                                                 handler,
                                                 Arc::clone(&data),
                                                 sender.clone(),

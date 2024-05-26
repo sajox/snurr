@@ -239,6 +239,11 @@ impl TryFrom<(BpmnType, HashMap<BpmnAttrib, String>)> for Bpmn {
         (bpmn_type, mut attributes): (BpmnType, HashMap<BpmnAttrib, String>),
     ) -> Result<Self, Self::Error> {
         let ty = match bpmn_type {
+            BpmnType::Definitions => Bpmn::Definitions {
+                id: attributes
+                    .remove(&BpmnAttrib::Id)
+                    .ok_or(Error::MissingId(bpmn_type.to_string()))?,
+            },
             BpmnType::Process => Bpmn::Process {
                 id: attributes
                     .remove(&BpmnAttrib::Id)
@@ -308,6 +313,9 @@ impl TryFrom<(BpmnType, HashMap<BpmnAttrib, String>)> for Bpmn {
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Bpmn {
+    Definitions {
+        id: String,
+    },
     Process {
         id: String,
         is_executable: bool,
@@ -353,7 +361,8 @@ pub(crate) enum Bpmn {
 impl Bpmn {
     pub(crate) fn id(&self) -> Option<&String> {
         match self {
-            Bpmn::Process { id, .. }
+            Bpmn::Definitions { id, .. }
+            | Bpmn::Process { id, .. }
             | Bpmn::Event { id, .. }
             | Bpmn::Activity { id, .. }
             | Bpmn::Gateway { id, .. }
@@ -384,6 +393,7 @@ impl Bpmn {
 impl From<&Bpmn> for BpmnType {
     fn from(value: &Bpmn) -> Self {
         match value {
+            Bpmn::Definitions { .. } => BpmnType::Definitions,
             Bpmn::Process { .. } => BpmnType::Process,
             Bpmn::Event { event, .. } => *event,
             Bpmn::Activity { aktivity, .. } => *aktivity,

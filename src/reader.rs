@@ -7,14 +7,15 @@ use quick_xml::reader::Reader;
 use crate::error::Error;
 use crate::model::{Bpmn, BpmnAttrib, BpmnType};
 
-type ReaderResult = Result<HashMap<String, Bpmn>, Error>;
+type ReaderResult = Result<HashMap<String, HashMap<String, Bpmn>>, Error>;
 
 // Read BPMN file and return ReaderResult containing a tuple with BPMN data and start ids.
 pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
     let mut reader = Reader::from_file(path)?;
     reader.trim_text(true);
 
-    let mut data: HashMap<String, Bpmn> = HashMap::new();
+    let mut process_stack: Vec<HashMap<String, Bpmn>> = Vec::new();
+    let mut data: HashMap<String, HashMap<String, Bpmn>> = HashMap::new();
     let mut stack: Vec<Bpmn> = Vec::new();
     let mut buf = Vec::new();
     loop {
@@ -33,10 +34,18 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                     | BpmnType::Outgoing
                     | BpmnType::Incoming
                     | BpmnType::ExclusiveGateway
+                    | BpmnType::Definitions
                     | BpmnType::Process
                     | BpmnType::SubProcess
                     | BpmnType::ParallelGateway
                     | BpmnType::InclusiveGateway => {
+                        if matches!(
+                            bpmn_type,
+                            BpmnType::Process | BpmnType::SubProcess | BpmnType::Definitions
+                        ) {
+                            process_stack.push(Default::default());
+                        }
+
                         stack.push(Bpmn::try_from((bpmn_type, collect_attributes(bs)))?)
                     }
                     _ => {}
@@ -61,7 +70,9 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                     BpmnType::SequenceFlow => {
                         let bpmn = Bpmn::try_from((bpmn_type, collect_attributes(bs)))?;
                         if let Bpmn::SequenceFlow { id, .. } = &bpmn {
-                            data.insert(id.into(), bpmn);
+                            if let Some(process) = process_stack.last_mut() {
+                                process.insert(id.into(), bpmn);
+                            }
                         }
                     }
                     _ => {}
@@ -99,24 +110,40 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                                 } => *start_id = Some(id.clone()),
                                 _ => {}
                             }
-                            data.insert(id.into(), bpmn);
+                            if let Some(process) = process_stack.last_mut() {
+                                process.insert(id.into(), bpmn);
+                            }
                         };
                     }
                     BpmnType::EndEvent
+                    | BpmnType::Definitions
+                    | BpmnType::Process
+                    | BpmnType::SubProcess
                     | BpmnType::BoundaryEvent
                     | BpmnType::IntermediateCatchEvent
                     | BpmnType::IntermediateThrowEvent
                     | BpmnType::Task
                     | BpmnType::ExclusiveGateway
-                    | BpmnType::Process
-                    | BpmnType::SubProcess
                     | BpmnType::ParallelGateway
                     | BpmnType::InclusiveGateway => {
                         if let Some(bpmn) = stack.pop() {
-                            let Some(id) = bpmn.id() else {
+                            let Some(id) = bpmn.id().cloned() else {
                                 continue;
                             };
-                            data.insert(id.into(), bpmn);
+
+                            if matches!(
+                                bpmn_type,
+                                BpmnType::Process | BpmnType::SubProcess | BpmnType::Definitions
+                            ) {
+                                if let Some(popped) = process_stack.pop() {
+                                    if let Some(process) = process_stack.last_mut() {
+                                        process.insert(id.to_string(), bpmn);
+                                    }
+                                    data.insert(id, popped);
+                                }
+                            } else if let Some(process) = process_stack.last_mut() {
+                                process.insert(id, bpmn);
+                            }
                         }
                     }
                     _ => {}
