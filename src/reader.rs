@@ -7,17 +7,18 @@ use quick_xml::reader::Reader;
 use crate::error::Error;
 use crate::model::{Bpmn, BpmnAttrib, BpmnType};
 
-type ReaderResult = Result<HashMap<String, HashMap<String, Bpmn>>, Error>;
+type ReaderResult = Result<(String, HashMap<String, HashMap<String, Bpmn>>), Error>;
 
 // Read BPMN file and return ReaderResult containing a tuple with BPMN data and start ids.
 pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
     let mut reader = Reader::from_file(path)?;
     reader.trim_text(true);
 
-    let mut process_stack: Vec<HashMap<String, Bpmn>> = Vec::new();
     let mut data: HashMap<String, HashMap<String, Bpmn>> = HashMap::new();
+    let mut process_stack: Vec<HashMap<String, Bpmn>> = Vec::new();
     let mut stack: Vec<Bpmn> = Vec::new();
     let mut buf = Vec::new();
+    let mut definitions_id = None;
     loop {
         match reader.read_event_into(&mut buf) {
             Err(e) => error!("Error at position {}: {:?}", reader.buffer_position(), e),
@@ -63,10 +64,8 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                     }
                     BpmnType::SequenceFlow => {
                         let bpmn = Bpmn::try_from((bpmn_type, collect_attributes(bs)))?;
-                        if let Bpmn::SequenceFlow { id, .. } = &bpmn {
-                            if let Some(process) = process_stack.last_mut() {
-                                process.insert(id.into(), bpmn);
-                            }
+                        if let Some((process, id)) = process_stack.last_mut().zip(bpmn.id()) {
+                            process.insert(id.into(), bpmn);
                         }
                     }
                     _ => {}
@@ -92,19 +91,16 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                     }
                     BpmnType::StartEvent => {
                         if let Some((bpmn, parent)) = stack.pop().zip(stack.last_mut()) {
-                            let Some(id) = bpmn.id() else {
-                                continue;
-                            };
                             match parent {
-                                Bpmn::Process { start_id, .. } => *start_id = Some(id.clone()),
+                                Bpmn::Process { start_id, .. } => *start_id = bpmn.id().cloned(),
                                 Bpmn::Activity {
                                     aktivity: BpmnType::SubProcess,
                                     start_id,
                                     ..
-                                } => *start_id = Some(id.clone()),
+                                } => *start_id = bpmn.id().cloned(),
                                 _ => {}
                             }
-                            if let Some(process) = process_stack.last_mut() {
+                            if let Some((process, id)) = process_stack.last_mut().zip(bpmn.id()) {
                                 process.insert(id.into(), bpmn);
                             }
                         };
@@ -118,24 +114,23 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                     | BpmnType::ParallelGateway
                     | BpmnType::InclusiveGateway => {
                         if let Some(bpmn) = stack.pop() {
-                            let Some(id) = bpmn.id().cloned() else {
-                                continue;
-                            };
-
-                            if let Some(process) = process_stack.last_mut() {
-                                process.insert(id, bpmn);
+                            if let Some((process, id)) = process_stack.last_mut().zip(bpmn.id()) {
+                                process.insert(id.into(), bpmn);
                             }
                         }
                     }
                     BpmnType::Definitions | BpmnType::Process | BpmnType::SubProcess => {
                         if let Some(bpmn) = stack.pop() {
-                            let Some(id) = bpmn.id().cloned() else {
-                                continue;
-                            };
-
-                            if let Some(process) = process_stack.pop() {
+                            if let Some((process, id)) = process_stack.pop().zip(bpmn.id().cloned())
+                            {
+                                // Put the Bpmn model in parent scope and in 'data' it's related process data.
+                                // Definitions collect all Processes
+                                // Process collect all related sub processes
                                 if let Some(parent_process) = process_stack.last_mut() {
                                     parent_process.insert(id.to_string(), bpmn);
+                                } else {
+                                    // No parent, must be Definitions.
+                                    definitions_id = bpmn.id().cloned();
                                 }
                                 data.insert(id, process);
                             }
@@ -155,8 +150,7 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
         }
         buf.clear();
     }
-
-    Ok(data)
+    Ok((definitions_id.ok_or(Error::MissingDefinitions)?, data))
 }
 
 fn collect_attributes(bs: quick_xml::events::BytesStart<'_>) -> HashMap<BpmnAttrib, String> {

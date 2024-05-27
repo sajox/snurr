@@ -17,8 +17,6 @@ use crate::{
     Data, Symbol,
 };
 
-const DEFINITIONS: &str = "Definitions";
-
 type ExecuteResult<'a> = Result<&'a String, Error>;
 
 /// Process result from a process run.
@@ -44,14 +42,7 @@ pub struct Process {
 impl Process {
     /// Create new process and initialize it from the BPMN file path.
     pub fn new(path: impl AsRef<Path>) -> Result<Self, Error> {
-        let data = read_bpmn_file(path)?;
-
-        // Find definitions to start
-        let definitions_id = data
-            .keys()
-            .find(|key| key.starts_with(DEFINITIONS))
-            .ok_or(Error::MissingDefinitions)?
-            .to_string();
+        let (definitions_id, data) = read_bpmn_file(path)?;
 
         // Collect all referencing output names
         let mut gateway_ids: HashMap<String, HashMap<String, String>> = HashMap::new();
