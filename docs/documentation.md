@@ -115,23 +115,33 @@ Register gateway by **name** (if it exist) or **id** and return the flow taken b
 
 #### Exclusive gateway
 
+![Exclusive gateway](/assets/images/exclusive-gateway.png)
+
 Zero or one flow is returned. If many flows is returned only the first one is processed.
 
 ```rust
-handler.add_gateway("Name or id", |input| {
+handler.add_gateway("CHOOSE", |input| {
     vec!["YES"]
 });
 ```
 
 #### Inclusive gateway
 
+![Inclusive gateway](/assets/images/inclusive-gateway.png)
+
 Zero or more flows is returned and processed. Inclusive gateway should always have a default flow in the BPMN diagram.
 
 ```rust
-handler.add_gateway("Name or id", |input| {
-    vec!["YES", "NO", "MAYBE"]
+handler.add_gateway("CHOOSE", |input| {
+    vec!["YES", "NO"]
 });
 ```
+
+#### Parallel gateway
+
+![Parallel gateway](/assets/images/parallel-gateway.png)
+
+**Parallel gateways** run **all** available flows. No need to add gateway.
 
 #### Default flow
 
@@ -192,7 +202,7 @@ Collapsed, expanded sub-process or transaction can be used.
 
 An end event symbol kan be used in a sub-process to use the boundary as an alternate flow.
 
-![End events](/assets/images/end-event.png)
+![End events](/assets/images/subprocess-message-end.png)
 
 ## Logging
 

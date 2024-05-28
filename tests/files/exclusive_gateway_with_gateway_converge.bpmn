@@ -41,9 +41,17 @@
       <bpmn:incoming>Flow_1jjb1db</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_1jjb1db" sourceRef="Activity_17y8xer" targetRef="Event_1c8ndoc" />
+    <bpmn:textAnnotation id="TextAnnotation_0hp1p3g">
+      <bpmn:text>One path is selected.</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Association_0qwfrnr" sourceRef="Gateway_0hwbylh" targetRef="TextAnnotation_0hp1p3g" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_10pudx4">
+      <bpmndi:BPMNShape id="TextAnnotation_0hp1p3g_di" bpmnElement="TextAnnotation_0hp1p3g">
+        <dc:Bounds x="470" y="10" width="100" height="41" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_0vpy957">
         <dc:Bounds x="156" y="102" width="36" height="36" />
       </bpmndi:BPMNShape>
@@ -78,6 +86,10 @@
       <bpmndi:BPMNShape id="Event_1c8ndoc_di" bpmnElement="Event_1c8ndoc">
         <dc:Bounds x="982" y="102" width="36" height="36" />
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Association_0qwfrnr_di" bpmnElement="Association_0qwfrnr">
+        <di:waypoint x="451" y="106" />
+        <di:waypoint x="498" y="51" />
+      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_0kwzv0p_di" bpmnElement="Flow_0kwzv0p">
         <di:waypoint x="192" y="120" />
         <di:waypoint x="250" y="120" />

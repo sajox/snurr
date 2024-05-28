@@ -76,6 +76,7 @@ fn subprocess_message_end() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
     handler.add_task(COUNT_1, func_cnt(1));
     handler.add_task(COUNT_2, func_cnt(2));
+    handler.add_gateway("CHOOSE", |_| vec![]);
 
     let bpmn = Process::new("tests/files/subprocess_message_end.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;

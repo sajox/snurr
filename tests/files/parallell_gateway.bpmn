@@ -44,9 +44,28 @@
     </bpmn:task>
     <bpmn:sequenceFlow id="Flow_1h899q5" name="MAYBE" sourceRef="Gateway_0hwbylh" targetRef="Activity_035za0g" />
     <bpmn:sequenceFlow id="Flow_0dog4sc" sourceRef="Activity_035za0g" targetRef="Gateway_086ov5i" />
+    <bpmn:textAnnotation id="TextAnnotation_0y81fmw">
+      <bpmn:text>Parallel gateway converge.
+
+
+Await all paths to finish before it procedes.</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Association_1fevord" sourceRef="Gateway_086ov5i" targetRef="TextAnnotation_0y81fmw" />
+    <bpmn:textAnnotation id="TextAnnotation_0j1voij">
+      <bpmn:text>All paths is taken.</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Association_1ib9ssd" sourceRef="Gateway_0hwbylh" targetRef="TextAnnotation_0j1voij" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_10pudx4">
+      <bpmndi:BPMNShape id="TextAnnotation_0y81fmw_di" bpmnElement="TextAnnotation_0y81fmw">
+        <dc:Bounds x="750" y="10" width="203" height="85" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="TextAnnotation_0j1voij_di" bpmnElement="TextAnnotation_0j1voij">
+        <dc:Bounds x="470" y="10" width="100" height="41" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_0vpy957">
         <dc:Bounds x="156" y="102" width="36" height="36" />
       </bpmndi:BPMNShape>
@@ -78,6 +97,14 @@
         <dc:Bounds x="530" y="300" width="100" height="80" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Association_1fevord_di" bpmnElement="Association_1fevord">
+        <di:waypoint x="731" y="106" />
+        <di:waypoint x="750" y="84" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_1ib9ssd_di" bpmnElement="Association_1ib9ssd">
+        <di:waypoint x="451" y="106" />
+        <di:waypoint x="498" y="51" />
+      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="Flow_0kwzv0p_di" bpmnElement="Flow_0kwzv0p">
         <di:waypoint x="192" y="120" />
         <di:waypoint x="250" y="120" />
