@@ -118,7 +118,7 @@ fn exclusive_gateway_default_path() -> Result<(), Box<dyn std::error::Error>> {
     handler.add_task(COUNT_2, func_cnt(2));
     handler.add_task(COUNT_3, func_cnt(3));
 
-    // Empty response. Default path
+    // Empty vec run default path
     handler.add_gateway("CHOOSE", |_| vec![]);
 
     let bpmn = Process::new("tests/files/exclusive_gateway.bpmn")?;
@@ -178,7 +178,7 @@ fn inclusive_gateway_default_path() -> Result<(), Box<dyn std::error::Error>> {
     handler.add_task(COUNT_2, func_cnt(2));
     handler.add_task(COUNT_3, func_cnt(3));
 
-    // Empty response. Default path
+    // Empty vec run default path
     handler.add_gateway("CHOOSE", |_| vec![]);
 
     let bpmn = Process::new("tests/files/inclusive_gateway.bpmn")?;
@@ -194,7 +194,6 @@ fn inclusive_gateway() -> Result<(), Box<dyn std::error::Error>> {
     handler.add_task(COUNT_2, func_cnt(2));
     handler.add_task(COUNT_3, func_cnt(3));
 
-    // Empty response. Default path
     handler.add_gateway("CHOOSE", |_| vec!["YES", "NO"]);
 
     let bpmn = Process::new("tests/files/inclusive_gateway.bpmn")?;
@@ -210,7 +209,6 @@ fn inclusive_gateway_split_end() -> Result<(), Box<dyn std::error::Error>> {
     handler.add_task(COUNT_2, func_cnt(2));
     handler.add_task(COUNT_3, func_cnt(3));
 
-    // Empty response. Default path
     handler.add_gateway("Gateway_0jgakfl", |_| vec!["YES", "NO"]);
 
     let bpmn = Process::new("tests/files/inclusive_gateway_split_end.bpmn")?;
@@ -223,7 +221,7 @@ fn inclusive_gateway_split_end() -> Result<(), Box<dyn std::error::Error>> {
 fn inclusive_gateway_no_output() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
 
-    // Empty response. Default path
+    // Empty vec run default path
     handler.add_gateway("Gateway_0qmfmmo", |_| vec![]);
 
     let bpmn = Process::new("tests/files/inclusive_gateway_no_output.bpmn")?;
@@ -319,5 +317,22 @@ fn subprocess_external_link_fail() -> Result<(), Box<dyn std::error::Error>> {
 
     let result = bpmn.run(&handler, Counter::default()).is_err();
     assert!(result, "Expected an error");
+    Ok(())
+}
+
+#[test]
+fn showcase() -> Result<(), Box<dyn std::error::Error>> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_task("Timeout 1", |_| Err(Symbol::Timer));
+    handler.add_gateway("RUN ALL", |_| vec!["A", "B"]);
+    handler.add_gateway("RUN A", |_| vec!["A"]);
+
+    // Empty vec run default path
+    handler.add_gateway("RUN DEFAULT", |_| vec![]);
+
+    let bpmn = Process::new("tests/files/showcase.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 15);
     Ok(())
 }
