@@ -259,7 +259,7 @@ impl Process {
         loop {
             let bpmn = process_data
                 .get(next_id)
-                .ok_or(Error::MissingId(next_id.into()))?;
+                .ok_or_else(|| Error::MissingId(next_id.into()))?;
 
             // We trace by name if exist. Id otherwise.
             let _ = sender.send((
@@ -285,7 +285,7 @@ impl Process {
                     info!("{}: {}", event, name.as_ref().unwrap_or(id));
                     let output = output
                         .as_ref()
-                        .ok_or(Error::MissingOutput(event.to_string()));
+                        .ok_or_else(|| Error::MissingOutput(event.to_string()));
                     match event {
                         BpmnType::StartEvent
                         | BpmnType::IntermediateCatchEvent
@@ -296,9 +296,11 @@ impl Process {
                                 output?
                             } else {
                                 match name.as_ref().zip(symbol.as_ref()) {
-                                    Some((name, symbol @ Symbol::Link)) => self
-                                        .catch_event_lookup(name, symbol)
-                                        .ok_or(Error::MissingIntermediateCatchEvent(name.into()))?,
+                                    Some((name, symbol @ Symbol::Link)) => {
+                                        self.catch_event_lookup(name, symbol).ok_or_else(|| {
+                                            Error::MissingIntermediateCatchEvent(name.into())
+                                        })?
+                                    }
                                     Some((_, _)) => output?,
                                     None => {
                                         Err(Error::MissingNameIntermediateThrowEvent(id.into()))?
@@ -324,11 +326,11 @@ impl Process {
                             let response = handler.run_task(name_or_id, Arc::clone(&data));
                             if let Err(symbol) = response {
                                 self.boundary_lookup(id, &symbol)
-                                    .ok_or(Error::MissingBoundary(name_or_id.into()))?
+                                    .ok_or_else(|| Error::MissingBoundary(name_or_id.into()))?
                             } else {
                                 output
                                     .as_ref()
-                                    .ok_or(Error::MissingOutput(aktivity.to_string()))?
+                                    .ok_or_else(|| Error::MissingOutput(aktivity.to_string()))?
                             }
                         }
                         BpmnType::SubProcess => {
@@ -349,11 +351,11 @@ impl Process {
                             }) = sub_process_data.get(response_id)
                             {
                                 self.boundary_lookup(id, symbol)
-                                    .ok_or(Error::MissingBoundary(name_or_id.into()))?
+                                    .ok_or_else(|| Error::MissingBoundary(name_or_id.into()))?
                             } else {
                                 output
                                     .as_ref()
-                                    .ok_or(Error::MissingOutput(aktivity.to_string()))?
+                                    .ok_or_else(|| Error::MissingOutput(aktivity.to_string()))?
                             }
                         }
                         _ => return Err(Error::BadActivityType),
@@ -378,18 +380,18 @@ impl Process {
                                     .copied()
                                     .or(default.as_deref())
                                     .or_else(|| outputs.first().map(|x| x.as_str()))
-                                    .ok_or(Error::MissingId(id.into()))?;
+                                    .ok_or_else(|| Error::MissingId(id.into()))?;
 
                                 // look up name to id or just use answer
                                 self.name_lookup(id, response)
                                     .or_else(|| {
                                         outputs.iter().find(|&outgoing| outgoing == response)
                                     })
-                                    .ok_or(Error::MissingOutput(gateway.to_string()))?
+                                    .ok_or_else(|| Error::MissingOutput(gateway.to_string()))?
                             } else {
                                 outputs
                                     .first()
-                                    .ok_or(Error::MissingOutput(gateway.to_string()))?
+                                    .ok_or_else(|| Error::MissingOutput(gateway.to_string()))?
                             }
                         }
                         BpmnType::InclusiveGateway => {
@@ -397,7 +399,7 @@ impl Process {
                             if outputs.len() <= 1 {
                                 return outputs
                                     .first()
-                                    .ok_or(Error::MissingOutput(gateway.to_string()));
+                                    .ok_or_else(|| Error::MissingOutput(gateway.to_string()));
                             }
 
                             // Diverging gateway
@@ -434,19 +436,22 @@ impl Process {
                                 }
                             }
 
-                            oks.into_iter().filter_map(Result::ok).next().ok_or(
-                                Error::BadGatewayOutput(format!(
-                                    "No output with name: {}",
-                                    response.join(", ")
-                                )),
-                            )?
+                            oks.into_iter()
+                                .filter_map(Result::ok)
+                                .next()
+                                .ok_or_else(|| {
+                                    Error::BadGatewayOutput(format!(
+                                        "No output with name: {}",
+                                        response.join(", ")
+                                    ))
+                                })?
                         }
                         BpmnType::ParallelGateway => {
                             // Converging gateway. Synchronize
                             if outputs.len() <= 1 {
                                 return outputs
                                     .first()
-                                    .ok_or(Error::MissingOutput(gateway.to_string()));
+                                    .ok_or_else(|| Error::MissingOutput(gateway.to_string()));
                             }
 
                             // Diverging gateway

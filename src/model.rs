@@ -242,12 +242,12 @@ impl TryFrom<(BpmnType, HashMap<BpmnAttrib, String>)> for Bpmn {
             BpmnType::Definitions => Bpmn::Definitions {
                 id: attributes
                     .remove(&BpmnAttrib::Id)
-                    .ok_or(Error::MissingId(bpmn_type.to_string()))?,
+                    .ok_or_else(|| Error::MissingId(bpmn_type.to_string()))?,
             },
             BpmnType::Process => Bpmn::Process {
                 id: attributes
                     .remove(&BpmnAttrib::Id)
-                    .ok_or(Error::MissingId(bpmn_type.to_string()))?,
+                    .ok_or_else(|| Error::MissingId(bpmn_type.to_string()))?,
                 is_executable: attributes
                     .remove(&BpmnAttrib::IsExecutable)
                     .and_then(|s| s.parse::<bool>().ok())
@@ -263,7 +263,7 @@ impl TryFrom<(BpmnType, HashMap<BpmnAttrib, String>)> for Bpmn {
                 symbol: None,
                 id: attributes
                     .remove(&BpmnAttrib::Id)
-                    .ok_or(Error::MissingId(bpmn_type.to_string()))?,
+                    .ok_or_else(|| Error::MissingId(bpmn_type.to_string()))?,
                 name: attributes.remove(&BpmnAttrib::Name),
                 attached_to_ref: attributes.remove(&BpmnAttrib::AttachedToRef),
                 cancel_activity: attributes.remove(&BpmnAttrib::CancelActivity),
@@ -273,7 +273,7 @@ impl TryFrom<(BpmnType, HashMap<BpmnAttrib, String>)> for Bpmn {
                 aktivity: bpmn_type,
                 id: attributes
                     .remove(&BpmnAttrib::Id)
-                    .ok_or(Error::MissingId(bpmn_type.to_string()))?,
+                    .ok_or_else(|| Error::MissingId(bpmn_type.to_string()))?,
                 name: attributes.remove(&BpmnAttrib::Name),
                 output: None,
                 start_id: None,
@@ -283,7 +283,7 @@ impl TryFrom<(BpmnType, HashMap<BpmnAttrib, String>)> for Bpmn {
                     gateway: bpmn_type,
                     id: attributes
                         .remove(&BpmnAttrib::Id)
-                        .ok_or(Error::MissingId(bpmn_type.to_string()))?,
+                        .ok_or_else(|| Error::MissingId(bpmn_type.to_string()))?,
                     name: attributes.remove(&BpmnAttrib::Name),
                     default: attributes.remove(&BpmnAttrib::Default),
                     outputs: Default::default(),
@@ -292,7 +292,7 @@ impl TryFrom<(BpmnType, HashMap<BpmnAttrib, String>)> for Bpmn {
             BpmnType::SequenceFlow => Bpmn::SequenceFlow {
                 id: attributes
                     .remove(&BpmnAttrib::Id)
-                    .ok_or(Error::MissingId(bpmn_type.to_string()))?,
+                    .ok_or_else(|| Error::MissingId(bpmn_type.to_string()))?,
                 name: attributes.remove(&BpmnAttrib::Name),
                 source_ref: attributes
                     .remove(&BpmnAttrib::SourceRef)
