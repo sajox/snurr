@@ -373,16 +373,15 @@ impl Process {
                         BpmnType::ExclusiveGateway => {
                             if outputs.len() > 1 {
                                 // Default to first outgoing if function is not set.
-                                let response = handler.run_gateway(name_or_id, Arc::clone(&data));
-                                let response = response
+                                let responses = handler.run_gateway(name_or_id, Arc::clone(&data));
+                                responses
                                     .first()
-                                    .copied()
+                                    .map(|response| {
+                                        self.name_lookup(id, response).unwrap_or(response)
+                                    })
                                     .or(default.as_deref())
                                     .or_else(|| outputs.first().map(|x| x.as_str()))
-                                    .ok_or_else(|| Error::MissingId(id.into()))?;
-
-                                // look up name to id or just use answer
-                                self.name_lookup(id, response).unwrap_or(response)
+                                    .ok_or_else(|| Error::MissingId(id.into()))?
                             } else {
                                 outputs
                                     .first()
@@ -399,20 +398,18 @@ impl Process {
                             }
 
                             // Diverging gateway
-                            let mut response = handler.run_gateway(name_or_id, Arc::clone(&data));
+                            let mut responses = handler.run_gateway(name_or_id, Arc::clone(&data));
                             // If empty. Add default or first output.
-                            if response.is_empty() {
+                            if responses.is_empty() {
                                 if let Some(resp) = default.as_ref().or_else(|| outputs.first()) {
-                                    response.push(resp);
+                                    responses.push(resp);
                                 }
                             }
 
                             // Run all chosen paths
-                            let (oks, mut errors): (Vec<_>, Vec<_>) = response
+                            let (oks, mut errors): (Vec<_>, Vec<_>) = responses
                                 .iter()
-                                .filter_map(|response| {
-                                    self.name_lookup(id, response).or(Some(response))
-                                })
+                                .map(|response| self.name_lookup(id, response).unwrap_or(response))
                                 .map(|outgoing| {
                                     self.execute(
                                         outgoing,
@@ -436,7 +433,7 @@ impl Process {
                                 .ok_or_else(|| {
                                     Error::BadGatewayOutput(format!(
                                         "No output with name: {}",
-                                        response.join(", ")
+                                        responses.join(", ")
                                     ))
                                 })?
                         }
