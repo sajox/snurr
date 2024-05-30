@@ -11,10 +11,10 @@ use std::{
 
 use crate::{
     error::Error,
-    model::{Bpmn, BpmnType, Eventhandler},
+    model::{Bpmn, BpmnType},
     reader::read_bpmn_file,
     scaffold::Scaffold,
-    Data, Symbol,
+    Data, Eventhandler, Symbol,
 };
 
 type ExecuteResult<'a> = Result<&'a String, Error>;

@@ -7,10 +7,12 @@
 //! This is not a complete implementation of the BPMN 2.0 specification but intend to be light weight subset of it.
 
 mod error;
+mod handler;
 mod model;
 mod process;
 mod reader;
 mod scaffold;
 
-pub use model::{Data, Eventhandler, Symbol, TaskResult};
+pub use handler::{Data, Eventhandler, TaskResult};
+pub use model::Symbol;
 pub use process::{Process, ProcessResult};
