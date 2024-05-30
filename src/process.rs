@@ -17,7 +17,7 @@ use crate::{
     Data, Eventhandler, Symbol,
 };
 
-type ExecuteResult<'a> = Result<&'a String, Error>;
+type ExecuteResult<'a> = Result<&'a str, Error>;
 
 /// Process result from a process run.
 #[derive(Debug)]
@@ -149,10 +149,11 @@ impl Process {
         scaffold.create(path)
     }
 
-    fn name_lookup(&self, gateway_id: &str, name: &str) -> Option<&String> {
+    fn name_lookup(&self, gateway_id: &str, name: &str) -> Option<&str> {
         self.gateway_ids
             .get(gateway_id)
             .and_then(|map| map.get(name))
+            .map(|s| s.as_str())
     }
 
     fn boundary_lookup(&self, activity_id: &str, symbol: &Symbol) -> Option<&String> {
@@ -161,10 +162,15 @@ impl Process {
             .and_then(|map| map.get(symbol))
     }
 
-    fn catch_event_lookup(&self, throw_event_name: &str, symbol: &Symbol) -> Option<&String> {
+    fn catch_event_lookup(
+        &self,
+        throw_event_name: &str,
+        symbol: &Symbol,
+    ) -> Result<&String, Error> {
         self.catch_events_ids
             .get(throw_event_name)
             .and_then(|map| map.get(symbol))
+            .ok_or_else(|| Error::MissingIntermediateCatchEvent(throw_event_name.into()))
     }
 
     /// Replay a trace from a process run. It will be sequential.
@@ -246,7 +252,7 @@ impl Process {
 
     fn execute<'a, T>(
         &'a self,
-        start_id: &'a String,
+        mut next_id: &'a str,
         process_data: &'a HashMap<String, Bpmn>,
         handler: &Eventhandler<T>,
         data: Data<T>,
@@ -255,12 +261,7 @@ impl Process {
     where
         T: Send + Sync,
     {
-        let mut next_id = start_id;
-        loop {
-            let bpmn = process_data
-                .get(next_id)
-                .ok_or_else(|| Error::MissingId(next_id.into()))?;
-
+        while let Some(bpmn) = process_data.get(next_id) {
             // We trace by name if exist. Id otherwise.
             let _ = sender.send((
                 BpmnType::from(bpmn),
@@ -297,9 +298,7 @@ impl Process {
                             } else {
                                 match name.as_ref().zip(symbol.as_ref()) {
                                     Some((name, symbol @ Symbol::Link)) => {
-                                        self.catch_event_lookup(name, symbol).ok_or_else(|| {
-                                            Error::MissingIntermediateCatchEvent(name.into())
-                                        })?
+                                        self.catch_event_lookup(name, symbol)?
                                     }
                                     Some((_, _)) => output?,
                                     None => {
@@ -308,7 +307,7 @@ impl Process {
                                 }
                             }
                         }
-                        BpmnType::EndEvent => break,
+                        BpmnType::EndEvent => return Ok(next_id),
                         _ => return Err(Error::BadEventType),
                     }
                 }
@@ -383,11 +382,7 @@ impl Process {
                                     .ok_or_else(|| Error::MissingId(id.into()))?;
 
                                 // look up name to id or just use answer
-                                self.name_lookup(id, response)
-                                    .or_else(|| {
-                                        outputs.iter().find(|&outgoing| outgoing == response)
-                                    })
-                                    .ok_or_else(|| Error::MissingOutput(gateway.to_string()))?
+                                self.name_lookup(id, response).unwrap_or(response)
                             } else {
                                 outputs
                                     .first()
@@ -399,6 +394,7 @@ impl Process {
                             if outputs.len() <= 1 {
                                 return outputs
                                     .first()
+                                    .map(|x| x.as_str())
                                     .ok_or_else(|| Error::MissingOutput(gateway.to_string()));
                             }
 
@@ -415,9 +411,7 @@ impl Process {
                             let (oks, mut errors): (Vec<_>, Vec<_>) = response
                                 .iter()
                                 .filter_map(|response| {
-                                    self.name_lookup(id, response).or_else(|| {
-                                        outputs.iter().find(|&outgoing| outgoing == response)
-                                    })
+                                    self.name_lookup(id, response).or(Some(response))
                                 })
                                 .map(|outgoing| {
                                     self.execute(
@@ -451,6 +445,7 @@ impl Process {
                             if outputs.len() <= 1 {
                                 return outputs
                                     .first()
+                                    .map(|s| s.as_str())
                                     .ok_or_else(|| Error::MissingOutput(gateway.to_string()));
                             }
 
@@ -506,8 +501,7 @@ impl Process {
                 bpmn => return Err(Error::MissingBpmnType(BpmnType::from(bpmn).to_string())),
             }
         }
-        // Return EndEvent Id
-        Ok(next_id)
+        Err(Error::MissingId(next_id.into()))
     }
 }
 
