@@ -280,27 +280,45 @@ impl Process {
                     symbol,
                     id,
                     name,
-                    output,
+                    outputs,
                     ..
                 } => {
                     info!("{}: {}", event, name.as_ref().unwrap_or(id));
-                    let output = output
-                        .as_ref()
-                        .ok_or_else(|| Error::MissingOutput(event.to_string()));
                     match event {
                         BpmnType::StartEvent
                         | BpmnType::IntermediateCatchEvent
-                        | BpmnType::BoundaryEvent => output?,
+                        | BpmnType::BoundaryEvent => self.run_parallel_or_return_first(
+                            outputs,
+                            process_data,
+                            handler,
+                            &data,
+                            &sender,
+                            event,
+                        )?,
                         BpmnType::IntermediateThrowEvent => {
                             // If no symbol is set then just follow output.
                             if symbol.as_ref().is_none() {
-                                output?
+                                self.run_parallel_or_return_first(
+                                    outputs,
+                                    process_data,
+                                    handler,
+                                    &data,
+                                    &sender,
+                                    event,
+                                )?
                             } else {
                                 match name.as_ref().zip(symbol.as_ref()) {
                                     Some((name, symbol @ Symbol::Link)) => {
                                         self.catch_event_lookup(name, symbol)?
                                     }
-                                    Some((_, _)) => output?,
+                                    Some((_, _)) => self.run_parallel_or_return_first(
+                                        outputs,
+                                        process_data,
+                                        handler,
+                                        &data,
+                                        &sender,
+                                        event,
+                                    )?,
                                     None => {
                                         Err(Error::MissingNameIntermediateThrowEvent(id.into()))?
                                     }
@@ -315,7 +333,7 @@ impl Process {
                     aktivity,
                     id,
                     name,
-                    output,
+                    outputs,
                     start_id,
                 } => {
                     let name_or_id = name.as_ref().unwrap_or(id);
@@ -327,9 +345,14 @@ impl Process {
                                 self.boundary_lookup(id, &symbol)
                                     .ok_or_else(|| Error::MissingBoundary(name_or_id.into()))?
                             } else {
-                                output
-                                    .as_ref()
-                                    .ok_or_else(|| Error::MissingOutput(aktivity.to_string()))?
+                                self.run_parallel_or_return_first(
+                                    outputs,
+                                    process_data,
+                                    handler,
+                                    &data,
+                                    &sender,
+                                    aktivity,
+                                )?
                             }
                         }
                         BpmnType::SubProcess => {
@@ -352,9 +375,14 @@ impl Process {
                                 self.boundary_lookup(id, symbol)
                                     .ok_or_else(|| Error::MissingBoundary(name_or_id.into()))?
                             } else {
-                                output
-                                    .as_ref()
-                                    .ok_or_else(|| Error::MissingOutput(aktivity.to_string()))?
+                                self.run_parallel_or_return_first(
+                                    outputs,
+                                    process_data,
+                                    handler,
+                                    &data,
+                                    &sender,
+                                    aktivity,
+                                )?
                             }
                         }
                         _ => return Err(Error::BadActivityType),
@@ -445,42 +473,14 @@ impl Process {
                                     .map(|s| s.as_str())
                                     .ok_or_else(|| Error::MissingOutput(gateway.to_string()));
                             }
-
-                            // Diverging gateway
-                            let (oks, mut errors): (Vec<_>, Vec<_>) = thread::scope(|s| {
-                                //Start everything first
-                                let children: Vec<_> = outputs
-                                    .iter()
-                                    .map(|outgoing| {
-                                        s.spawn(|| {
-                                            self.execute(
-                                                outgoing,
-                                                process_data,
-                                                handler,
-                                                Arc::clone(&data),
-                                                sender.clone(),
-                                            )
-                                        })
-                                    })
-                                    .collect();
-
-                                // Collect results
-                                children
-                                    .into_iter()
-                                    .filter_map(|handle| handle.join().ok())
-                                    .partition(Result::is_ok)
-                            });
-
-                            if !errors.is_empty() {
-                                if let Some(result) = errors.pop() {
-                                    return result;
-                                }
-                            }
-
-                            oks.into_iter()
-                                .filter_map(Result::ok)
-                                .next()
-                                .ok_or(Error::NoGatewayOutput)?
+                            self.run_parallel_or_return_first(
+                                outputs,
+                                process_data,
+                                handler,
+                                &data,
+                                &sender,
+                                gateway,
+                            )?
                         }
                         _ => return Err(Error::BadGatewayType),
                     }
@@ -499,6 +499,60 @@ impl Process {
             }
         }
         Err(Error::MissingId(next_id.into()))
+    }
+
+    fn run_parallel_or_return_first<'a, T>(
+        &'a self,
+        outputs: &'a [String],
+        process_data: &'a HashMap<String, Bpmn>,
+        handler: &Eventhandler<T>,
+        data: &Arc<Mutex<T>>,
+        sender: &Sender<(BpmnType, String)>,
+        bpmn_type: &BpmnType,
+    ) -> Result<&str, Error>
+    where
+        T: Send + Sync,
+    {
+        if outputs.len() <= 1 {
+            return outputs
+                .first()
+                .map(|s| s.as_str())
+                .ok_or_else(|| Error::MissingOutput(bpmn_type.to_string()));
+        }
+
+        // Diverging gateway
+        let (oks, mut errors): (Vec<_>, Vec<_>) = thread::scope(|s| {
+            //Start everything first
+            let children: Vec<_> = outputs
+                .iter()
+                .map(|outgoing| {
+                    s.spawn(|| {
+                        self.execute(
+                            outgoing,
+                            process_data,
+                            handler,
+                            Arc::clone(data),
+                            sender.clone(),
+                        )
+                    })
+                })
+                .collect();
+
+            // Collect results
+            children
+                .into_iter()
+                .filter_map(|handle| handle.join().ok())
+                .partition(Result::is_ok)
+        });
+        if !errors.is_empty() {
+            if let Some(result) = errors.pop() {
+                return result;
+            }
+        }
+        oks.into_iter()
+            .filter_map(Result::ok)
+            .next()
+            .ok_or(Error::NoGatewayOutput)
     }
 }
 

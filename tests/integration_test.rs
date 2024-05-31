@@ -337,3 +337,14 @@ fn showcase() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(pr.result.count, 15);
     Ok(())
 }
+
+#[test]
+fn task_fork() -> Result<(), Box<dyn std::error::Error>> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+
+    let bpmn = Process::new("tests/files/task_fork.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 6);
+    Ok(())
+}

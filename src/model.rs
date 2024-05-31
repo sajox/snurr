@@ -190,7 +190,7 @@ impl TryFrom<(BpmnType, HashMap<BpmnAttrib, String>)> for Bpmn {
                 name: attributes.remove(&BpmnAttrib::Name),
                 attached_to_ref: attributes.remove(&BpmnAttrib::AttachedToRef),
                 cancel_activity: attributes.remove(&BpmnAttrib::CancelActivity),
-                output: None,
+                outputs: Default::default(),
             },
             BpmnType::Task | BpmnType::SubProcess => Bpmn::Activity {
                 aktivity: bpmn_type,
@@ -198,7 +198,7 @@ impl TryFrom<(BpmnType, HashMap<BpmnAttrib, String>)> for Bpmn {
                     .remove(&BpmnAttrib::Id)
                     .ok_or_else(|| Error::MissingId(bpmn_type.to_string()))?,
                 name: attributes.remove(&BpmnAttrib::Name),
-                output: None,
+                outputs: Default::default(),
                 start_id: None,
             },
             BpmnType::ExclusiveGateway | BpmnType::ParallelGateway | BpmnType::InclusiveGateway => {
@@ -251,13 +251,13 @@ pub(crate) enum Bpmn {
         name: Option<String>,
         attached_to_ref: Option<String>,
         cancel_activity: Option<String>,
-        output: Option<String>,
+        outputs: Vec<String>,
     },
     Activity {
         aktivity: BpmnType,
         id: String,
         name: Option<String>,
-        output: Option<String>,
+        outputs: Vec<String>,
 
         // Only used by subprocess type
         start_id: Option<String>,
@@ -306,8 +306,9 @@ impl Bpmn {
 
     pub(crate) fn set_output(&mut self, text: String) {
         match self {
-            Bpmn::Event { output, .. } | Bpmn::Activity { output, .. } => *output = Some(text),
-            Bpmn::Gateway { outputs, .. } => outputs.push(text),
+            Bpmn::Event { outputs, .. }
+            | Bpmn::Gateway { outputs, .. }
+            | Bpmn::Activity { outputs, .. } => outputs.push(text),
             _ => {}
         }
     }
