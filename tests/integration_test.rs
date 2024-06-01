@@ -348,3 +348,14 @@ fn task_fork() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(pr.result.count, 6);
     Ok(())
 }
+
+#[test]
+fn fork_explosion() -> Result<(), Box<dyn std::error::Error>> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+
+    let bpmn = Process::new("tests/files/fork_explosion.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 33);
+    Ok(())
+}
