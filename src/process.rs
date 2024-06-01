@@ -177,11 +177,7 @@ impl Process {
     }
 
     /// Replay a trace from a process run. It will be sequential. Only Tasks and gateways is traced that might mutate data.
-    pub fn replay_trace<T>(
-        handler: &Eventhandler<T>,
-        data: T,
-        trace: &[(&'static str, String)],
-    ) -> T
+    pub fn replay_trace<T>(handler: &Eventhandler<T>, data: T, trace: &[(&str, String)]) -> T
     where
         T: std::fmt::Debug,
     {
