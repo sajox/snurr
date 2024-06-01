@@ -65,4 +65,7 @@ pub enum Error {
 
     #[error("couldn't extract result")]
     NoResult,
+
+    #[error("malformed utf8")]
+    Utf8(#[from] std::str::Utf8Error),
 }

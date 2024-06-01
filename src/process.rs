@@ -11,13 +11,16 @@ use std::{
 
 use crate::{
     error::Error,
-    model::{Bpmn, BpmnType},
+    model::{ActivityType, Bpmn, EventType, GatewayType},
     reader::read_bpmn_file,
     scaffold::Scaffold,
     Data, Eventhandler, Symbol,
 };
 
 type ExecuteResult<'a> = Result<&'a str, Error>;
+
+const GATEWAY: &str = "Gateway";
+const TASK: &str = "Task";
 
 /// Process result from a process run.
 #[derive(Debug)]
@@ -26,7 +29,7 @@ pub struct ProcessResult<T> {
     pub result: T,
 
     /// Trace from the process run
-    pub trace: Vec<(BpmnType, String)>,
+    pub trace: Vec<(&'static str, String)>,
 }
 
 /// Process that contains information from the BPMN file
@@ -69,7 +72,7 @@ impl Process {
                 }
 
                 if let Bpmn::Event {
-                    event: BpmnType::BoundaryEvent,
+                    event: EventType::Boundary,
                     symbol: Some(symbol),
                     id,
                     attached_to_ref: Some(attached_to_ref),
@@ -81,7 +84,7 @@ impl Process {
                 }
 
                 if let Bpmn::Event {
-                    event: BpmnType::IntermediateCatchEvent,
+                    event: EventType::IntermediateCatch,
                     symbol: Some(symbol),
                     id,
                     name: Some(name),
@@ -112,7 +115,7 @@ impl Process {
             .for_each(|process: &HashMap<String, Bpmn>| {
                 process.values().for_each(|bpmn| {
                     if let Bpmn::Activity {
-                        aktivity: BpmnType::Task,
+                        aktivity: ActivityType::Task,
                         id,
                         ..
                     } = bpmn
@@ -126,7 +129,7 @@ impl Process {
                     }
 
                     if let Bpmn::Gateway {
-                        gateway: BpmnType::ExclusiveGateway | BpmnType::InclusiveGateway,
+                        gateway: GatewayType::Exclusive | GatewayType::Inclusive,
                         id,
                         outputs,
                         ..
@@ -173,20 +176,22 @@ impl Process {
             .ok_or_else(|| Error::MissingIntermediateCatchEvent(throw_event_name.into()))
     }
 
-    /// Replay a trace from a process run. It will be sequential.
-    pub fn replay_trace<T>(handler: &Eventhandler<T>, data: T, trace: &[(BpmnType, String)]) -> T
+    /// Replay a trace from a process run. It will be sequential. Only Tasks and gateways is traced that might mutate data.
+    pub fn replay_trace<T>(
+        handler: &Eventhandler<T>,
+        data: T,
+        trace: &[(&'static str, String)],
+    ) -> T
     where
         T: std::fmt::Debug,
     {
         let data = Arc::new(Mutex::new(data));
         for (ty, id) in trace {
-            match ty {
-                BpmnType::Task | BpmnType::SubProcess => {
+            match *ty {
+                TASK => {
                     let _ = handler.run_task(id, Arc::clone(&data));
                 }
-                BpmnType::ExclusiveGateway
-                | BpmnType::InclusiveGateway
-                | BpmnType::ParallelGateway => {
+                GATEWAY => {
                     let _ = handler.run_gateway(id, Arc::clone(&data));
                 }
                 _ => {}
@@ -256,21 +261,12 @@ impl Process {
         process_data: &'a HashMap<String, Bpmn>,
         handler: &Eventhandler<T>,
         data: Data<T>,
-        sender: Sender<(BpmnType, String)>,
+        sender: Sender<(&'static str, String)>,
     ) -> ExecuteResult<'a>
     where
         T: Send + Sync,
     {
         while let Some(bpmn) = process_data.get(next_id) {
-            // We trace by name if exist. Id otherwise.
-            let _ = sender.send((
-                BpmnType::from(bpmn),
-                bpmn.name()
-                    .or_else(|| bpmn.id())
-                    .cloned()
-                    .unwrap_or_default(),
-            ));
-
             next_id = match bpmn {
                 Bpmn::Process { start_id, .. } => {
                     start_id.as_ref().ok_or(Error::MissingProcessStart)?
@@ -285,17 +281,17 @@ impl Process {
                 } => {
                     info!("{}: {}", event, name.as_ref().unwrap_or(id));
                     match event {
-                        BpmnType::StartEvent
-                        | BpmnType::IntermediateCatchEvent
-                        | BpmnType::BoundaryEvent => self.run_parallel_or_return_first(
-                            outputs,
-                            process_data,
-                            handler,
-                            &data,
-                            &sender,
-                            event,
-                        )?,
-                        BpmnType::IntermediateThrowEvent => {
+                        EventType::Start | EventType::IntermediateCatch | EventType::Boundary => {
+                            self.run_parallel_or_return_first(
+                                outputs,
+                                process_data,
+                                handler,
+                                &data,
+                                &sender,
+                                id,
+                            )?
+                        }
+                        EventType::IntermediateThrow => {
                             // If no symbol is set then just follow output.
                             if symbol.as_ref().is_none() {
                                 self.run_parallel_or_return_first(
@@ -304,7 +300,7 @@ impl Process {
                                     handler,
                                     &data,
                                     &sender,
-                                    event,
+                                    id,
                                 )?
                             } else {
                                 match name.as_ref().zip(symbol.as_ref()) {
@@ -317,7 +313,7 @@ impl Process {
                                         handler,
                                         &data,
                                         &sender,
-                                        event,
+                                        id,
                                     )?,
                                     None => {
                                         Err(Error::MissingNameIntermediateThrowEvent(id.into()))?
@@ -325,8 +321,7 @@ impl Process {
                                 }
                             }
                         }
-                        BpmnType::EndEvent => return Ok(next_id),
-                        _ => return Err(Error::BadEventType),
+                        EventType::End => return Ok(next_id),
                     }
                 }
                 Bpmn::Activity {
@@ -339,7 +334,8 @@ impl Process {
                     let name_or_id = name.as_ref().unwrap_or(id);
                     info!("{}: {}", aktivity, name_or_id);
                     match aktivity {
-                        BpmnType::Task => {
+                        ActivityType::Task => {
+                            let _ = sender.send((TASK, name_or_id.to_owned()));
                             let response = handler.run_task(name_or_id, Arc::clone(&data));
                             if let Err(symbol) = response {
                                 self.boundary_lookup(id, &symbol)
@@ -351,11 +347,11 @@ impl Process {
                                     handler,
                                     &data,
                                     &sender,
-                                    aktivity,
+                                    id,
                                 )?
                             }
                         }
-                        BpmnType::SubProcess => {
+                        ActivityType::SubProcess => {
                             let sub_process_data =
                                 self.data.get(id).ok_or(Error::MissingSubProcess)?;
                             let response_id = self.execute(
@@ -367,7 +363,7 @@ impl Process {
                             )?;
 
                             if let Some(Bpmn::Event {
-                                event: BpmnType::EndEvent,
+                                event: EventType::End,
                                 symbol: Some(symbol),
                                 ..
                             }) = sub_process_data.get(response_id)
@@ -381,11 +377,10 @@ impl Process {
                                     handler,
                                     &data,
                                     &sender,
-                                    aktivity,
+                                    id,
                                 )?
                             }
                         }
-                        _ => return Err(Error::BadActivityType),
                     }
                 }
                 Bpmn::Gateway {
@@ -397,8 +392,9 @@ impl Process {
                 } => {
                     let name_or_id = name.as_ref().unwrap_or(id);
                     info!("{}: {}", gateway, name_or_id);
+                    let _ = sender.send((GATEWAY, name_or_id.to_owned()));
                     match gateway {
-                        BpmnType::ExclusiveGateway => {
+                        GatewayType::Exclusive => {
                             if outputs.len() > 1 {
                                 // Default to first outgoing if function is not set.
                                 let responses = handler.run_gateway(name_or_id, Arc::clone(&data));
@@ -416,7 +412,7 @@ impl Process {
                                     .ok_or_else(|| Error::MissingOutput(gateway.to_string()))?
                             }
                         }
-                        BpmnType::InclusiveGateway => {
+                        GatewayType::Inclusive => {
                             // Converging gateway. Synchronize
                             if outputs.len() <= 1 {
                                 return outputs
@@ -465,7 +461,7 @@ impl Process {
                                     ))
                                 })?
                         }
-                        BpmnType::ParallelGateway => {
+                        GatewayType::Parallel => {
                             // Converging gateway. Synchronize
                             if outputs.len() <= 1 {
                                 return outputs
@@ -479,10 +475,9 @@ impl Process {
                                 handler,
                                 &data,
                                 &sender,
-                                gateway,
+                                id,
                             )?
                         }
-                        _ => return Err(Error::BadGatewayType),
                     }
                 }
                 Bpmn::SequenceFlow {
@@ -495,7 +490,7 @@ impl Process {
                     info!("SequenceFlow: {}", name.as_ref().unwrap_or(id));
                     target_ref
                 }
-                bpmn => return Err(Error::MissingBpmnType(BpmnType::from(bpmn).to_string())),
+                _ => return Err(Error::MissingBpmnType("Type not handled.".into())),
             }
         }
         Err(Error::MissingId(next_id.into()))
@@ -507,8 +502,8 @@ impl Process {
         process_data: &'a HashMap<String, Bpmn>,
         handler: &Eventhandler<T>,
         data: &Arc<Mutex<T>>,
-        sender: &Sender<(BpmnType, String)>,
-        bpmn_type: &BpmnType,
+        sender: &Sender<(&'static str, String)>,
+        id: &str,
     ) -> Result<&str, Error>
     where
         T: Send + Sync,
@@ -517,7 +512,7 @@ impl Process {
             return outputs
                 .first()
                 .map(|s| s.as_str())
-                .ok_or_else(|| Error::MissingOutput(bpmn_type.to_string()));
+                .ok_or_else(|| Error::MissingOutput(id.into()));
         }
 
         // Diverging gateway

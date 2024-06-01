@@ -5,7 +5,7 @@ use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 
 use crate::error::Error;
-use crate::model::{Bpmn, BpmnAttrib, BpmnType};
+use crate::model::*;
 
 type ReaderResult = Result<(String, HashMap<String, HashMap<String, Bpmn>>), Error>;
 
@@ -23,47 +23,51 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
         match reader.read_event_into(&mut buf) {
             Err(e) => error!("Error at position {}: {:?}", reader.buffer_position(), e),
             Ok(Event::Eof) => break,
-            Ok(Event::Start(bs)) => {
-                let bpmn_type: BpmnType = bs.local_name().as_ref().into();
-                match bpmn_type {
-                    BpmnType::StartEvent
-                    | BpmnType::EndEvent
-                    | BpmnType::BoundaryEvent
-                    | BpmnType::IntermediateCatchEvent
-                    | BpmnType::IntermediateThrowEvent
-                    | BpmnType::Task
-                    | BpmnType::Outgoing
-                    | BpmnType::Incoming
-                    | BpmnType::ExclusiveGateway
-                    | BpmnType::ParallelGateway
-                    | BpmnType::InclusiveGateway => {
-                        stack.push(Bpmn::try_from((bpmn_type, collect_attributes(bs)))?)
-                    }
-                    BpmnType::Definitions | BpmnType::Process | BpmnType::SubProcess => {
-                        process_stack.push(Default::default());
-                        stack.push(Bpmn::try_from((bpmn_type, collect_attributes(bs)))?)
-                    }
-                    _ => {}
+            Ok(Event::Start(bs)) => match bs.local_name().as_ref() {
+                bpmn_type @ (START_EVENT
+                | END_EVENT
+                | BOUNDARY_EVENT
+                | INTERMEDIATE_CATCH_EVENT
+                | INTERMEDIATE_THROW_EVENT
+                | TASK
+                | SCRIPT_TASK
+                | USER_TASK
+                | SERVICE_TASK
+                | CALL_ACTIVITY
+                | RECEIVE_TASK
+                | SEND_TASK
+                | MANUAL_TASK
+                | BUSINESS_RULE_TASK
+                | OUTGOING
+                | INCOMING
+                | EXCLUSIVE_GATEWAY
+                | PARALLEL_GATEWAY
+                | INCLUSIVE_GATEWAY) => {
+                    stack.push(Bpmn::try_from((bpmn_type, collect_attributes(&bs)))?)
                 }
-            }
+                bpmn_type @ (DEFINITIONS | PROCESS | SUB_PROCESS | TRANSACTION) => {
+                    process_stack.push(Default::default());
+                    stack.push(Bpmn::try_from((bpmn_type, collect_attributes(&bs)))?)
+                }
+                _ => {}
+            },
             Ok(Event::Empty(bs)) => {
-                let bpmn_type: BpmnType = bs.local_name().as_ref().into();
-                match bpmn_type {
+                match bs.local_name().as_ref() {
                     // Attach symbol to parent
-                    BpmnType::ErrorEventDefinition
-                    | BpmnType::MessageEventDefinition
-                    | BpmnType::TimerEventDefinition
-                    | BpmnType::EscalationEventDefinition
-                    | BpmnType::ConditionalEventDefinition
-                    | BpmnType::SignalEventDefinition
-                    | BpmnType::CompensateEventDefinition
-                    | BpmnType::LinkEventDefinition => {
+                    bpmn_type @ (ERROR_EVENT_DEFINITION
+                    | MESSAGE_EVENT_DEFINITION
+                    | TIMER_EVENT_DEFINITION
+                    | ESCALATION_EVENT_DEFINITION
+                    | CONDITIONAL_EVENT_DEFINITION
+                    | SIGNAL_EVENT_DEFINITION
+                    | COMPENSATE_EVENT_DEFINITION
+                    | LINK_EVENT_DEFINITION) => {
                         if let Some(Bpmn::Event { symbol, .. }) = stack.last_mut() {
                             *symbol = bpmn_type.try_into().ok();
                         }
                     }
-                    BpmnType::SequenceFlow => {
-                        let bpmn = Bpmn::try_from((bpmn_type, collect_attributes(bs)))?;
+                    bpmn_type @ SEQUENCE_FLOW => {
+                        let bpmn = Bpmn::try_from((bpmn_type, collect_attributes(&bs)))?;
                         if let Some((process, id)) = process_stack.last_mut().zip(bpmn.id()) {
                             process.insert(id.into(), bpmn);
                         }
@@ -72,9 +76,8 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                 }
             }
             Ok(Event::End(be)) => {
-                let bpmn_type: BpmnType = be.local_name().as_ref().into();
-                match bpmn_type {
-                    BpmnType::Outgoing => {
+                match be.local_name().as_ref() {
+                    OUTGOING => {
                         if let Some((
                             Bpmn::Direction {
                                 text: Some(out), ..
@@ -85,16 +88,16 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                             parent.set_output(out);
                         }
                     }
-                    BpmnType::Incoming => {
+                    INCOMING => {
                         // Silently remove incoming as we dont handle it. Easy to add if support needed.
                         stack.pop();
                     }
-                    BpmnType::StartEvent => {
+                    START_EVENT => {
                         if let Some((bpmn, parent)) = stack.pop().zip(stack.last_mut()) {
                             match parent {
                                 Bpmn::Process { start_id, .. } => *start_id = bpmn.id().cloned(),
                                 Bpmn::Activity {
-                                    aktivity: BpmnType::SubProcess,
+                                    aktivity: ActivityType::SubProcess,
                                     start_id,
                                     ..
                                 } => *start_id = bpmn.id().cloned(),
@@ -105,21 +108,29 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                             }
                         };
                     }
-                    BpmnType::EndEvent
-                    | BpmnType::BoundaryEvent
-                    | BpmnType::IntermediateCatchEvent
-                    | BpmnType::IntermediateThrowEvent
-                    | BpmnType::Task
-                    | BpmnType::ExclusiveGateway
-                    | BpmnType::ParallelGateway
-                    | BpmnType::InclusiveGateway => {
+                    END_EVENT
+                    | BOUNDARY_EVENT
+                    | INTERMEDIATE_CATCH_EVENT
+                    | INTERMEDIATE_THROW_EVENT
+                    | TASK
+                    | SCRIPT_TASK
+                    | USER_TASK
+                    | SERVICE_TASK
+                    | CALL_ACTIVITY
+                    | RECEIVE_TASK
+                    | SEND_TASK
+                    | MANUAL_TASK
+                    | BUSINESS_RULE_TASK
+                    | EXCLUSIVE_GATEWAY
+                    | PARALLEL_GATEWAY
+                    | INCLUSIVE_GATEWAY => {
                         if let Some(bpmn) = stack.pop() {
                             if let Some((process, id)) = process_stack.last_mut().zip(bpmn.id()) {
                                 process.insert(id.into(), bpmn);
                             }
                         }
                     }
-                    BpmnType::Definitions | BpmnType::Process | BpmnType::SubProcess => {
+                    DEFINITIONS | PROCESS | SUB_PROCESS | TRANSACTION => {
                         if let Some(bpmn) = stack.pop() {
                             if let Some((process, id)) = process_stack.pop().zip(bpmn.id().cloned())
                             {
@@ -153,7 +164,7 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
     Ok((definitions_id.ok_or(Error::MissingDefinitions)?, data))
 }
 
-fn collect_attributes(bs: quick_xml::events::BytesStart<'_>) -> HashMap<BpmnAttrib, String> {
+fn collect_attributes(bs: &quick_xml::events::BytesStart<'_>) -> HashMap<BpmnAttrib, String> {
     bs.attributes()
         .filter_map(Result::ok)
         .map(|attribute| {
