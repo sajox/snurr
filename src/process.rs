@@ -1,3 +1,7 @@
+mod parallel;
+
+use parallel::maybe_parallelize;
+
 use log::info;
 use std::{
     collections::HashMap,
@@ -203,7 +207,7 @@ impl Process {
     /// Run the process and return the `ProcessResult` or an `Error`.
     pub fn run<T>(&self, handler: &Eventhandler<T>, data: T) -> Result<ProcessResult<T>, Error>
     where
-        T: Send + Sync + std::fmt::Debug,
+        T: Send + std::fmt::Debug,
     {
         let data = Arc::new(Mutex::new(data));
         let (sender, receiver) = channel();
@@ -264,8 +268,18 @@ impl Process {
         sender: Sender<(&'static str, String)>,
     ) -> ExecuteResult<'a>
     where
-        T: Send + Sync,
+        T: Send,
     {
+        let recursion = |output: &'a str| {
+            self.execute(
+                output,
+                process_data,
+                handler,
+                Arc::clone(&data),
+                sender.clone(),
+            )
+        };
+
         while let Some(bpmn) = process_data.get(next_id) {
             next_id = match bpmn {
                 Bpmn::Process { start_id, .. } => {
@@ -282,39 +296,22 @@ impl Process {
                     info!("{}: {}", event, name.as_ref().unwrap_or(id));
                     match event {
                         EventType::Start | EventType::IntermediateCatch | EventType::Boundary => {
-                            self.run_parallel_or_return_first(
-                                outputs,
-                                process_data,
-                                handler,
-                                &data,
-                                &sender,
-                                id,
-                            )?
+                            maybe_parallelize(outputs, id, |output: &str| recursion(output))?
                         }
                         EventType::IntermediateThrow => {
                             // If no symbol is set then just follow output.
                             if symbol.as_ref().is_none() {
-                                self.run_parallel_or_return_first(
-                                    outputs,
-                                    process_data,
-                                    handler,
-                                    &data,
-                                    &sender,
-                                    id,
-                                )?
+                                maybe_parallelize(outputs, id, |output: &str| recursion(output))?
                             } else {
                                 match name.as_ref().zip(symbol.as_ref()) {
                                     Some((name, symbol @ Symbol::Link)) => {
                                         self.catch_event_lookup(name, symbol)?
                                     }
-                                    Some((_, _)) => self.run_parallel_or_return_first(
-                                        outputs,
-                                        process_data,
-                                        handler,
-                                        &data,
-                                        &sender,
-                                        id,
-                                    )?,
+                                    Some((_, _)) => {
+                                        maybe_parallelize(outputs, id, |output: &str| {
+                                            recursion(output)
+                                        })?
+                                    }
                                     None => {
                                         Err(Error::MissingNameIntermediateThrowEvent(id.into()))?
                                     }
@@ -341,14 +338,7 @@ impl Process {
                                 self.boundary_lookup(id, &symbol)
                                     .ok_or_else(|| Error::MissingBoundary(name_or_id.into()))?
                             } else {
-                                self.run_parallel_or_return_first(
-                                    outputs,
-                                    process_data,
-                                    handler,
-                                    &data,
-                                    &sender,
-                                    id,
-                                )?
+                                maybe_parallelize(outputs, id, |output: &str| recursion(output))?
                             }
                         }
                         ActivityType::SubProcess => {
@@ -371,14 +361,7 @@ impl Process {
                                 self.boundary_lookup(id, symbol)
                                     .ok_or_else(|| Error::MissingBoundary(name_or_id.into()))?
                             } else {
-                                self.run_parallel_or_return_first(
-                                    outputs,
-                                    process_data,
-                                    handler,
-                                    &data,
-                                    &sender,
-                                    id,
-                                )?
+                                maybe_parallelize(outputs, id, |output: &str| recursion(output))?
                             }
                         }
                     }
@@ -434,15 +417,7 @@ impl Process {
                             let (oks, mut errors): (Vec<_>, Vec<_>) = responses
                                 .iter()
                                 .map(|response| self.name_lookup(id, response).unwrap_or(response))
-                                .map(|outgoing| {
-                                    self.execute(
-                                        outgoing,
-                                        process_data,
-                                        handler,
-                                        Arc::clone(&data),
-                                        sender.clone(),
-                                    )
-                                })
+                                .map(recursion)
                                 .partition(Result::is_ok);
 
                             if !errors.is_empty() {
@@ -469,14 +444,7 @@ impl Process {
                                     .map(|s| s.as_str())
                                     .ok_or_else(|| Error::MissingOutput(gateway.to_string()));
                             }
-                            self.run_parallel_or_return_first(
-                                outputs,
-                                process_data,
-                                handler,
-                                &data,
-                                &sender,
-                                id,
-                            )?
+                            maybe_parallelize(outputs, id, |output: &str| recursion(output))?
                         }
                     }
                 }
@@ -494,60 +462,6 @@ impl Process {
             }
         }
         Err(Error::MissingId(next_id.into()))
-    }
-
-    fn run_parallel_or_return_first<'a, T>(
-        &'a self,
-        outputs: &'a [String],
-        process_data: &'a HashMap<String, Bpmn>,
-        handler: &Eventhandler<T>,
-        data: &Arc<Mutex<T>>,
-        sender: &Sender<(&'static str, String)>,
-        id: &str,
-    ) -> Result<&str, Error>
-    where
-        T: Send + Sync,
-    {
-        if outputs.len() <= 1 {
-            return outputs
-                .first()
-                .map(|s| s.as_str())
-                .ok_or_else(|| Error::MissingOutput(id.into()));
-        }
-
-        // Diverging gateway
-        let (oks, mut errors): (Vec<_>, Vec<_>) = thread::scope(|s| {
-            //Start everything first
-            let children: Vec<_> = outputs
-                .iter()
-                .map(|outgoing| {
-                    s.spawn(|| {
-                        self.execute(
-                            outgoing,
-                            process_data,
-                            handler,
-                            Arc::clone(data),
-                            sender.clone(),
-                        )
-                    })
-                })
-                .collect();
-
-            // Collect results
-            children
-                .into_iter()
-                .filter_map(|handle| handle.join().ok())
-                .partition(Result::is_ok)
-        });
-        if !errors.is_empty() {
-            if let Some(result) = errors.pop() {
-                return result;
-            }
-        }
-        oks.into_iter()
-            .filter_map(Result::ok)
-            .next()
-            .ok_or(Error::NoGatewayOutput)
     }
 }
 
