@@ -59,7 +59,7 @@ pub(crate) const ATTRIB_ATTACHED_TO_REF: &[u8] = b"attachedToRef";
 pub(crate) const ATTRIB_CANCEL_ACTIVITY: &[u8] = b"cancelActivity";
 
 #[derive(Debug, Copy, Clone)]
-pub enum EventType {
+pub(crate) enum EventType {
     Start,
     End,
     Boundary,
@@ -89,7 +89,7 @@ impl Display for EventType {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum ActivityType {
+pub(crate) enum ActivityType {
     Task,
     SubProcess,
 }
@@ -114,7 +114,7 @@ impl Display for ActivityType {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum GatewayType {
+pub(crate) enum GatewayType {
     Exclusive,
     Parallel,
     Inclusive,
@@ -140,7 +140,7 @@ impl Display for GatewayType {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum DirectionType {
+pub(crate) enum DirectionType {
     Outgoing,
     Incoming,
 }
