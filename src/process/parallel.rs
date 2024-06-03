@@ -51,4 +51,4 @@ macro_rules! parallelize_helper {
     }};
 }
 
-pub(crate) use parallelize_helper;
+pub(super) use parallelize_helper;
