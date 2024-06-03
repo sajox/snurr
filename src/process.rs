@@ -1,6 +1,6 @@
 mod parallel;
 
-use parallel::maybe_parallelize;
+use parallel::parallelize_helper;
 
 use log::info;
 use std::{
@@ -21,7 +21,7 @@ use crate::{
     Data, Eventhandler, Symbol,
 };
 
-type ExecuteResult<'a> = Result<&'a str, Error>;
+type ExecuteResult<'a> = Result<Option<&'a str>, Error>;
 
 const GATEWAY: &str = "Gateway";
 const TASK: &str = "Task";
@@ -236,7 +236,7 @@ impl Process {
             {
                 self.execute(
                     start_id,
-                    self.data.get(id).ok_or(Error::MissingProcess)?,
+                    self.data.get_key_value(id).ok_or(Error::MissingProcess)?,
                     handler,
                     Arc::clone(&data),
                     sender.clone(),
@@ -262,7 +262,7 @@ impl Process {
     fn execute<'a, T>(
         &'a self,
         mut next_id: &'a str,
-        process_data: &'a HashMap<String, Bpmn>,
+        process @ (process_id, process_data): (&String, &'a HashMap<String, Bpmn>),
         handler: &Eventhandler<T>,
         data: Data<T>,
         sender: Sender<(&'static str, String)>,
@@ -271,13 +271,7 @@ impl Process {
         T: Send,
     {
         let recursion = |output: &'a str| {
-            self.execute(
-                output,
-                process_data,
-                handler,
-                Arc::clone(&data),
-                sender.clone(),
-            )
+            self.execute(output, process, handler, Arc::clone(&data), sender.clone())
         };
 
         while let Some(bpmn) = process_data.get(next_id) {
@@ -296,21 +290,21 @@ impl Process {
                     info!("{}: {}", event, name.as_ref().unwrap_or(id));
                     match event {
                         EventType::Start | EventType::IntermediateCatch | EventType::Boundary => {
-                            maybe_parallelize(outputs, id, |output: &str| recursion(output))?
+                            parallelize_helper!(outputs, id, |output: &str| recursion(output))
                         }
                         EventType::IntermediateThrow => {
                             // If no symbol is set then just follow output.
                             if symbol.as_ref().is_none() {
-                                maybe_parallelize(outputs, id, |output: &str| recursion(output))?
+                                parallelize_helper!(outputs, id, |output: &str| recursion(output))
                             } else {
                                 match name.as_ref().zip(symbol.as_ref()) {
                                     Some((name, symbol @ Symbol::Link)) => {
                                         self.catch_event_lookup(name, symbol)?
                                     }
                                     Some((_, _)) => {
-                                        maybe_parallelize(outputs, id, |output: &str| {
+                                        parallelize_helper!(outputs, id, |output: &str| {
                                             recursion(output)
-                                        })?
+                                        })
                                     }
                                     None => {
                                         Err(Error::MissingNameIntermediateThrowEvent(id.into()))?
@@ -318,7 +312,14 @@ impl Process {
                                 }
                             }
                         }
-                        EventType::End => return Ok(next_id),
+                        EventType::End => {
+                            if let Some(symbol) = symbol {
+                                return Ok(self
+                                    .boundary_lookup(process_id, symbol)
+                                    .map(|s| s.as_str()));
+                            }
+                            return Ok(None);
+                        }
                     }
                 }
                 Bpmn::Activity {
@@ -338,30 +339,26 @@ impl Process {
                                 self.boundary_lookup(id, &symbol)
                                     .ok_or_else(|| Error::MissingBoundary(name_or_id.into()))?
                             } else {
-                                maybe_parallelize(outputs, id, |output: &str| recursion(output))?
+                                parallelize_helper!(outputs, id, |output: &str| recursion(output))
                             }
                         }
                         ActivityType::SubProcess => {
-                            let sub_process_data =
-                                self.data.get(id).ok_or(Error::MissingSubProcess)?;
+                            let sub_process = self
+                                .data
+                                .get_key_value(id)
+                                .ok_or(Error::MissingSubProcess)?;
                             let response_id = self.execute(
                                 start_id.as_ref().ok_or(Error::MissingProcessStart)?,
-                                sub_process_data,
+                                sub_process,
                                 handler,
                                 Arc::clone(&data),
                                 sender.clone(),
                             )?;
 
-                            if let Some(Bpmn::Event {
-                                event: EventType::End,
-                                symbol: Some(symbol),
-                                ..
-                            }) = sub_process_data.get(response_id)
-                            {
-                                self.boundary_lookup(id, symbol)
-                                    .ok_or_else(|| Error::MissingBoundary(name_or_id.into()))?
+                            if let Some(response_id) = response_id {
+                                response_id
                             } else {
-                                maybe_parallelize(outputs, id, |output: &str| recursion(output))?
+                                parallelize_helper!(outputs, id, |output: &str| recursion(output))
                             }
                         }
                     }
@@ -401,6 +398,7 @@ impl Process {
                                 return outputs
                                     .first()
                                     .map(|x| x.as_str())
+                                    .map(Some)
                                     .ok_or_else(|| Error::MissingOutput(gateway.to_string()));
                             }
 
@@ -426,15 +424,17 @@ impl Process {
                                 }
                             }
 
-                            oks.into_iter()
-                                .filter_map(Result::ok)
-                                .next()
-                                .ok_or_else(|| {
+                            match oks.into_iter().filter_map(Result::ok).next().ok_or_else(
+                                || {
                                     Error::BadGatewayOutput(format!(
                                         "No output with name: {}",
                                         responses.join(", ")
                                     ))
-                                })?
+                                },
+                            )? {
+                                Some(id) => id,
+                                None => return Ok(None),
+                            }
                         }
                         GatewayType::Parallel => {
                             // Converging gateway. Synchronize
@@ -442,9 +442,10 @@ impl Process {
                                 return outputs
                                     .first()
                                     .map(|s| s.as_str())
+                                    .map(Some)
                                     .ok_or_else(|| Error::MissingOutput(gateway.to_string()));
                             }
-                            maybe_parallelize(outputs, id, |output: &str| recursion(output))?
+                            parallelize_helper!(outputs, id, |output: &str| recursion(output))
                         }
                     }
                 }

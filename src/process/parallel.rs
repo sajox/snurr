@@ -10,11 +10,12 @@ pub(super) fn maybe_parallelize<'a>(
     outputs: &'a [String],
     message: &str,
     func: impl Fn(&'a str) -> ExecuteResult<'a> + Sync,
-) -> Result<&'a str, Error> {
+) -> ExecuteResult<'a> {
     if outputs.len() <= 1 {
         return outputs
             .first()
             .map(|s| s.as_str())
+            .map(Some)
             .ok_or_else(|| Error::MissingOutput(message.into()));
     }
 
@@ -32,13 +33,22 @@ pub(super) fn maybe_parallelize<'a>(
             .filter_map(|handle| handle.join().ok())
             .partition(Result::is_ok)
     });
-    if !errors.is_empty() {
-        if let Some(result) = errors.pop() {
-            return result;
-        }
+
+    if let Some(res) = errors.pop() {
+        return Err(res.unwrap_err());
     }
-    oks.into_iter()
-        .filter_map(Result::ok)
-        .next()
-        .ok_or(Error::NoGatewayOutput)
+
+    Ok(oks.into_iter().filter_map(Result::ok).next().flatten())
 }
+
+// Early return if no id is found.
+macro_rules! parallelize_helper {
+    ($outputs:expr, $id:expr, $func:expr) => {{
+        match crate::process::parallel::maybe_parallelize($outputs, $id, $func)? {
+            Some(id) => id,
+            None => return Ok(None),
+        }
+    }};
+}
+
+pub(crate) use parallelize_helper;

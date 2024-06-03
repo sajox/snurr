@@ -359,3 +359,12 @@ fn fork_explosion() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(pr.result.count, 33);
     Ok(())
 }
+
+#[test]
+fn process_end_with_symbol() -> Result<(), Box<dyn std::error::Error>> {
+    let handler: Eventhandler<Counter> = Eventhandler::default();
+    let bpmn = Process::new("tests/files/process_end_with_symbol.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 0);
+    Ok(())
+}
