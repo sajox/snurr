@@ -418,10 +418,8 @@ impl Process {
                                 .map(recursion)
                                 .partition(Result::is_ok);
 
-                            if !errors.is_empty() {
-                                if let Some(result) = errors.pop() {
-                                    return result;
-                                }
+                            if let Some(result) = errors.pop() {
+                                return result;
                             }
 
                             match oks
