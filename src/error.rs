@@ -27,12 +27,6 @@ pub enum Error {
     #[error("missing bpmn type {0}")]
     MissingBpmnType(String),
 
-    #[error("bad gateway output {0}")]
-    BadGatewayOutput(String),
-
-    #[error("no gateway output")]
-    NoGatewayOutput,
-
     #[error("missing boundary")]
     MissingBoundary(String),
 

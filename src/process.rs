@@ -316,7 +316,7 @@ impl Process {
                             if let Some(symbol) = symbol {
                                 return Ok(self
                                     .boundary_lookup(process_id, symbol)
-                                    .map(|s| s.as_str()));
+                                    .map(String::as_str));
                             }
                             return Ok(None);
                         }
@@ -397,7 +397,7 @@ impl Process {
                             if outputs.len() <= 1 {
                                 return outputs
                                     .first()
-                                    .map(|x| x.as_str())
+                                    .map(String::as_str)
                                     .map(Some)
                                     .ok_or_else(|| Error::MissingOutput(gateway.to_string()));
                             }
@@ -424,14 +424,12 @@ impl Process {
                                 }
                             }
 
-                            match oks.into_iter().filter_map(Result::ok).next().ok_or_else(
-                                || {
-                                    Error::BadGatewayOutput(format!(
-                                        "No output with name: {}",
-                                        responses.join(", ")
-                                    ))
-                                },
-                            )? {
+                            match oks
+                                .into_iter()
+                                .filter_map(Result::ok)
+                                .find(Option::is_some)
+                                .flatten()
+                            {
                                 Some(id) => id,
                                 None => return Ok(None),
                             }
@@ -441,7 +439,7 @@ impl Process {
                             if outputs.len() <= 1 {
                                 return outputs
                                     .first()
-                                    .map(|s| s.as_str())
+                                    .map(String::as_str)
                                     .map(Some)
                                     .ok_or_else(|| Error::MissingOutput(gateway.to_string()));
                             }

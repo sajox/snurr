@@ -368,3 +368,26 @@ fn process_end_with_symbol() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(pr.result.count, 0);
     Ok(())
 }
+
+#[test]
+fn inclusive_gateway_not_all_joined() -> Result<(), Box<dyn std::error::Error>> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_gateway("RUN ALL", |_| vec!["A", "B"]);
+    handler.add_gateway("RUN C", |_| vec!["C"]);
+
+    let bpmn = Process::new("tests/files/inclusive_gateway_not_all_joined.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 3);
+    Ok(())
+}
+
+#[test]
+fn parallel_gateway_not_all_joined() -> Result<(), Box<dyn std::error::Error>> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+    let bpmn = Process::new("tests/files/parallel_gateway_not_all_joined.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 4);
+    Ok(())
+}

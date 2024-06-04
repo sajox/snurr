@@ -14,7 +14,7 @@ pub(super) fn maybe_parallelize<'a>(
     if outputs.len() <= 1 {
         return outputs
             .first()
-            .map(|s| s.as_str())
+            .map(String::as_str)
             .map(Some)
             .ok_or_else(|| Error::MissingOutput(message.into()));
     }
@@ -34,11 +34,15 @@ pub(super) fn maybe_parallelize<'a>(
             .partition(Result::is_ok)
     });
 
-    if let Some(res) = errors.pop() {
-        return Err(res.unwrap_err());
+    if let Some(result) = errors.pop() {
+        return result;
     }
 
-    Ok(oks.into_iter().filter_map(Result::ok).next().flatten())
+    Ok(oks
+        .into_iter()
+        .filter_map(Result::ok)
+        .find(Option::is_some)
+        .flatten())
 }
 
 // Early return if no id is found.
