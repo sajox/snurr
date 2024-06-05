@@ -290,21 +290,19 @@ impl Process {
                     info!("{}: {}", event, name.as_ref().unwrap_or(id));
                     match event {
                         EventType::Start | EventType::IntermediateCatch | EventType::Boundary => {
-                            parallelize_helper!(outputs, id, |output: &str| recursion(output))
+                            parallelize_helper!(outputs, id, recursion)
                         }
                         EventType::IntermediateThrow => {
                             // If no symbol is set then just follow output.
                             if symbol.as_ref().is_none() {
-                                parallelize_helper!(outputs, id, |output: &str| recursion(output))
+                                parallelize_helper!(outputs, id, recursion)
                             } else {
                                 match name.as_ref().zip(symbol.as_ref()) {
                                     Some((name, symbol @ Symbol::Link)) => {
                                         self.catch_event_lookup(name, symbol)?
                                     }
                                     Some((_, _)) => {
-                                        parallelize_helper!(outputs, id, |output: &str| {
-                                            recursion(output)
-                                        })
+                                        parallelize_helper!(outputs, id, recursion)
                                     }
                                     None => {
                                         Err(Error::MissingNameIntermediateThrowEvent(id.into()))?
@@ -339,7 +337,7 @@ impl Process {
                                 self.boundary_lookup(id, &symbol)
                                     .ok_or_else(|| Error::MissingBoundary(name_or_id.into()))?
                             } else {
-                                parallelize_helper!(outputs, id, |output: &str| recursion(output))
+                                parallelize_helper!(outputs, id, recursion)
                             }
                         }
                         ActivityType::SubProcess => {
@@ -358,7 +356,7 @@ impl Process {
                             if let Some(response_id) = response_id {
                                 response_id
                             } else {
-                                parallelize_helper!(outputs, id, |output: &str| recursion(output))
+                                parallelize_helper!(outputs, id, recursion)
                             }
                         }
                     }
@@ -441,7 +439,7 @@ impl Process {
                                     .map(Some)
                                     .ok_or_else(|| Error::MissingOutput(gateway.to_string()));
                             }
-                            parallelize_helper!(outputs, id, |output: &str| recursion(output))
+                            parallelize_helper!(outputs, id, recursion)
                         }
                     }
                 }
