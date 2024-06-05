@@ -223,3 +223,17 @@ RUST_LOG=warn cargo run
  WARN  snurr::model > Missing function. Please register: Count 1
  WARN  snurr::model > Missing function. Please register: equal to 3
 ```
+
+## Not supported (Not yet)
+
+### Conditional Sequence Flows
+
+![Conditional Sequence Flows](/tests/not_supported/conditional_sequence_flows.png)
+
+### Both join and fork
+
+![Join and fork](/tests/not_supported/join_and_fork.png)
+
+### Unbalanced Parallel or Inclusive gateway
+
+![Unbalanced Parallel or Inclusive gateway](/tests/not_supported/parallel_unbalanced.png)
