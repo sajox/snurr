@@ -80,17 +80,24 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                     OUTGOING => {
                         if let Some((
                             Bpmn::Direction {
-                                text: Some(out), ..
+                                text: Some(output), ..
                             },
                             parent,
                         )) = stack.pop().zip(stack.last_mut())
                         {
-                            parent.set_output(out);
+                            parent.set_output(output);
                         }
                     }
                     INCOMING => {
-                        // Silently remove incoming as we dont handle it. Easy to add if support needed.
-                        stack.pop();
+                        if let Some((
+                            Bpmn::Direction {
+                                text: Some(input), ..
+                            },
+                            parent,
+                        )) = stack.pop().zip(stack.last_mut())
+                        {
+                            parent.set_input(input);
+                        }
                     }
                     START_EVENT => {
                         if let Some((bpmn, parent)) = stack.pop().zip(stack.last_mut()) {

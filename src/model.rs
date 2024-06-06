@@ -231,6 +231,7 @@ impl TryFrom<(&[u8], HashMap<BpmnAttrib, String>)> for Bpmn {
                 attached_to_ref: attributes.remove(&BpmnAttrib::AttachedToRef),
                 _cancel_activity: attributes.remove(&BpmnAttrib::CancelActivity),
                 outputs: Default::default(),
+                inputs: Default::default(),
             },
             TASK | SCRIPT_TASK | USER_TASK | SERVICE_TASK | CALL_ACTIVITY | RECEIVE_TASK
             | SEND_TASK | MANUAL_TASK | BUSINESS_RULE_TASK | SUB_PROCESS | TRANSACTION => {
@@ -241,6 +242,7 @@ impl TryFrom<(&[u8], HashMap<BpmnAttrib, String>)> for Bpmn {
                         .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
                     name: attributes.remove(&BpmnAttrib::Name),
                     outputs: Default::default(),
+                    inputs: Default::default(),
                     start_id: None,
                 }
             }
@@ -252,6 +254,7 @@ impl TryFrom<(&[u8], HashMap<BpmnAttrib, String>)> for Bpmn {
                 name: attributes.remove(&BpmnAttrib::Name),
                 default: attributes.remove(&BpmnAttrib::Default),
                 outputs: Default::default(),
+                inputs: Default::default(),
             },
             SEQUENCE_FLOW => Bpmn::SequenceFlow {
                 id: attributes
@@ -293,12 +296,14 @@ pub(crate) enum Bpmn {
         attached_to_ref: Option<String>,
         _cancel_activity: Option<String>,
         outputs: Vec<String>,
+        inputs: Vec<String>,
     },
     Activity {
         aktivity: ActivityType,
         id: String,
         name: Option<String>,
         outputs: Vec<String>,
+        inputs: Vec<String>,
 
         // Only used by subprocess type
         start_id: Option<String>,
@@ -309,6 +314,7 @@ pub(crate) enum Bpmn {
         name: Option<String>,
         default: Option<String>,
         outputs: Vec<String>,
+        inputs: Vec<String>,
     },
     SequenceFlow {
         id: String,
@@ -340,6 +346,15 @@ impl Bpmn {
             Bpmn::Event { outputs, .. }
             | Bpmn::Gateway { outputs, .. }
             | Bpmn::Activity { outputs, .. } => outputs.push(text),
+            _ => {}
+        }
+    }
+
+    pub(crate) fn set_input(&mut self, text: String) {
+        match self {
+            Bpmn::Event { inputs, .. }
+            | Bpmn::Gateway { inputs, .. }
+            | Bpmn::Activity { inputs, .. } => inputs.push(text),
             _ => {}
         }
     }

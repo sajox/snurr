@@ -326,6 +326,7 @@ impl Process {
                     name,
                     outputs,
                     start_id,
+                    ..
                 } => {
                     let name_or_id = name.as_ref().unwrap_or(id);
                     info!("{}: {}", aktivity, name_or_id);
@@ -367,6 +368,7 @@ impl Process {
                     name,
                     default,
                     outputs,
+                    ..
                 } => {
                     let name_or_id = name.as_ref().unwrap_or(id);
                     info!("{}: {}", gateway, name_or_id);
