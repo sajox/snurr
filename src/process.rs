@@ -41,7 +41,6 @@ pub struct ProcessResult<T> {
 pub struct Process {
     data: HashMap<String, HashMap<String, Bpmn>>,
     definitions_id: String,
-    gateway_ids: HashMap<String, HashMap<String, String>>,
     activity_ids: HashMap<String, HashMap<Symbol, String>>,
     catch_events_ids: HashMap<String, HashMap<Symbol, String>>,
 }
@@ -49,7 +48,7 @@ pub struct Process {
 impl Process {
     /// Create new process and initialize it from the BPMN file path.
     pub fn new(path: impl AsRef<Path>) -> Result<Self, Error> {
-        let (definitions_id, data) = read_bpmn_file(path)?;
+        let (definitions_id, mut data) = read_bpmn_file(path)?;
 
         // Collect all referencing output names
         let mut gateway_ids: HashMap<String, HashMap<String, String>> = HashMap::new();
@@ -101,10 +100,22 @@ impl Process {
             });
         });
 
+        // Update gateway outputs with name
+        data.values_mut().for_each(|process| {
+            process.values_mut().for_each(|bpmn| {
+                if let Bpmn::Gateway { id, outputs, .. } = bpmn {
+                    if let Some(map) = gateway_ids.get(id) {
+                        for (name, id) in map.iter() {
+                            outputs.register_name(id, name);
+                        }
+                    }
+                }
+            });
+        });
+
         Ok(Self {
             data,
             definitions_id,
-            gateway_ids,
             activity_ids,
             catch_events_ids,
         })
@@ -134,33 +145,18 @@ impl Process {
 
                     if let Bpmn::Gateway {
                         gateway: GatewayType::Exclusive | GatewayType::Inclusive,
-                        id,
                         outputs,
                         ..
                     } = bpmn
                     {
                         if outputs.len() > 1 {
-                            let names = if let Some(map) = self.gateway_ids.get(id) {
-                                let mut names = map.keys().collect::<Vec<&String>>();
-                                names.sort();
-                                names
-                            } else {
-                                Vec::new()
-                            };
-                            scaffold.add_gateway(bpmn, names);
+                            scaffold.add_gateway(bpmn);
                         }
                     }
                 });
             });
 
         scaffold.create(path)
-    }
-
-    fn name_lookup(&self, gateway_id: &str, name: &str) -> Option<&str> {
-        self.gateway_ids
-            .get(gateway_id)
-            .and_then(|map| map.get(name))
-            .map(|s| s.as_str())
     }
 
     fn boundary_lookup(&self, activity_id: &str, symbol: &Symbol) -> Option<&String> {
@@ -403,7 +399,7 @@ impl Process {
                             let responses = handler.run_gateway(name_or_id, Arc::clone(&data));
                             responses
                                 .first()
-                                .map(|response| self.name_lookup(id, response).unwrap_or(response))
+                                .map(|response| outputs.name_to_id(response).unwrap_or(response))
                                 .or(default.as_deref())
                                 .or_else(|| outputs.first().map(|x| x.as_str()))
                                 .ok_or_else(|| Error::MissingId(id.into()))?
@@ -420,7 +416,7 @@ impl Process {
                             // Run all chosen paths
                             let (oks, mut errors): (Vec<_>, Vec<_>) = responses
                                 .iter()
-                                .map(|response| self.name_lookup(id, response).unwrap_or(response))
+                                .map(|response| outputs.name_to_id(response).unwrap_or(response))
                                 .map(recursion)
                                 .partition(Result::is_ok);
 

@@ -5,7 +5,6 @@ use crate::{error::Error, model::Bpmn, Symbol};
 #[derive(Debug)]
 struct Gateway<'a> {
     bpmn: &'a Bpmn,
-    output_names: Vec<&'a String>,
 }
 
 #[derive(Debug)]
@@ -25,8 +24,8 @@ impl<'a> Scaffold<'a> {
         self.tasks.push(Task { bpmn, symbols });
     }
 
-    pub(crate) fn add_gateway(&mut self, bpmn: &'a Bpmn, output_names: Vec<&'a String>) {
-        self.gateways.push(Gateway { bpmn, output_names });
+    pub(crate) fn add_gateway(&mut self, bpmn: &'a Bpmn) {
+        self.gateways.push(Gateway { bpmn });
     }
 
     /// Generate code from all the task and gateways to the given file path.
@@ -69,20 +68,17 @@ impl<'a> Scaffold<'a> {
                 bpmn: Bpmn::Gateway {
                     id, name, outputs, ..
                 },
-                output_names: out_names,
             } = gateway
             else {
                 continue;
             };
 
             let name_or_id = name.as_ref().unwrap_or(id);
-            content.push(format!(
-                r#"    // "{}" output id(s) {:?}"#,
-                name_or_id, outputs
-            ));
+            content.push(format!(r#"    // "{}", {:?}"#, name_or_id, outputs));
             content.push(format!(
                 r#"    handler.add_gateway("{}", |input| vec!{:?});"#,
-                name_or_id, out_names
+                name_or_id,
+                outputs.names().collect::<Vec<&str>>()
             ));
             content.push("".into());
         }

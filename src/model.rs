@@ -194,6 +194,130 @@ impl From<&[u8]> for BpmnAttrib {
     }
 }
 
+/// BPMN Symbols
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum Symbol {
+    Message,
+    Timer,
+    Escalation,
+    Conditional,
+    Link,
+    Error,
+    Cancel,
+    Compensation,
+    Signal,
+    Multiple,
+    ParallelMultiple,
+    Terminate,
+}
+
+impl Display for Symbol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl TryFrom<&[u8]> for Symbol {
+    type Error = Error;
+
+    fn try_from(value: &[u8]) -> Result<Self, Error> {
+        let ty = match value {
+            MESSAGE_EVENT_DEFINITION => Symbol::Message,
+            TIMER_EVENT_DEFINITION => Symbol::Timer,
+            ESCALATION_EVENT_DEFINITION => Symbol::Escalation,
+            CONDITIONAL_EVENT_DEFINITION => Symbol::Conditional,
+            ERROR_EVENT_DEFINITION => Symbol::Error,
+            COMPENSATE_EVENT_DEFINITION => Symbol::Compensation,
+            SIGNAL_EVENT_DEFINITION => Symbol::Signal,
+            LINK_EVENT_DEFINITION => Symbol::Link,
+            _ => return Err(Error::BadSymbolType),
+        };
+        Ok(ty)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum Bpmn {
+    Definitions {
+        id: String,
+    },
+    Process {
+        id: String,
+        _is_executable: bool,
+        start_id: Option<String>,
+    },
+    Event {
+        event: EventType,
+        symbol: Option<Symbol>,
+        id: String,
+        name: Option<String>,
+        attached_to_ref: Option<String>,
+        _cancel_activity: Option<String>,
+        outputs: Outputs,
+        inputs: Vec<String>,
+    },
+    Activity {
+        aktivity: ActivityType,
+        id: String,
+        name: Option<String>,
+        outputs: Outputs,
+        inputs: Vec<String>,
+
+        // Only used by subprocess type
+        start_id: Option<String>,
+    },
+    Gateway {
+        gateway: GatewayType,
+        id: String,
+        name: Option<String>,
+        default: Option<String>,
+        outputs: Outputs,
+        inputs: Vec<String>,
+    },
+    SequenceFlow {
+        id: String,
+        name: Option<String>,
+        source_ref: String,
+        target_ref: String,
+    },
+    Direction {
+        _direction: DirectionType,
+        text: Option<String>,
+    },
+}
+
+impl Bpmn {
+    pub(crate) fn id(&self) -> Option<&String> {
+        match self {
+            Bpmn::Definitions { id, .. }
+            | Bpmn::Process { id, .. }
+            | Bpmn::Event { id, .. }
+            | Bpmn::Activity { id, .. }
+            | Bpmn::Gateway { id, .. }
+            | Bpmn::SequenceFlow { id, .. } => Some(id),
+            Bpmn::Direction { .. } => None,
+        }
+    }
+
+    pub(crate) fn set_output(&mut self, text: String) {
+        match self {
+            Bpmn::Event { outputs, .. }
+            | Bpmn::Gateway { outputs, .. }
+            | Bpmn::Activity { outputs, .. } => outputs.add(text),
+            _ => {}
+        }
+    }
+
+    pub(crate) fn set_input(&mut self, text: String) {
+        match self {
+            Bpmn::Event { inputs, .. }
+            | Bpmn::Gateway { inputs, .. }
+            | Bpmn::Activity { inputs, .. } => inputs.push(text),
+            _ => {}
+        }
+    }
+}
+
 impl TryFrom<(&[u8], HashMap<BpmnAttrib, String>)> for Bpmn {
     type Error = Error;
 
@@ -278,126 +402,56 @@ impl TryFrom<(&[u8], HashMap<BpmnAttrib, String>)> for Bpmn {
     }
 }
 
-#[derive(Debug)]
-pub(crate) enum Bpmn {
-    Definitions {
-        id: String,
-    },
-    Process {
-        id: String,
-        _is_executable: bool,
-        start_id: Option<String>,
-    },
-    Event {
-        event: EventType,
-        symbol: Option<Symbol>,
-        id: String,
-        name: Option<String>,
-        attached_to_ref: Option<String>,
-        _cancel_activity: Option<String>,
-        outputs: Vec<String>,
-        inputs: Vec<String>,
-    },
-    Activity {
-        aktivity: ActivityType,
-        id: String,
-        name: Option<String>,
-        outputs: Vec<String>,
-        inputs: Vec<String>,
-
-        // Only used by subprocess type
-        start_id: Option<String>,
-    },
-    Gateway {
-        gateway: GatewayType,
-        id: String,
-        name: Option<String>,
-        default: Option<String>,
-        outputs: Vec<String>,
-        inputs: Vec<String>,
-    },
-    SequenceFlow {
-        id: String,
-        name: Option<String>,
-        source_ref: String,
-        target_ref: String,
-    },
-    Direction {
-        _direction: DirectionType,
-        text: Option<String>,
-    },
+#[derive(Debug, Default)]
+pub(crate) struct Outputs {
+    names: Vec<Option<String>>,
+    ids: Vec<String>,
 }
 
-impl Bpmn {
-    pub(crate) fn id(&self) -> Option<&String> {
-        match self {
-            Bpmn::Definitions { id, .. }
-            | Bpmn::Process { id, .. }
-            | Bpmn::Event { id, .. }
-            | Bpmn::Activity { id, .. }
-            | Bpmn::Gateway { id, .. }
-            | Bpmn::SequenceFlow { id, .. } => Some(id),
-            Bpmn::Direction { .. } => None,
+impl Outputs {
+    fn add(&mut self, output_id: impl Into<String>) {
+        self.ids.push(output_id.into());
+        self.names.push(None);
+    }
+
+    pub(crate) fn register_name(&mut self, search_id: impl AsRef<str>, name: impl Into<String>) {
+        if let Some((index, _)) = self
+            .ids
+            .iter()
+            .enumerate()
+            .find(|(_, id)| id.as_str() == search_id.as_ref())
+        {
+            if let Some(value) = self.names.get_mut(index) {
+                *value = Some(name.into())
+            }
         }
     }
 
-    pub(crate) fn set_output(&mut self, text: String) {
-        match self {
-            Bpmn::Event { outputs, .. }
-            | Bpmn::Gateway { outputs, .. }
-            | Bpmn::Activity { outputs, .. } => outputs.push(text),
-            _ => {}
+    pub(crate) fn name_to_id(&self, search_name: impl AsRef<str>) -> Option<&str> {
+        if let Some((index, _)) = self
+            .names
+            .iter()
+            .enumerate()
+            .find(|(_, name)| name.as_deref() == Some(search_name.as_ref()))
+        {
+            return self.ids.get(index).map(|s| s.as_str());
         }
+        None
     }
 
-    pub(crate) fn set_input(&mut self, text: String) {
-        match self {
-            Bpmn::Event { inputs, .. }
-            | Bpmn::Gateway { inputs, .. }
-            | Bpmn::Activity { inputs, .. } => inputs.push(text),
-            _ => {}
-        }
+    pub(crate) fn names(&self) -> impl Iterator<Item = &str> {
+        self.names.iter().filter_map(|s| s.as_deref())
     }
-}
 
-/// BPMN Symbols
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum Symbol {
-    Message,
-    Timer,
-    Escalation,
-    Conditional,
-    Link,
-    Error,
-    Cancel,
-    Compensation,
-    Signal,
-    Multiple,
-    ParallelMultiple,
-    Terminate,
-}
-
-impl Display for Symbol {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+    pub(crate) fn ids(&self) -> impl Iterator<Item = &str> {
+        self.ids.iter().map(String::as_str)
     }
-}
 
-impl TryFrom<&[u8]> for Symbol {
-    type Error = Error;
+    pub(crate) fn len(&self) -> usize {
+        self.ids.len()
+    }
 
-    fn try_from(value: &[u8]) -> Result<Self, Error> {
-        let ty = match value {
-            MESSAGE_EVENT_DEFINITION => Symbol::Message,
-            TIMER_EVENT_DEFINITION => Symbol::Timer,
-            ESCALATION_EVENT_DEFINITION => Symbol::Escalation,
-            CONDITIONAL_EVENT_DEFINITION => Symbol::Conditional,
-            ERROR_EVENT_DEFINITION => Symbol::Error,
-            COMPENSATE_EVENT_DEFINITION => Symbol::Compensation,
-            SIGNAL_EVENT_DEFINITION => Symbol::Signal,
-            LINK_EVENT_DEFINITION => Symbol::Link,
-            _ => return Err(Error::BadSymbolType),
-        };
-        Ok(ty)
+    pub(crate) fn first(&self) -> Option<&String> {
+        self.ids.first()
     }
 }
