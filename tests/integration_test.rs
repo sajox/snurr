@@ -226,8 +226,8 @@ fn inclusive_gateway_no_output() -> Result<(), Box<dyn std::error::Error>> {
     handler.add_gateway("Gateway_0qmfmmo", |_| vec![]);
 
     let bpmn = Process::new("tests/files/inclusive_gateway_no_output.bpmn")?;
-    let pr = bpmn.run(&handler, Counter::default()).is_err();
-    assert!(pr, "Expected an error");
+    let failed = bpmn.run(&handler, Counter::default()).is_err();
+    assert!(failed, "Expected an error");
     Ok(())
 }
 
@@ -316,8 +316,8 @@ fn subprocess_external_link_fail() -> Result<(), Box<dyn std::error::Error>> {
     let handler: Eventhandler<Counter> = Eventhandler::default();
     let bpmn = Process::new("tests/files/subprocess_external_link_fail.bpmn")?;
 
-    let result = bpmn.run(&handler, Counter::default()).is_err();
-    assert!(result, "Expected an error");
+    let failed = bpmn.run(&handler, Counter::default()).is_err();
+    assert!(failed, "Expected an error");
     Ok(())
 }
 
@@ -400,5 +400,14 @@ fn parallel_unbalanced() -> Result<(), Box<dyn std::error::Error>> {
     let bpmn = Process::new("tests/files/parallel_unbalanced.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
     assert_eq!(pr.result.count, 5);
+    Ok(())
+}
+
+#[test]
+fn join_and_fork() -> Result<(), Box<dyn std::error::Error>> {
+    let handler: Eventhandler<_> = Eventhandler::default();
+    let bpmn = Process::new("tests/files/join_and_fork.bpmn")?;
+    let failed = bpmn.run(&handler, {}).is_err();
+    assert!(failed, "Expected an error");
     Ok(())
 }

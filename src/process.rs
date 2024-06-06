@@ -362,6 +362,39 @@ impl Process {
                         }
                     }
                 }
+                // Join
+                Bpmn::Gateway {
+                    gateway,
+                    id,
+                    name,
+                    outputs,
+                    ..
+                } if outputs.len() <= 1 => {
+                    let name_or_id = name.as_ref().unwrap_or(id);
+                    info!("{}: {}", gateway, name_or_id);
+                    let _ = sender.send((GATEWAY, name_or_id.to_owned()));
+                    match gateway {
+                        GatewayType::Exclusive => outputs
+                            .first()
+                            .ok_or_else(|| Error::MissingOutput(gateway.to_string()))?,
+                        GatewayType::Inclusive | GatewayType::Parallel => {
+                            return outputs
+                                .first()
+                                .map(String::as_str)
+                                .map(Some)
+                                .ok_or_else(|| Error::MissingOutput(gateway.to_string()));
+                        }
+                    }
+                }
+                // Join AND Fork
+                Bpmn::Gateway {
+                    outputs, inputs, ..
+                } if outputs.len() > 1 && inputs.len() > 1 => {
+                    return Err(Error::NotSupported(String::from(
+                        "Both Join and Fork not supported",
+                    )))
+                }
+                // Fork
                 Bpmn::Gateway {
                     gateway,
                     id,
@@ -369,40 +402,22 @@ impl Process {
                     default,
                     outputs,
                     ..
-                } => {
+                } if outputs.len() > 1 => {
                     let name_or_id = name.as_ref().unwrap_or(id);
                     info!("{}: {}", gateway, name_or_id);
                     let _ = sender.send((GATEWAY, name_or_id.to_owned()));
                     match gateway {
                         GatewayType::Exclusive => {
-                            if outputs.len() > 1 {
-                                // Default to first outgoing if function is not set.
-                                let responses = handler.run_gateway(name_or_id, Arc::clone(&data));
-                                responses
-                                    .first()
-                                    .map(|response| {
-                                        self.name_lookup(id, response).unwrap_or(response)
-                                    })
-                                    .or(default.as_deref())
-                                    .or_else(|| outputs.first().map(|x| x.as_str()))
-                                    .ok_or_else(|| Error::MissingId(id.into()))?
-                            } else {
-                                outputs
-                                    .first()
-                                    .ok_or_else(|| Error::MissingOutput(gateway.to_string()))?
-                            }
+                            // Default to first outgoing if function is not set.
+                            let responses = handler.run_gateway(name_or_id, Arc::clone(&data));
+                            responses
+                                .first()
+                                .map(|response| self.name_lookup(id, response).unwrap_or(response))
+                                .or(default.as_deref())
+                                .or_else(|| outputs.first().map(|x| x.as_str()))
+                                .ok_or_else(|| Error::MissingId(id.into()))?
                         }
                         GatewayType::Inclusive => {
-                            // Converging gateway. Synchronize
-                            if outputs.len() <= 1 {
-                                return outputs
-                                    .first()
-                                    .map(String::as_str)
-                                    .map(Some)
-                                    .ok_or_else(|| Error::MissingOutput(gateway.to_string()));
-                            }
-
-                            // Diverging gateway
                             let mut responses = handler.run_gateway(name_or_id, Arc::clone(&data));
                             // If empty. Add default or first output.
                             if responses.is_empty() {
@@ -432,23 +447,12 @@ impl Process {
                                 None => return Ok(None),
                             }
                         }
-                        GatewayType::Parallel => {
-                            // Converging gateway. Synchronize
-                            if outputs.len() <= 1 {
-                                return outputs
-                                    .first()
-                                    .map(String::as_str)
-                                    .map(Some)
-                                    .ok_or_else(|| Error::MissingOutput(gateway.to_string()));
-                            }
-                            parallelize_helper!(outputs, id, recursion)
-                        }
+                        GatewayType::Parallel => parallelize_helper!(outputs, id, recursion),
                     }
                 }
                 Bpmn::SequenceFlow {
                     id,
                     name,
-
                     target_ref,
                     ..
                 } => {

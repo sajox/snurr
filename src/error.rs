@@ -62,4 +62,7 @@ pub enum Error {
 
     #[error("malformed utf8")]
     Utf8(#[from] std::str::Utf8Error),
+
+    #[error("not supported")]
+    NotSupported(String),
 }
