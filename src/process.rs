@@ -292,24 +292,16 @@ impl Process {
                         EventType::Start | EventType::IntermediateCatch | EventType::Boundary => {
                             parallelize_helper!(outputs, id, recursion)
                         }
-                        EventType::IntermediateThrow => {
-                            // If no symbol is set then just follow output.
-                            if symbol.as_ref().is_none() {
-                                parallelize_helper!(outputs, id, recursion)
-                            } else {
-                                match name.as_ref().zip(symbol.as_ref()) {
-                                    Some((name, symbol @ Symbol::Link)) => {
-                                        self.catch_event_lookup(name, symbol)?
-                                    }
-                                    Some((_, _)) => {
-                                        parallelize_helper!(outputs, id, recursion)
-                                    }
-                                    None => {
-                                        Err(Error::MissingNameIntermediateThrowEvent(id.into()))?
-                                    }
-                                }
+                        EventType::IntermediateThrow => match (name.as_ref(), symbol.as_ref()) {
+                            (Some(name), Some(symbol @ Symbol::Link)) => {
+                                self.catch_event_lookup(name, symbol)?
                             }
-                        }
+                            // Follow outputs for other throw events
+                            (Some(_), _) => {
+                                parallelize_helper!(outputs, id, recursion)
+                            }
+                            _ => Err(Error::MissingNameIntermediateThrowEvent(id.into()))?,
+                        },
                         EventType::End => {
                             if let Some(symbol) = symbol {
                                 return Ok(self
@@ -333,12 +325,11 @@ impl Process {
                     match aktivity {
                         ActivityType::Task => {
                             let _ = sender.send((TASK, name_or_id.to_owned()));
-                            let response = handler.run_task(name_or_id, Arc::clone(&data));
-                            if let Err(symbol) = response {
-                                self.boundary_lookup(id, &symbol)
-                                    .ok_or_else(|| Error::MissingBoundary(name_or_id.into()))?
-                            } else {
-                                parallelize_helper!(outputs, id, recursion)
+                            match handler.run_task(name_or_id, Arc::clone(&data)) {
+                                Ok(_) => parallelize_helper!(outputs, id, recursion),
+                                Err(symbol) => self
+                                    .boundary_lookup(id, &symbol)
+                                    .ok_or_else(|| Error::MissingBoundary(name_or_id.into()))?,
                             }
                         }
                         ActivityType::SubProcess => {
@@ -346,18 +337,18 @@ impl Process {
                                 .data
                                 .get_key_value(id)
                                 .ok_or(Error::MissingSubProcess)?;
-                            let response_id = self.execute(
+
+                            match self.execute(
                                 start_id.as_ref().ok_or(Error::MissingProcessStart)?,
                                 sub_process,
                                 handler,
                                 Arc::clone(&data),
                                 sender.clone(),
-                            )?;
-
-                            if let Some(response_id) = response_id {
-                                response_id
-                            } else {
-                                parallelize_helper!(outputs, id, recursion)
+                            )? {
+                                // Boundary id returned
+                                Some(id) => id,
+                                // Continue from subprocess
+                                None => parallelize_helper!(outputs, id, recursion),
                             }
                         }
                     }
