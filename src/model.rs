@@ -54,7 +54,7 @@ pub(crate) const ATTRIB_NAME: &[u8] = b"name";
 pub(crate) const ATTRIB_SOURCE_REF: &[u8] = b"sourceRef";
 pub(crate) const ATTRIB_TARGET_REF: &[u8] = b"targetRef";
 pub(crate) const ATTRIB_DEFAULT: &[u8] = b"default";
-pub(crate) const ATTRIB_EXPORTER_VERSION: &[u8] = b"exporterVersion";
+pub(crate) const _ATTRIB_EXPORTER_VERSION: &[u8] = b"exporterVersion";
 pub(crate) const ATTRIB_ATTACHED_TO_REF: &[u8] = b"attachedToRef";
 pub(crate) const ATTRIB_CANCEL_ACTIVITY: &[u8] = b"cancelActivity";
 
@@ -160,37 +160,6 @@ impl TryFrom<&[u8]> for DirectionType {
 impl Display for DirectionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub(crate) enum BpmnAttrib {
-    Id,
-    IsExecutable,
-    Name,
-    SourceRef,
-    TargetRef,
-    Default,
-    ExporterVersion,
-    AttachedToRef,
-    CancelActivity,
-    Ignore,
-}
-
-impl From<&[u8]> for BpmnAttrib {
-    fn from(value: &[u8]) -> Self {
-        match value {
-            ATTRIB_ID => BpmnAttrib::Id,
-            ATTRIB_IS_EXECUTABLE => BpmnAttrib::IsExecutable,
-            ATTRIB_NAME => BpmnAttrib::Name,
-            ATTRIB_SOURCE_REF => BpmnAttrib::SourceRef,
-            ATTRIB_TARGET_REF => BpmnAttrib::TargetRef,
-            ATTRIB_DEFAULT => BpmnAttrib::Default,
-            ATTRIB_EXPORTER_VERSION => BpmnAttrib::ExporterVersion,
-            ATTRIB_ATTACHED_TO_REF => BpmnAttrib::AttachedToRef,
-            ATTRIB_CANCEL_ACTIVITY => BpmnAttrib::CancelActivity,
-            _ => BpmnAttrib::Ignore,
-        }
     }
 }
 
@@ -318,25 +287,25 @@ impl Bpmn {
     }
 }
 
-impl TryFrom<(&[u8], HashMap<BpmnAttrib, String>)> for Bpmn {
+impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
     type Error = Error;
 
     fn try_from(
-        (bpmn_type, mut attributes): (&[u8], HashMap<BpmnAttrib, String>),
+        (bpmn_type, mut attributes): (&[u8], HashMap<&[u8], String>),
     ) -> Result<Self, Self::Error> {
         let bpmn_type_str = std::str::from_utf8(bpmn_type)?;
         let ty = match bpmn_type {
             DEFINITIONS => Bpmn::Definitions {
                 id: attributes
-                    .remove(&BpmnAttrib::Id)
+                    .remove(ATTRIB_ID)
                     .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
             },
             PROCESS => Bpmn::Process {
                 id: attributes
-                    .remove(&BpmnAttrib::Id)
+                    .remove(ATTRIB_ID)
                     .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
                 _is_executable: attributes
-                    .remove(&BpmnAttrib::IsExecutable)
+                    .remove(ATTRIB_IS_EXECUTABLE)
                     .and_then(|s| s.parse::<bool>().ok())
                     .unwrap_or_default(),
                 start_id: None,
@@ -349,11 +318,11 @@ impl TryFrom<(&[u8], HashMap<BpmnAttrib, String>)> for Bpmn {
                 event: bpmn_type.try_into()?,
                 symbol: None,
                 id: attributes
-                    .remove(&BpmnAttrib::Id)
+                    .remove(ATTRIB_ID)
                     .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
-                name: attributes.remove(&BpmnAttrib::Name),
-                attached_to_ref: attributes.remove(&BpmnAttrib::AttachedToRef),
-                _cancel_activity: attributes.remove(&BpmnAttrib::CancelActivity),
+                name: attributes.remove(ATTRIB_NAME),
+                attached_to_ref: attributes.remove(ATTRIB_ATTACHED_TO_REF),
+                _cancel_activity: attributes.remove(ATTRIB_CANCEL_ACTIVITY),
                 outputs: Default::default(),
                 inputs: Default::default(),
             },
@@ -362,9 +331,9 @@ impl TryFrom<(&[u8], HashMap<BpmnAttrib, String>)> for Bpmn {
                 Bpmn::Activity {
                     aktivity: bpmn_type.try_into()?,
                     id: attributes
-                        .remove(&BpmnAttrib::Id)
+                        .remove(ATTRIB_ID)
                         .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
-                    name: attributes.remove(&BpmnAttrib::Name),
+                    name: attributes.remove(ATTRIB_NAME),
                     outputs: Default::default(),
                     inputs: Default::default(),
                     start_id: None,
@@ -373,23 +342,23 @@ impl TryFrom<(&[u8], HashMap<BpmnAttrib, String>)> for Bpmn {
             EXCLUSIVE_GATEWAY | PARALLEL_GATEWAY | INCLUSIVE_GATEWAY => Bpmn::Gateway {
                 gateway: bpmn_type.try_into()?,
                 id: attributes
-                    .remove(&BpmnAttrib::Id)
+                    .remove(ATTRIB_ID)
                     .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
-                name: attributes.remove(&BpmnAttrib::Name),
-                default: attributes.remove(&BpmnAttrib::Default),
+                name: attributes.remove(ATTRIB_NAME),
+                default: attributes.remove(ATTRIB_DEFAULT),
                 outputs: Default::default(),
                 inputs: Default::default(),
             },
             SEQUENCE_FLOW => Bpmn::SequenceFlow {
                 id: attributes
-                    .remove(&BpmnAttrib::Id)
+                    .remove(ATTRIB_ID)
                     .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
-                name: attributes.remove(&BpmnAttrib::Name),
+                name: attributes.remove(ATTRIB_NAME),
                 source_ref: attributes
-                    .remove(&BpmnAttrib::SourceRef)
+                    .remove(ATTRIB_SOURCE_REF)
                     .ok_or(Error::MissingSourceRef)?,
                 target_ref: attributes
-                    .remove(&BpmnAttrib::TargetRef)
+                    .remove(ATTRIB_TARGET_REF)
                     .ok_or(Error::MissingTargetRef)?,
             },
             INCOMING | OUTGOING => Bpmn::Direction {

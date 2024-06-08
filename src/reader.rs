@@ -171,19 +171,19 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
     Ok((definitions_id.ok_or(Error::MissingDefinitions)?, data))
 }
 
-fn collect_attributes(bs: &quick_xml::events::BytesStart<'_>) -> HashMap<BpmnAttrib, String> {
+fn collect_attributes<'a>(bs: &'a quick_xml::events::BytesStart<'_>) -> HashMap<&'a [u8], String> {
     bs.attributes()
         .filter_map(Result::ok)
         .map(|attribute| {
             (
-                attribute.key.local_name().into_inner().into(),
+                attribute.key.local_name().into_inner(),
                 std::str::from_utf8(attribute.value.as_ref())
                     .unwrap_or_default()
                     .to_string(),
             )
         })
         .filter(|(_, s)| !s.is_empty())
-        .collect::<HashMap<BpmnAttrib, String>>()
+        .collect::<HashMap<&'a [u8], String>>()
 }
 
 #[cfg(test)]
