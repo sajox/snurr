@@ -6,6 +6,22 @@ Snurr contains no database or state over last known position.
 
 This is not a complete implementation of the BPMN 2.0 specification but intend to be light weight subset of it.
 
+## Lib
+
+**parallel feature** is disabled by default and might be sufficient. Spawning threads can add additional overhead.
+
+```toml
+[dependencies]
+snurr = { git = "https://github.com/sajox/snurr.git"}
+```
+
+With parallel feature enabled, new threads are spawned with parallel gateway, task and event "forks".
+
+```toml
+[dependencies]
+snurr = { git = "https://github.com/sajox/snurr.git", features = ["parallel"] }
+```
+
 
 ## Process
 
