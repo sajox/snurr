@@ -78,7 +78,7 @@ impl<'a> Scaffold<'a> {
             content.push(format!(
                 r#"    handler.add_gateway("{}", |input| vec!{:?});"#,
                 name_or_id,
-                outputs.names().collect::<Vec<&str>>()
+                outputs.names()
             ));
             content.push("".into());
         }

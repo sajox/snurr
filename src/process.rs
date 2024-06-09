@@ -4,7 +4,7 @@ use parallel::parallelize_helper;
 
 use log::info;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     path::Path,
     sync::{
         mpsc::{channel, Sender},
@@ -21,7 +21,7 @@ use crate::{
     Data, Eventhandler, Symbol,
 };
 
-type ExecuteResult<'a> = Result<Option<&'a str>, Error>;
+type ExecuteResult<'a> = Result<Vec<&'a str>, Error>;
 
 const GATEWAY: &str = "Gateway";
 const TASK: &str = "Task";
@@ -231,7 +231,7 @@ impl Process {
             } = bpmn
             {
                 self.execute(
-                    start_id,
+                    vec![start_id],
                     self.data.get_key_value(id).ok_or(Error::MissingProcess)?,
                     handler,
                     Arc::clone(&data),
@@ -257,7 +257,7 @@ impl Process {
 
     fn execute<'a, T>(
         &'a self,
-        mut next_id: &'a str,
+        ids: Vec<&'a str>,
         process @ (process_id, process_data): (&String, &'a HashMap<String, Bpmn>),
         handler: &Eventhandler<T>,
         data: Data<T>,
@@ -266,190 +266,203 @@ impl Process {
     where
         T: Send,
     {
-        let recursion = |output: &'a str| {
-            self.execute(output, process, handler, Arc::clone(&data), sender.clone())
+        let recursion = |outputs: Vec<&'a str>| {
+            self.execute(outputs, process, handler, Arc::clone(&data), sender.clone())
         };
 
-        while let Some(bpmn) = process_data.get(next_id) {
-            next_id = match bpmn {
-                Bpmn::Process { start_id, .. } => {
-                    start_id.as_ref().ok_or(Error::MissingProcessStart)?
-                }
-                Bpmn::Event {
-                    event,
-                    symbol,
-                    id,
-                    name,
-                    outputs,
-                    ..
-                } => {
-                    info!("{}: {}", event, name.as_ref().unwrap_or(id));
-                    match event {
-                        EventType::Start | EventType::IntermediateCatch | EventType::Boundary => {
-                            parallelize_helper!(outputs, id, recursion)
-                        }
-                        EventType::IntermediateThrow => match (name.as_ref(), symbol.as_ref()) {
-                            (Some(name), Some(symbol @ Symbol::Link)) => {
-                                self.catch_event_lookup(name, symbol)?
-                            }
-                            // Follow outputs for other throw events
-                            (Some(_), _) => {
-                                parallelize_helper!(outputs, id, recursion)
-                            }
-                            _ => Err(Error::MissingNameIntermediateThrowEvent(id.into()))?,
-                        },
-                        EventType::End => {
-                            if let Some(symbol) = symbol {
-                                return Ok(self
-                                    .boundary_lookup(process_id, symbol)
-                                    .map(String::as_str));
-                            }
-                            return Ok(None);
-                        }
+        let mut results: Vec<&str> = vec![];
+        let mut queue = VecDeque::from(ids);
+        while let Some(next_id) = queue.pop_front() {
+            queue.push_back(
+                match process_data
+                    .get(next_id)
+                    .ok_or_else(|| Error::MissingId(next_id.to_string()))?
+                {
+                    Bpmn::Process { start_id, .. } => {
+                        start_id.as_ref().ok_or(Error::MissingProcessStart)?
                     }
-                }
-                Bpmn::Activity {
-                    aktivity,
-                    id,
-                    name,
-                    outputs,
-                    start_id,
-                    ..
-                } => {
-                    let name_or_id = name.as_ref().unwrap_or(id);
-                    info!("{}: {}", aktivity, name_or_id);
-                    match aktivity {
-                        ActivityType::Task => {
-                            let _ = sender.send((TASK, name_or_id.to_owned()));
-                            match handler.run_task(name_or_id, Arc::clone(&data)) {
-                                Ok(_) => parallelize_helper!(outputs, id, recursion),
-                                Err(symbol) => self
-                                    .boundary_lookup(id, &symbol)
-                                    .ok_or_else(|| Error::MissingBoundary(name_or_id.into()))?,
+                    Bpmn::Event {
+                        event,
+                        symbol,
+                        id,
+                        name,
+                        outputs,
+                        ..
+                    } => {
+                        info!("{}: {}", event, name.as_ref().unwrap_or(id));
+                        match event {
+                            EventType::Start
+                            | EventType::IntermediateCatch
+                            | EventType::Boundary => {
+                                parallelize_helper!(outputs, recursion)
                             }
-                        }
-                        ActivityType::SubProcess => {
-                            let sub_process = self
-                                .data
-                                .get_key_value(id)
-                                .ok_or(Error::MissingSubProcess)?;
-
-                            match self.execute(
-                                start_id.as_ref().ok_or(Error::MissingProcessStart)?,
-                                sub_process,
-                                handler,
-                                Arc::clone(&data),
-                                sender.clone(),
-                            )? {
-                                // Boundary id returned
-                                Some(id) => id,
-                                // Continue from subprocess
-                                None => parallelize_helper!(outputs, id, recursion),
-                            }
-                        }
-                    }
-                }
-                // Join
-                Bpmn::Gateway {
-                    gateway,
-                    id,
-                    name,
-                    outputs,
-                    ..
-                } if outputs.len() <= 1 => {
-                    let name_or_id = name.as_ref().unwrap_or(id);
-                    info!("{}: {}", gateway, name_or_id);
-                    let _ = sender.send((GATEWAY, name_or_id.to_owned()));
-                    match gateway {
-                        GatewayType::Exclusive => outputs
-                            .first()
-                            .ok_or_else(|| Error::MissingOutput(gateway.to_string()))?,
-                        GatewayType::Inclusive | GatewayType::Parallel => {
-                            return outputs
-                                .first()
-                                .map(String::as_str)
-                                .map(Some)
-                                .ok_or_else(|| Error::MissingOutput(gateway.to_string()));
-                        }
-                    }
-                }
-                // Join AND Fork
-                Bpmn::Gateway {
-                    outputs, inputs, ..
-                } if outputs.len() > 1 && inputs.len() > 1 => {
-                    return Err(Error::NotSupported(String::from(
-                        "Both Join and Fork not supported",
-                    )))
-                }
-                // Fork
-                Bpmn::Gateway {
-                    gateway,
-                    id,
-                    name,
-                    default,
-                    outputs,
-                    ..
-                } if outputs.len() > 1 => {
-                    let name_or_id = name.as_ref().unwrap_or(id);
-                    info!("{}: {}", gateway, name_or_id);
-                    let _ = sender.send((GATEWAY, name_or_id.to_owned()));
-                    match gateway {
-                        GatewayType::Exclusive => {
-                            // Default to first outgoing if function is not set.
-                            let responses = handler.run_gateway(name_or_id, Arc::clone(&data));
-                            responses
-                                .first()
-                                .map(|response| outputs.name_to_id(response).unwrap_or(response))
-                                .or(default.as_deref())
-                                .or_else(|| outputs.first().map(|x| x.as_str()))
-                                .ok_or_else(|| Error::MissingId(id.into()))?
-                        }
-                        GatewayType::Inclusive => {
-                            let mut responses = handler.run_gateway(name_or_id, Arc::clone(&data));
-                            // If empty. Add default or first output.
-                            if responses.is_empty() {
-                                if let Some(resp) = default.as_ref().or_else(|| outputs.first()) {
-                                    responses.push(resp);
+                            EventType::IntermediateThrow => {
+                                match (name.as_ref(), symbol.as_ref()) {
+                                    (Some(name), Some(symbol @ Symbol::Link)) => {
+                                        self.catch_event_lookup(name, symbol)?
+                                    }
+                                    // Follow outputs for other throw events
+                                    (Some(_), _) => {
+                                        parallelize_helper!(outputs, recursion)
+                                    }
+                                    _ => Err(Error::MissingNameIntermediateThrowEvent(id.into()))?,
                                 }
                             }
-
-                            // Run all chosen paths
-                            let (oks, mut errors): (Vec<_>, Vec<_>) = responses
-                                .iter()
-                                .map(|response| outputs.name_to_id(response).unwrap_or(response))
-                                .map(recursion)
-                                .partition(Result::is_ok);
-
-                            if let Some(result) = errors.pop() {
-                                return result;
-                            }
-
-                            match oks
-                                .into_iter()
-                                .filter_map(Result::ok)
-                                .find(Option::is_some)
-                                .flatten()
-                            {
-                                Some(id) => id,
-                                None => return Ok(None),
+                            EventType::End => {
+                                if let Some(boundary_id) = symbol.as_ref().and_then(|symbol| {
+                                    self.boundary_lookup(process_id, symbol).map(String::as_str)
+                                }) {
+                                    results.push(boundary_id);
+                                }
+                                continue;
                             }
                         }
-                        GatewayType::Parallel => parallelize_helper!(outputs, id, recursion),
                     }
-                }
-                Bpmn::SequenceFlow {
-                    id,
-                    name,
-                    target_ref,
-                    ..
-                } => {
-                    info!("SequenceFlow: {}", name.as_ref().unwrap_or(id));
-                    target_ref
-                }
-                _ => return Err(Error::MissingBpmnType("Type not handled.".into())),
-            }
+                    Bpmn::Activity {
+                        aktivity,
+                        id,
+                        name,
+                        outputs,
+                        start_id,
+                        ..
+                    } => {
+                        let name_or_id = name.as_ref().unwrap_or(id);
+                        info!("{}: {}", aktivity, name_or_id);
+                        match aktivity {
+                            ActivityType::Task => {
+                                let _ = sender.send((TASK, name_or_id.to_owned()));
+                                match handler.run_task(name_or_id, Arc::clone(&data)) {
+                                    Ok(_) => parallelize_helper!(outputs, recursion),
+                                    Err(symbol) => self
+                                        .boundary_lookup(id, &symbol)
+                                        .ok_or_else(|| Error::MissingBoundary(name_or_id.into()))?,
+                                }
+                            }
+                            ActivityType::SubProcess => {
+                                let sub_process = self
+                                    .data
+                                    .get_key_value(id)
+                                    .ok_or(Error::MissingSubProcess)?;
+
+                                match self
+                                    .execute(
+                                        vec![start_id
+                                            .as_ref()
+                                            .ok_or(Error::MissingProcessStart)?],
+                                        sub_process,
+                                        handler,
+                                        Arc::clone(&data),
+                                        sender.clone(),
+                                    )?
+                                    .as_slice()
+                                {
+                                    // Boundary id returned
+                                    &[id, ..] => id,
+                                    // Continue from subprocess
+                                    _ => parallelize_helper!(outputs, recursion),
+                                }
+                            }
+                        }
+                    }
+                    // Join
+                    Bpmn::Gateway {
+                        gateway,
+                        id,
+                        name,
+                        outputs,
+                        ..
+                    } if outputs.len() <= 1 => {
+                        let name_or_id = name.as_ref().unwrap_or(id);
+                        info!("{}: {}", gateway, name_or_id);
+                        let _ = sender.send((GATEWAY, name_or_id.to_owned()));
+                        match gateway {
+                            GatewayType::Exclusive => outputs
+                                .first()
+                                .ok_or_else(|| Error::MissingOutput(gateway.to_string()))?,
+                            GatewayType::Inclusive | GatewayType::Parallel => {
+                                results.push(
+                                    outputs
+                                        .first()
+                                        .ok_or_else(|| Error::MissingOutput(gateway.to_string()))?,
+                                );
+                                continue;
+                            }
+                        }
+                    }
+                    // Join AND Fork
+                    Bpmn::Gateway {
+                        outputs, inputs, ..
+                    } if outputs.len() > 1 && inputs.len() > 1 => {
+                        return Err(Error::NotSupported(String::from(
+                            "Both Join and Fork not supported",
+                        )))
+                    }
+                    // Fork
+                    Bpmn::Gateway {
+                        gateway,
+                        id,
+                        name,
+                        default,
+                        outputs,
+                        ..
+                    } if outputs.len() > 1 => {
+                        let name_or_id = name.as_ref().unwrap_or(id);
+                        info!("{}: {}", gateway, name_or_id);
+                        let _ = sender.send((GATEWAY, name_or_id.to_owned()));
+                        match gateway {
+                            GatewayType::Exclusive => {
+                                // Default to first outgoing if function is not set.
+                                let responses = handler.run_gateway(name_or_id, Arc::clone(&data));
+                                responses
+                                    .first()
+                                    .map(|response| {
+                                        outputs.name_to_id(response).unwrap_or(response)
+                                    })
+                                    .or(default.as_deref())
+                                    .or_else(|| outputs.first().map(|x| x.as_str()))
+                                    .ok_or_else(|| Error::MissingId(id.into()))?
+                            }
+                            GatewayType::Inclusive => {
+                                let mut responses =
+                                    handler.run_gateway(name_or_id, Arc::clone(&data));
+                                // If empty. Add default or first output.
+                                if responses.is_empty() {
+                                    if let Some(resp) = default.as_ref().or_else(|| outputs.first())
+                                    {
+                                        responses.push(resp);
+                                    }
+                                }
+
+                                // Run all chosen paths
+                                let responses = responses
+                                    .iter()
+                                    .map(|response| {
+                                        outputs.name_to_id(response).unwrap_or(response)
+                                    })
+                                    .collect();
+
+                                match recursion(responses)?.as_slice() {
+                                    &[id, ..] => id,
+                                    _ => continue,
+                                }
+                            }
+                            GatewayType::Parallel => parallelize_helper!(outputs, recursion),
+                        }
+                    }
+                    Bpmn::SequenceFlow {
+                        id,
+                        name,
+                        target_ref,
+                        ..
+                    } => {
+                        info!("SequenceFlow: {}", name.as_ref().unwrap_or(id));
+                        target_ref
+                    }
+                    _ => return Err(Error::MissingBpmnType("Type not handled.".into())),
+                },
+            );
         }
-        Err(Error::MissingId(next_id.into()))
+        Ok(results)
     }
 }
 

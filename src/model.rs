@@ -408,12 +408,12 @@ impl Outputs {
         None
     }
 
-    pub(crate) fn names(&self) -> impl Iterator<Item = &str> {
-        self.names.iter().filter_map(|s| s.as_deref())
+    pub(crate) fn names(&self) -> Vec<&str> {
+        self.names.iter().filter_map(|s| s.as_deref()).collect()
     }
 
-    pub(crate) fn ids(&self) -> impl Iterator<Item = &str> {
-        self.ids.iter().map(String::as_str)
+    pub(crate) fn ids(&self) -> Vec<&str> {
+        self.ids.iter().map(String::as_str).collect()
     }
 
     pub(crate) fn len(&self) -> usize {
