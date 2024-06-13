@@ -42,7 +42,8 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                 | INCOMING
                 | EXCLUSIVE_GATEWAY
                 | PARALLEL_GATEWAY
-                | INCLUSIVE_GATEWAY) => {
+                | INCLUSIVE_GATEWAY
+                | SEQUENCE_FLOW) => {
                     stack.push(Bpmn::try_from((bpmn_type, collect_attributes(&bs)))?)
                 }
                 bpmn_type @ (DEFINITIONS | PROCESS | SUB_PROCESS | TRANSACTION) => {
@@ -130,8 +131,10 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                     | BUSINESS_RULE_TASK
                     | EXCLUSIVE_GATEWAY
                     | PARALLEL_GATEWAY
-                    | INCLUSIVE_GATEWAY => {
+                    | INCLUSIVE_GATEWAY
+                    | SEQUENCE_FLOW => {
                         if let Some(bpmn) = stack.pop() {
+                            check_unsupported(&bpmn)?;
                             if let Some((process, id)) = process_stack.last_mut().zip(bpmn.id()) {
                                 process.insert(id.into(), bpmn);
                             }
@@ -184,6 +187,30 @@ fn collect_attributes<'a>(bs: &'a quick_xml::events::BytesStart<'_>) -> HashMap<
         })
         .filter(|(_, s)| !s.is_empty())
         .collect::<HashMap<&'a [u8], String>>()
+}
+
+fn check_unsupported(bpmn: &Bpmn) -> Result<(), Error> {
+    Err(match bpmn {
+        Bpmn::Gateway {
+            gateway: GatewayType::Parallel | GatewayType::Inclusive,
+            id,
+            name,
+            outputs,
+            inputs,
+            ..
+        } if outputs.len() > 1 && inputs.len() > 1 => Error::NotSupported(format!(
+            "{}: {}",
+            name.as_ref().unwrap_or(id),
+            "Both Join and Fork",
+        )),
+        // SequenceFlow with Start and End tag is Conditional Sequence Flow
+        Bpmn::SequenceFlow { id, name, .. } => Error::NotSupported(format!(
+            "{}: {}",
+            name.as_ref().unwrap_or(id),
+            "Conditional Sequence Flow",
+        )),
+        _ => return Ok(()),
+    })
 }
 
 #[cfg(test)]

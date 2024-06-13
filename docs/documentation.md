@@ -175,7 +175,7 @@ handler.add_gateway("Name or id", |input| {
 
 - Intermediate **none** events (no icon) don't do anything and just follow its output. 
 - **Link** (throw and catch need a matching name)
-- **Other symbols** don't do anything and just follow its output. (Some will be implemented in the future)
+- **Other symbols** don't do anything and just follow its output.
 
 Example with message Link throw and catch event:
 
@@ -240,13 +240,13 @@ RUST_LOG=warn cargo run
  WARN  snurr::model > Missing function. Please register: equal to 3
 ```
 
-## Not supported (Not yet)
+## Not supported
 
 ### Conditional Sequence Flows
 
 ![Conditional Sequence Flows](/tests/not_supported/conditional_sequence_flows.png)
 
-### Both join and fork
+### Both join and fork (Inclusive and Parallel gateway)
 
 ![Join and fork](/tests/not_supported/join_and_fork.png)
 

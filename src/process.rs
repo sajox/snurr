@@ -389,14 +389,6 @@ impl Process {
                             }
                         }
                     }
-                    // Join AND Fork
-                    Bpmn::Gateway {
-                        outputs, inputs, ..
-                    } if outputs.len() > 1 && inputs.len() > 1 => {
-                        return Err(Error::NotSupported(String::from(
-                            "Both Join and Fork not supported",
-                        )))
-                    }
                     // Fork
                     Bpmn::Gateway {
                         gateway,

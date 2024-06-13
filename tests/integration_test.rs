@@ -405,9 +405,28 @@ fn parallel_unbalanced() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn join_and_fork() -> Result<(), Box<dyn std::error::Error>> {
-    let handler: Eventhandler<_> = Eventhandler::default();
-    let bpmn = Process::new("tests/files/join_and_fork.bpmn")?;
-    let failed = bpmn.run(&handler, {}).is_err();
+    let failed = Process::new("tests/files/join_and_fork.bpmn").is_err();
     assert!(failed, "Expected an error");
+    Ok(())
+}
+
+#[test]
+fn conditional_sequence_flows() -> Result<(), Box<dyn std::error::Error>> {
+    let failed = Process::new("tests/files/conditional_sequence_flows.bpmn").is_err();
+    assert!(failed, "Expected an error");
+    Ok(())
+}
+
+#[test]
+fn exclusive_gateway_merging_branching() -> Result<(), Box<dyn std::error::Error>> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_task(COUNT_2, func_cnt(2));
+    handler.add_gateway("BRANCHING", |_| vec!["A"]);
+    handler.add_gateway("MERGE AND BRANCH", |_| vec!["B"]);
+
+    let bpmn = Process::new("tests/files/exclusive_gateway_merging_branching.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 3);
     Ok(())
 }
