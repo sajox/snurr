@@ -12,8 +12,6 @@ type ReaderResult = Result<(String, HashMap<String, HashMap<String, Bpmn>>), Err
 // Read BPMN file and return ReaderResult containing a tuple with BPMN data and start ids.
 pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
     let mut reader = Reader::from_file(path)?;
-    reader.trim_text(true);
-
     let mut data: HashMap<String, HashMap<String, Bpmn>> = HashMap::new();
     let mut process_stack: Vec<HashMap<String, Bpmn>> = Vec::new();
     let mut stack: Vec<Bpmn> = Vec::new();
