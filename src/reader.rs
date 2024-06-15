@@ -53,14 +53,16 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
             Ok(Event::Empty(bs)) => {
                 match bs.local_name().as_ref() {
                     // Attach symbol to parent
-                    bpmn_type @ (ERROR_EVENT_DEFINITION
-                    | MESSAGE_EVENT_DEFINITION
-                    | TIMER_EVENT_DEFINITION
-                    | ESCALATION_EVENT_DEFINITION
-                    | CONDITIONAL_EVENT_DEFINITION
-                    | SIGNAL_EVENT_DEFINITION
+                    bpmn_type @ (CANCEL_EVENT_DEFINITION
                     | COMPENSATE_EVENT_DEFINITION
-                    | LINK_EVENT_DEFINITION) => {
+                    | CONDITIONAL_EVENT_DEFINITION
+                    | ERROR_EVENT_DEFINITION
+                    | ESCALATION_EVENT_DEFINITION
+                    | MESSAGE_EVENT_DEFINITION
+                    | LINK_EVENT_DEFINITION
+                    | SIGNAL_EVENT_DEFINITION
+                    | TERMINATE_EVENT_DEFINITION
+                    | TIMER_EVENT_DEFINITION) => {
                         if let Some(Bpmn::Event { symbol, .. }) = stack.last_mut() {
                             *symbol = bpmn_type.try_into().ok();
                         }

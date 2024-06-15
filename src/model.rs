@@ -13,14 +13,16 @@ pub(crate) const INTERMEDIATE_CATCH_EVENT: &[u8] = b"intermediateCatchEvent";
 pub(crate) const INTERMEDIATE_THROW_EVENT: &[u8] = b"intermediateThrowEvent";
 
 // Event symbol
-pub(crate) const ERROR_EVENT_DEFINITION: &[u8] = b"errorEventDefinition";
-pub(crate) const MESSAGE_EVENT_DEFINITION: &[u8] = b"messageEventDefinition";
-pub(crate) const TIMER_EVENT_DEFINITION: &[u8] = b"timerEventDefinition";
-pub(crate) const ESCALATION_EVENT_DEFINITION: &[u8] = b"escalationEventDefinition";
-pub(crate) const CONDITIONAL_EVENT_DEFINITION: &[u8] = b"conditionalEventDefinition";
-pub(crate) const SIGNAL_EVENT_DEFINITION: &[u8] = b"signalEventDefinition";
+pub(crate) const CANCEL_EVENT_DEFINITION: &[u8] = b"cancelEventDefinition";
 pub(crate) const COMPENSATE_EVENT_DEFINITION: &[u8] = b"compensateEventDefinition";
+pub(crate) const CONDITIONAL_EVENT_DEFINITION: &[u8] = b"conditionalEventDefinition";
+pub(crate) const ERROR_EVENT_DEFINITION: &[u8] = b"errorEventDefinition";
+pub(crate) const ESCALATION_EVENT_DEFINITION: &[u8] = b"escalationEventDefinition";
+pub(crate) const MESSAGE_EVENT_DEFINITION: &[u8] = b"messageEventDefinition";
 pub(crate) const LINK_EVENT_DEFINITION: &[u8] = b"linkEventDefinition";
+pub(crate) const SIGNAL_EVENT_DEFINITION: &[u8] = b"signalEventDefinition";
+pub(crate) const TERMINATE_EVENT_DEFINITION: &[u8] = b"terminateEventDefinition";
+pub(crate) const TIMER_EVENT_DEFINITION: &[u8] = b"timerEventDefinition";
 
 // Task
 pub(crate) const TASK: &[u8] = b"task";
@@ -60,11 +62,11 @@ pub(crate) const ATTRIB_CANCEL_ACTIVITY: &[u8] = b"cancelActivity";
 
 #[derive(Debug, Copy, Clone)]
 pub(crate) enum EventType {
-    Start,
-    End,
     Boundary,
+    End,
     IntermediateCatch,
     IntermediateThrow,
+    Start,
 }
 
 impl TryFrom<&[u8]> for EventType {
@@ -72,11 +74,11 @@ impl TryFrom<&[u8]> for EventType {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Ok(match value {
-            START_EVENT => EventType::Start,
-            END_EVENT => EventType::End,
             BOUNDARY_EVENT => EventType::Boundary,
+            END_EVENT => EventType::End,
             INTERMEDIATE_CATCH_EVENT => EventType::IntermediateCatch,
             INTERMEDIATE_THROW_EVENT => EventType::IntermediateThrow,
+            START_EVENT => EventType::Start,
             _ => return Err(Error::BadEventType),
         })
     }
@@ -90,8 +92,8 @@ impl Display for EventType {
 
 #[derive(Debug, Copy, Clone)]
 pub(crate) enum ActivityType {
-    Task,
     SubProcess,
+    Task,
 }
 
 impl TryFrom<&[u8]> for ActivityType {
@@ -99,9 +101,9 @@ impl TryFrom<&[u8]> for ActivityType {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Ok(match value {
+            SUB_PROCESS | TRANSACTION => ActivityType::SubProcess,
             TASK | SCRIPT_TASK | USER_TASK | SERVICE_TASK | CALL_ACTIVITY | RECEIVE_TASK
             | SEND_TASK | MANUAL_TASK | BUSINESS_RULE_TASK => ActivityType::Task,
-            SUB_PROCESS | TRANSACTION => ActivityType::SubProcess,
             _ => return Err(Error::BadActivityType),
         })
     }
@@ -116,8 +118,8 @@ impl Display for ActivityType {
 #[derive(Debug, Copy, Clone)]
 pub(crate) enum GatewayType {
     Exclusive,
-    Parallel,
     Inclusive,
+    Parallel,
 }
 
 impl TryFrom<&[u8]> for GatewayType {
@@ -126,8 +128,8 @@ impl TryFrom<&[u8]> for GatewayType {
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Ok(match value {
             EXCLUSIVE_GATEWAY => GatewayType::Exclusive,
-            PARALLEL_GATEWAY => GatewayType::Parallel,
             INCLUSIVE_GATEWAY => GatewayType::Inclusive,
+            PARALLEL_GATEWAY => GatewayType::Parallel,
             _ => return Err(Error::BadGatewayType),
         })
     }
@@ -141,8 +143,8 @@ impl Display for GatewayType {
 
 #[derive(Debug, Copy, Clone)]
 pub(crate) enum DirectionType {
-    Outgoing,
     Incoming,
+    Outgoing,
 }
 
 impl TryFrom<&[u8]> for DirectionType {
@@ -150,8 +152,8 @@ impl TryFrom<&[u8]> for DirectionType {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Ok(match value {
-            OUTGOING => DirectionType::Outgoing,
             INCOMING => DirectionType::Incoming,
+            OUTGOING => DirectionType::Outgoing,
             _ => return Err(Error::BadDirectionType),
         })
     }
@@ -166,18 +168,16 @@ impl Display for DirectionType {
 /// BPMN Symbols
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Symbol {
-    Message,
-    Timer,
-    Escalation,
-    Conditional,
-    Link,
-    Error,
     Cancel,
     Compensation,
+    Conditional,
+    Error,
+    Escalation,
+    Link,
+    Message,
     Signal,
-    Multiple,
-    ParallelMultiple,
     Terminate,
+    Timer,
 }
 
 impl Display for Symbol {
@@ -191,14 +191,16 @@ impl TryFrom<&[u8]> for Symbol {
 
     fn try_from(value: &[u8]) -> Result<Self, Error> {
         let ty = match value {
-            MESSAGE_EVENT_DEFINITION => Symbol::Message,
-            TIMER_EVENT_DEFINITION => Symbol::Timer,
-            ESCALATION_EVENT_DEFINITION => Symbol::Escalation,
+            CANCEL_EVENT_DEFINITION => Symbol::Cancel,
+            COMPENSATE_EVENT_DEFINITION => Symbol::Compensation,
             CONDITIONAL_EVENT_DEFINITION => Symbol::Conditional,
             ERROR_EVENT_DEFINITION => Symbol::Error,
-            COMPENSATE_EVENT_DEFINITION => Symbol::Compensation,
-            SIGNAL_EVENT_DEFINITION => Symbol::Signal,
+            ESCALATION_EVENT_DEFINITION => Symbol::Escalation,
+            MESSAGE_EVENT_DEFINITION => Symbol::Message,
             LINK_EVENT_DEFINITION => Symbol::Link,
+            SIGNAL_EVENT_DEFINITION => Symbol::Signal,
+            TERMINATE_EVENT_DEFINITION => Symbol::Terminate,
+            TIMER_EVENT_DEFINITION => Symbol::Timer,
             _ => return Err(Error::BadSymbolType),
         };
         Ok(ty)
@@ -207,13 +209,22 @@ impl TryFrom<&[u8]> for Symbol {
 
 #[derive(Debug)]
 pub(crate) enum Bpmn {
+    Activity {
+        aktivity: ActivityType,
+        id: String,
+        name: Option<String>,
+        outputs: Outputs,
+        inputs: Vec<String>,
+
+        // Only used by subprocess type
+        start_id: Option<String>,
+    },
     Definitions {
         id: String,
     },
-    Process {
-        id: String,
-        _is_executable: bool,
-        start_id: Option<String>,
+    Direction {
+        _direction: DirectionType,
+        text: Option<String>,
     },
     Event {
         event: EventType,
@@ -225,16 +236,6 @@ pub(crate) enum Bpmn {
         outputs: Outputs,
         inputs: Vec<String>,
     },
-    Activity {
-        aktivity: ActivityType,
-        id: String,
-        name: Option<String>,
-        outputs: Outputs,
-        inputs: Vec<String>,
-
-        // Only used by subprocess type
-        start_id: Option<String>,
-    },
     Gateway {
         gateway: GatewayType,
         id: String,
@@ -243,15 +244,16 @@ pub(crate) enum Bpmn {
         outputs: Outputs,
         inputs: Vec<String>,
     },
+    Process {
+        id: String,
+        _is_executable: bool,
+        start_id: Option<String>,
+    },
     SequenceFlow {
         id: String,
         name: Option<String>,
         source_ref: String,
         target_ref: String,
-    },
-    Direction {
-        _direction: DirectionType,
-        text: Option<String>,
     },
 }
 
