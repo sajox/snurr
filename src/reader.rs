@@ -9,7 +9,7 @@ use crate::model::*;
 
 type ReaderResult = Result<(String, HashMap<String, HashMap<String, Bpmn>>), Error>;
 
-// Read BPMN file and return ReaderResult containing a tuple with BPMN data and start ids.
+// Read BPMN file and return the ReaderResult containing a tuple with definitions ID and BPMN data.
 pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
     let mut reader = Reader::from_file(path)?;
     let mut data: HashMap<String, HashMap<String, Bpmn>> = HashMap::new();
