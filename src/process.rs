@@ -1,4 +1,7 @@
 mod parallel;
+mod replay;
+mod scaffold;
+mod trace;
 
 use parallel::parallelize_helper;
 
@@ -6,25 +9,18 @@ use log::info;
 use std::{
     collections::{HashMap, VecDeque},
     path::Path,
-    sync::{
-        mpsc::{channel, Sender},
-        Arc, Mutex,
-    },
-    thread,
+    sync::{mpsc::Sender, Arc, Mutex},
 };
+use trace::{tracer, Trace};
 
 use crate::{
     error::Error,
     model::{ActivityType, Bpmn, EventType, GatewayType},
     reader::read_bpmn_file,
-    scaffold::Scaffold,
     Data, Eventhandler, Symbol,
 };
 
 type ExecuteResult<'a> = Result<Vec<&'a str>, Error>;
-
-const GATEWAY: &str = "Gateway";
-const TASK: &str = "Task";
 
 /// Process result from a process run.
 #[derive(Debug)]
@@ -121,44 +117,6 @@ impl Process {
         })
     }
 
-    /// Generate code from all the task and gateways to the given file path.
-    /// No file is allowed to exist at the target location.
-    pub fn scaffold(&self, path: impl AsRef<Path>) -> Result<(), Error> {
-        let mut scaffold = Scaffold::default();
-        self.data
-            .values()
-            .for_each(|process: &HashMap<String, Bpmn>| {
-                process.values().for_each(|bpmn| {
-                    if let Bpmn::Activity {
-                        aktivity: ActivityType::Task,
-                        id,
-                        ..
-                    } = bpmn
-                    {
-                        let symbols = if let Some(map) = self.activity_ids.get(id) {
-                            map.keys().collect::<Vec<&Symbol>>()
-                        } else {
-                            Vec::new()
-                        };
-                        scaffold.add_task(bpmn, symbols);
-                    }
-
-                    if let Bpmn::Gateway {
-                        gateway: GatewayType::Exclusive | GatewayType::Inclusive,
-                        outputs,
-                        ..
-                    } = bpmn
-                    {
-                        if outputs.len() > 1 {
-                            scaffold.add_gateway(bpmn);
-                        }
-                    }
-                });
-            });
-
-        scaffold.create(path)
-    }
-
     fn boundary_lookup(&self, activity_id: &str, symbol: &Symbol) -> Option<&String> {
         self.activity_ids
             .get(activity_id)
@@ -176,46 +134,13 @@ impl Process {
             .ok_or_else(|| Error::MissingIntermediateCatchEvent(throw_event_name.into()))
     }
 
-    /// Replay a trace from a process run. It will be sequential. Only Tasks and gateways is traced that might mutate data.
-    pub fn replay_trace<T>(
-        handler: &Eventhandler<T>,
-        data: T,
-        trace: &[(impl AsRef<str>, impl AsRef<str>)],
-    ) -> T
-    where
-        T: std::fmt::Debug,
-    {
-        let data = Arc::new(Mutex::new(data));
-        for (ty, id) in trace.iter().map(|(ty, id)| (ty.as_ref(), id.as_ref())) {
-            match ty {
-                TASK => {
-                    let _ = handler.run_task(id, Arc::clone(&data));
-                }
-                GATEWAY => {
-                    let _ = handler.run_gateway(id, Arc::clone(&data));
-                }
-                _ => {}
-            }
-        }
-        Arc::try_unwrap(data).unwrap().into_inner().unwrap()
-    }
-
     /// Run the process and return the `ProcessResult` or an `Error`.
     pub fn run<T>(&self, handler: &Eventhandler<T>, data: T) -> Result<ProcessResult<T>, Error>
     where
         T: Send + std::fmt::Debug,
     {
         let data = Arc::new(Mutex::new(data));
-        let (sender, receiver) = channel();
-
-        // Collect the name or id for the path taken
-        let recv_handle = thread::spawn(move || {
-            let mut trace = vec![];
-            while let Ok(value) = receiver.recv() {
-                trace.push(value);
-            }
-            trace
-        });
+        let trace: Trace<(&str, String)> = tracer();
 
         // Run every process specified in the diagram
         for (_, bpmn) in self
@@ -235,23 +160,17 @@ impl Process {
                     self.data.get_key_value(id).ok_or(Error::MissingProcess)?,
                     handler,
                     Arc::clone(&data),
-                    sender.clone(),
+                    trace.sender(),
                 )?;
             }
         }
-
-        // We have one left because we clone() every sender in the loop.
-        drop(sender);
-
-        // When sender die, the recv handle terminates.
-        let trace = recv_handle.join().expect("oops! the child thread panicked");
 
         Ok(ProcessResult {
             result: Arc::into_inner(data)
                 .ok_or(Error::NoResult)?
                 .into_inner()
                 .map_err(|_| Error::NoResult)?,
-            trace,
+            trace: trace.finish(),
         })
     }
 
@@ -330,7 +249,7 @@ impl Process {
                         info!("{}: {}", aktivity, name_or_id);
                         match aktivity {
                             ActivityType::Task => {
-                                let _ = sender.send((TASK, name_or_id.to_owned()));
+                                let _ = sender.send((replay::TASK, name_or_id.to_owned()));
                                 match handler.run_task(name_or_id, Arc::clone(&data)) {
                                     Ok(_) => parallelize_helper!(outputs, recursion),
                                     Err(symbol) => self
@@ -374,7 +293,7 @@ impl Process {
                     } if outputs.len() <= 1 => {
                         let name_or_id = name.as_ref().unwrap_or(id);
                         info!("{}: {}", gateway, name_or_id);
-                        let _ = sender.send((GATEWAY, name_or_id.to_owned()));
+                        let _ = sender.send((replay::GATEWAY, name_or_id.to_owned()));
                         match gateway {
                             GatewayType::Exclusive => outputs
                                 .first()
@@ -400,7 +319,7 @@ impl Process {
                     } if outputs.len() > 1 => {
                         let name_or_id = name.as_ref().unwrap_or(id);
                         info!("{}: {}", gateway, name_or_id);
-                        let _ = sender.send((GATEWAY, name_or_id.to_owned()));
+                        let _ = sender.send((replay::GATEWAY, name_or_id.to_owned()));
                         match gateway {
                             GatewayType::Exclusive => {
                                 // Default to first outgoing if function is not set.

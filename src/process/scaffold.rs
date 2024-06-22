@@ -1,6 +1,50 @@
-use std::{io::Write, path::Path};
+use std::{collections::HashMap, io::Write, path::Path};
 
-use crate::{error::Error, model::Bpmn, Symbol};
+use crate::{
+    error::Error,
+    model::{ActivityType, Bpmn, GatewayType, Symbol},
+    Process,
+};
+
+impl Process {
+    /// Generate code from all the task and gateways to the given file path.
+    /// No file with same name is allowed to exist at the target location.
+    pub fn scaffold(&self, path: impl AsRef<Path>) -> Result<(), Error> {
+        let mut scaffold = Scaffold::default();
+        self.data
+            .values()
+            .for_each(|process: &HashMap<String, Bpmn>| {
+                process.values().for_each(|bpmn| {
+                    if let Bpmn::Activity {
+                        aktivity: ActivityType::Task,
+                        id,
+                        ..
+                    } = bpmn
+                    {
+                        let symbols = if let Some(map) = self.activity_ids.get(id) {
+                            map.keys().collect::<Vec<&Symbol>>()
+                        } else {
+                            Vec::new()
+                        };
+                        scaffold.add_task(bpmn, symbols);
+                    }
+
+                    if let Bpmn::Gateway {
+                        gateway: GatewayType::Exclusive | GatewayType::Inclusive,
+                        outputs,
+                        ..
+                    } = bpmn
+                    {
+                        if outputs.len() > 1 {
+                            scaffold.add_gateway(bpmn);
+                        }
+                    }
+                });
+            });
+
+        scaffold.create(path)
+    }
+}
 
 #[derive(Debug)]
 struct Gateway<'a> {
@@ -14,23 +58,23 @@ struct Task<'a> {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct Scaffold<'a> {
+struct Scaffold<'a> {
     tasks: Vec<Task<'a>>,
     gateways: Vec<Gateway<'a>>,
 }
 
 impl<'a> Scaffold<'a> {
-    pub(crate) fn add_task(&mut self, bpmn: &'a Bpmn, symbols: Vec<&'a Symbol>) {
+    fn add_task(&mut self, bpmn: &'a Bpmn, symbols: Vec<&'a Symbol>) {
         self.tasks.push(Task { bpmn, symbols });
     }
 
-    pub(crate) fn add_gateway(&mut self, bpmn: &'a Bpmn) {
+    fn add_gateway(&mut self, bpmn: &'a Bpmn) {
         self.gateways.push(Gateway { bpmn });
     }
 
     /// Generate code from all the task and gateways to the given file path.
     /// No file is allowed to exist at the target location.
-    pub(crate) fn create(&self, path: impl AsRef<Path>) -> Result<(), Error> {
+    fn create(&self, path: impl AsRef<Path>) -> Result<(), Error> {
         let mut content = vec![];
         content.push("pub fn create_handler<T>() -> snurr::Eventhandler<T> {".into());
         content.push(

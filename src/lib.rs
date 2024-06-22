@@ -11,7 +11,6 @@ mod handler;
 mod model;
 mod process;
 mod reader;
-mod scaffold;
 
 pub use handler::{Data, Eventhandler, TaskResult};
 pub use model::Symbol;
