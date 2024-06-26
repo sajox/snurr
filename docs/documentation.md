@@ -15,7 +15,7 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
 snurr = { git = "https://github.com/sajox/snurr.git"}
 ```
 
-With parallel feature enabled, new threads are spawned with parallel gateway, task and event "forks".
+With parallel feature enabled, new threads are spawned with parallel, inclusive, task and event forks.
 
 ```toml
 [dependencies]

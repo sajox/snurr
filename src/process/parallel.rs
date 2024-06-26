@@ -1,5 +1,4 @@
 use super::ExecuteResult;
-use crate::model::Outputs;
 
 #[cfg(feature = "parallel")]
 use std::thread;
@@ -7,11 +6,11 @@ use std::thread;
 // If more than 1 output exist then all outputs run in a thread with registered Fn. When all threads terminates
 // then the next Id is returned to continue on. Thread terminates on a Parallel or Inclusive Join and End events.
 pub(super) fn maybe_parallelize<'a>(
-    outputs: &'a Outputs,
+    outputs: Vec<&'a str>,
     func: impl Fn(Vec<&'a str>) -> ExecuteResult<'a> + Sync,
 ) -> ExecuteResult<'a> {
     if outputs.len() <= 1 {
-        return Ok(outputs.ids());
+        return Ok(outputs);
     }
 
     #[cfg(feature = "parallel")]
@@ -20,7 +19,6 @@ pub(super) fn maybe_parallelize<'a>(
         let (oks, mut errors): (Vec<_>, Vec<_>) = thread::scope(|s| {
             //Start everything first
             let children: Vec<_> = outputs
-                .ids()
                 .iter()
                 .map(|output| s.spawn(|| (func)(vec![output])))
                 .collect();
@@ -45,7 +43,7 @@ pub(super) fn maybe_parallelize<'a>(
 
     #[cfg(not(feature = "parallel"))]
     {
-        func(outputs.ids())
+        func(outputs)
     }
 }
 

@@ -426,3 +426,9 @@ impl Outputs {
         self.ids.first()
     }
 }
+
+impl<'a> From<&'a Outputs> for Vec<&'a str> {
+    fn from(outputs: &'a Outputs) -> Self {
+        outputs.ids()
+    }
+}
