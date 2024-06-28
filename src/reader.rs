@@ -180,9 +180,7 @@ fn collect_attributes<'a>(bs: &'a quick_xml::events::BytesStart<'_>) -> HashMap<
         .map(|attribute| {
             (
                 attribute.key.local_name().into_inner(),
-                std::str::from_utf8(attribute.value.as_ref())
-                    .unwrap_or_default()
-                    .to_string(),
+                String::from_utf8(attribute.value.to_vec()).unwrap_or_default(),
             )
         })
         .filter(|(_, s)| !s.is_empty())
