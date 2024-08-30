@@ -223,7 +223,7 @@ pub(crate) enum Bpmn {
         id: String,
     },
     Direction {
-        _direction: DirectionType,
+        direction: DirectionType,
         text: Option<String>,
     },
     Event {
@@ -258,19 +258,19 @@ pub(crate) enum Bpmn {
 }
 
 impl Bpmn {
-    pub(crate) fn id(&self) -> Option<&String> {
+    pub(crate) fn id(&self) -> Result<&str, Error> {
         match self {
             Bpmn::Definitions { id, .. }
             | Bpmn::Process { id, .. }
             | Bpmn::Event { id, .. }
             | Bpmn::Activity { id, .. }
             | Bpmn::Gateway { id, .. }
-            | Bpmn::SequenceFlow { id, .. } => Some(id),
-            Bpmn::Direction { .. } => None,
+            | Bpmn::SequenceFlow { id, .. } => Ok(id),
+            Bpmn::Direction { direction, .. } => Err(Error::MissingId(direction.to_string())),
         }
     }
 
-    pub(crate) fn set_output(&mut self, text: String) {
+    pub(crate) fn add_output(&mut self, text: String) {
         match self {
             Bpmn::Event { outputs, .. }
             | Bpmn::Gateway { outputs, .. }
@@ -279,7 +279,7 @@ impl Bpmn {
         }
     }
 
-    pub(crate) fn set_input(&mut self, text: String) {
+    pub(crate) fn add_input(&mut self, text: String) {
         match self {
             Bpmn::Event { inputs, .. }
             | Bpmn::Gateway { inputs, .. }
@@ -364,7 +364,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     .ok_or(Error::MissingTargetRef)?,
             },
             INCOMING | OUTGOING => Bpmn::Direction {
-                _direction: bpmn_type.try_into()?,
+                direction: bpmn_type.try_into()?,
                 text: None,
             },
             _ => return Err(Error::MissingBpmnType(bpmn_type_str.into())),

@@ -69,8 +69,8 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                     }
                     bpmn_type @ SEQUENCE_FLOW => {
                         let bpmn = Bpmn::try_from((bpmn_type, collect_attributes(&bs)))?;
-                        if let Some((process, id)) = process_stack.last_mut().zip(bpmn.id()) {
-                            process.insert(id.into(), bpmn);
+                        if let Some(process) = process_stack.last_mut() {
+                            process.insert(bpmn.id()?.into(), bpmn);
                         }
                     }
                     _ => {}
@@ -78,41 +78,36 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
             }
             Ok(Event::End(be)) => {
                 match be.local_name().as_ref() {
-                    OUTGOING => {
+                    direction @ (OUTGOING | INCOMING) => {
                         if let Some((
                             Bpmn::Direction {
-                                text: Some(output), ..
+                                text: Some(value), ..
                             },
                             parent,
                         )) = stack.pop().zip(stack.last_mut())
                         {
-                            parent.set_output(output);
-                        }
-                    }
-                    INCOMING => {
-                        if let Some((
-                            Bpmn::Direction {
-                                text: Some(input), ..
-                            },
-                            parent,
-                        )) = stack.pop().zip(stack.last_mut())
-                        {
-                            parent.set_input(input);
+                            match direction {
+                                OUTGOING => parent.add_output(value),
+                                _ => parent.add_input(value),
+                            }
                         }
                     }
                     START_EVENT => {
-                        if let Some((bpmn, parent)) = stack.pop().zip(stack.last_mut()) {
-                            match parent {
-                                Bpmn::Process { start_id, .. } => *start_id = bpmn.id().cloned(),
-                                Bpmn::Activity {
-                                    aktivity: ActivityType::SubProcess,
-                                    start_id,
-                                    ..
-                                } => *start_id = bpmn.id().cloned(),
-                                _ => {}
-                            }
-                            if let Some((process, id)) = process_stack.last_mut().zip(bpmn.id()) {
-                                process.insert(id.into(), bpmn);
+                        if let Some((
+                            bpmn,
+                            Bpmn::Process { start_id, .. }
+                            | Bpmn::Activity {
+                                aktivity: ActivityType::SubProcess,
+                                start_id,
+                                ..
+                            },
+                        )) = stack.pop().zip(stack.last_mut())
+                        {
+                            // Update parent process or subprocess start_id
+                            *start_id = Some(bpmn.id()?.into());
+
+                            if let Some(process) = process_stack.last_mut() {
+                                process.insert(bpmn.id()?.into(), bpmn);
                             }
                         };
                     }
@@ -135,23 +130,23 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                     | SEQUENCE_FLOW => {
                         if let Some(bpmn) = stack.pop() {
                             check_unsupported(&bpmn)?;
-                            if let Some((process, id)) = process_stack.last_mut().zip(bpmn.id()) {
-                                process.insert(id.into(), bpmn);
+                            if let Some(process) = process_stack.last_mut() {
+                                process.insert(bpmn.id()?.into(), bpmn);
                             }
                         }
                     }
                     DEFINITIONS | PROCESS | SUB_PROCESS | TRANSACTION => {
                         if let Some(bpmn) = stack.pop() {
-                            if let Some((process, id)) = process_stack.pop().zip(bpmn.id().cloned())
-                            {
+                            if let Some(process) = process_stack.pop() {
+                                let id = bpmn.id()?.to_string();
                                 // Put the Bpmn model in parent scope and in 'data' it's related process data.
                                 // Definitions collect all Processes
                                 // Process collect all related sub processes
                                 if let Some(parent_process) = process_stack.last_mut() {
-                                    parent_process.insert(id.to_string(), bpmn);
+                                    parent_process.insert(id.clone(), bpmn);
                                 } else {
                                     // No parent, must be Definitions.
-                                    definitions_id = bpmn.id().cloned();
+                                    definitions_id = Some(id.clone());
                                 }
                                 data.insert(id, process);
                             }
