@@ -9,7 +9,7 @@ readme = "README.md"
 license = "MIT"
 keywords = ["BPMN", "process"]
 
-include = ["Cargo.toml", "LICENSE", "/src"]
+include = ["Cargo.toml", "LICENSE", "/src", "/examples"]
 
 [[example]]
 name = "simple"
