@@ -1,6 +1,6 @@
 [package]
 name = "snurr"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2021"
 authors = ["sajox"]
 description = "Read BPMN 2.0 files and run the process flow"
@@ -10,8 +10,6 @@ license = "MIT"
 keywords = ["BPMN", "process"]
 
 include = ["Cargo.toml", "LICENSE", "/src"]
-
-publish = false
 
 [[example]]
 name = "simple"

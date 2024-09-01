@@ -18,7 +18,7 @@ BPMN diagram used in example.
 
 ```toml
 [dependencies]
-snurr = { git = "https://github.com/sajox/snurr.git"}
+snurr = "0.3"
 log = "0.4"
 pretty_env_logger = "0.5"
 ```
