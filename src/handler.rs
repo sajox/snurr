@@ -23,7 +23,7 @@ type TaskCallback<T> = Box<dyn Fn(Data<T>) -> TaskResult + Sync>;
 /// Gateway callback that use `Data` type as input and return a `Vec` with flow(s) to take
 type GatewayCallback<T> = Box<dyn Fn(Data<T>) -> Vec<&'static str> + Sync>;
 
-/// Event handler to add task or gateway functions by name or id
+/// Event handler to add task or gateway closures by name or id
 pub struct Eventhandler<T> {
     task_func: HashMap<String, TaskCallback<T>>,
     gateway_func: HashMap<String, GatewayCallback<T>>,
@@ -44,7 +44,7 @@ impl<T> Eventhandler<T> {
         }
     }
 
-    /// Add a task to the event handler by name or id with corresponding `TaskCallback`
+    /// Add a task to the event handler by name or id with corresponding closure.
     pub fn add_task<F>(&mut self, name: impl Into<String>, func: F)
     where
         F: Fn(Data<T>) -> TaskResult + 'static + Sync,
@@ -61,7 +61,7 @@ impl<T> Eventhandler<T> {
         Ok(())
     }
 
-    /// Add a gateway to the event handler by name or id with corresponding `GatewayCallback`
+    /// Add a gateway to the event handler by name or id with corresponding closure.
     pub fn add_gateway<F>(&mut self, name: impl Into<String>, func: F)
     where
         F: Fn(Data<T>) -> Vec<&'static str> + 'static + Sync,
