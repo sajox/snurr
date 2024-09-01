@@ -2,17 +2,17 @@
 
 [![Build Status](https://github.com/sajox/snurr/actions/workflows/rust.yml/badge.svg)](https://github.com/sajox/snurr/actions)
 
-Create and run the process flow from a BPMN 2.0 file created by [BPMN Editor demo](https://demo.bpmn.io/new). Add your own behavior with Rust code from a small API. Read the [Snurr documentation](/docs/documentation.md) and explore the **tests** folder for more examples. 
+Create and run the process flow from a BPMN 2.0 file created by [BPMN Editor demo](https://demo.bpmn.io/new). Add your own behavior with Rust code from a small API. Read the [Snurr documentation](https://github.com/sajox/snurr/blob/main/docs/documentation.md) and explore the **tests** folder for more examples. 
 
 **_NOTE:_** To view or edit BPMN files in your project you can use the [BPMN Editor](https://github.com/bpmn-io/vs-code-bpmn-io) plugin in VS Code.   
 
-![Tasks](/assets/images/vscode-plugin-bpmnio.png)
+![Tasks](https://github.com/sajox/snurr/blob/main/assets/images/vscode-plugin-bpmnio.png?raw=true)
 
 ## Example
 
 BPMN diagram used in example.
 
-![BPMN example](/assets/images/example.png)
+![BPMN example](https://github.com/sajox/snurr/blob/main/assets/images/example.png?raw=true)
 
 ### Usage
 
@@ -37,7 +37,7 @@ struct Counter {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     pretty_env_logger::init();
 
-    let bpmn = Process::new("examples/example.bpmn")?;
+    let bpmn = Process::new("example.bpmn")?;
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
 
     handler.add_task("Count 1", |input| {
