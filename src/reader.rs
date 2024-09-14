@@ -11,12 +11,9 @@ type ReaderResult = Result<(String, HashMap<String, HashMap<String, Bpmn>>), Err
 
 // Read BPMN file and return the ReaderResult containing a tuple with definitions ID and BPMN data.
 pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
+    let mut builder = DataBuilder::default();
     let mut reader = Reader::from_file(path)?;
-    let mut data: HashMap<String, HashMap<String, Bpmn>> = HashMap::new();
-    let mut process_stack: Vec<HashMap<String, Bpmn>> = Vec::new();
-    let mut stack: Vec<Bpmn> = Vec::new();
     let mut buf = Vec::new();
-    let mut definitions_id = None;
     loop {
         match reader.read_event_into(&mut buf) {
             Err(e) => error!("Error at position {}: {:?}", reader.buffer_position(), e),
@@ -42,11 +39,10 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                 | PARALLEL_GATEWAY
                 | INCLUSIVE_GATEWAY
                 | SEQUENCE_FLOW) => {
-                    stack.push(Bpmn::try_from((bpmn_type, collect_attributes(&bs)))?)
+                    builder.add(Bpmn::try_from((bpmn_type, collect_attributes(&bs)))?)
                 }
                 bpmn_type @ (DEFINITIONS | PROCESS | SUB_PROCESS | TRANSACTION) => {
-                    process_stack.push(Default::default());
-                    stack.push(Bpmn::try_from((bpmn_type, collect_attributes(&bs)))?)
+                    builder.add_new_process(Bpmn::try_from((bpmn_type, collect_attributes(&bs)))?)
                 }
                 _ => {}
             },
@@ -63,102 +59,42 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
                     | SIGNAL_EVENT_DEFINITION
                     | TERMINATE_EVENT_DEFINITION
                     | TIMER_EVENT_DEFINITION) => {
-                        if let Some(Bpmn::Event { symbol, .. }) = stack.last_mut() {
-                            *symbol = bpmn_type.try_into().ok();
-                        }
+                        builder.update_symbol(bpmn_type);
                     }
                     bpmn_type @ SEQUENCE_FLOW => {
-                        let bpmn = Bpmn::try_from((bpmn_type, collect_attributes(&bs)))?;
-                        if let Some(process) = process_stack.last_mut() {
-                            process.insert(bpmn.id()?.into(), bpmn);
-                        }
+                        builder.add_to_process(Bpmn::try_from((
+                            bpmn_type,
+                            collect_attributes(&bs),
+                        ))?)?;
                     }
                     _ => {}
                 }
             }
-            Ok(Event::End(be)) => {
-                match be.local_name().as_ref() {
-                    direction @ (OUTGOING | INCOMING) => {
-                        if let Some((
-                            Bpmn::Direction {
-                                text: Some(value), ..
-                            },
-                            parent,
-                        )) = stack.pop().zip(stack.last_mut())
-                        {
-                            match direction {
-                                OUTGOING => parent.add_output(value),
-                                _ => parent.add_input(value),
-                            }
-                        }
-                    }
-                    START_EVENT => {
-                        if let Some((
-                            bpmn,
-                            Bpmn::Process { start_id, .. }
-                            | Bpmn::Activity {
-                                aktivity: ActivityType::SubProcess,
-                                start_id,
-                                ..
-                            },
-                        )) = stack.pop().zip(stack.last_mut())
-                        {
-                            // Update parent process or subprocess start_id
-                            *start_id = Some(bpmn.id()?.into());
-
-                            if let Some(process) = process_stack.last_mut() {
-                                process.insert(bpmn.id()?.into(), bpmn);
-                            }
-                        };
-                    }
-                    END_EVENT
-                    | BOUNDARY_EVENT
-                    | INTERMEDIATE_CATCH_EVENT
-                    | INTERMEDIATE_THROW_EVENT
-                    | TASK
-                    | SCRIPT_TASK
-                    | USER_TASK
-                    | SERVICE_TASK
-                    | CALL_ACTIVITY
-                    | RECEIVE_TASK
-                    | SEND_TASK
-                    | MANUAL_TASK
-                    | BUSINESS_RULE_TASK
-                    | EXCLUSIVE_GATEWAY
-                    | PARALLEL_GATEWAY
-                    | INCLUSIVE_GATEWAY
-                    | SEQUENCE_FLOW => {
-                        if let Some(bpmn) = stack.pop() {
-                            check_unsupported(&bpmn)?;
-                            if let Some(process) = process_stack.last_mut() {
-                                process.insert(bpmn.id()?.into(), bpmn);
-                            }
-                        }
-                    }
-                    DEFINITIONS | PROCESS | SUB_PROCESS | TRANSACTION => {
-                        if let Some(bpmn) = stack.pop() {
-                            if let Some(process) = process_stack.pop() {
-                                let id = bpmn.id()?.to_string();
-                                // Put the Bpmn model in parent scope and in 'data' it's related process data.
-                                // Definitions collect all Processes
-                                // Process collect all related sub processes
-                                if let Some(parent_process) = process_stack.last_mut() {
-                                    parent_process.insert(id.clone(), bpmn);
-                                } else {
-                                    // No parent, must be Definitions.
-                                    definitions_id = Some(id.clone());
-                                }
-                                data.insert(id, process);
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
+            Ok(Event::End(be)) => match be.local_name().as_ref() {
+                direction @ (OUTGOING | INCOMING) => builder.add_direction(direction),
+                START_EVENT => builder.update_start_id()?,
+                END_EVENT
+                | BOUNDARY_EVENT
+                | INTERMEDIATE_CATCH_EVENT
+                | INTERMEDIATE_THROW_EVENT
+                | TASK
+                | SCRIPT_TASK
+                | USER_TASK
+                | SERVICE_TASK
+                | CALL_ACTIVITY
+                | RECEIVE_TASK
+                | SEND_TASK
+                | MANUAL_TASK
+                | BUSINESS_RULE_TASK
+                | EXCLUSIVE_GATEWAY
+                | PARALLEL_GATEWAY
+                | INCLUSIVE_GATEWAY
+                | SEQUENCE_FLOW => builder.end()?,
+                DEFINITIONS | PROCESS | SUB_PROCESS | TRANSACTION => builder.end_process()?,
+                _ => {}
+            },
             Ok(Event::Text(bt)) => {
-                if let Some(Bpmn::Direction { text, .. }) = stack.last_mut() {
-                    *text = Some(bt.unescape()?.into_owned());
-                }
+                builder.add_text(bt.unescape()?.into_owned())?;
             }
 
             // Ignore other XML events
@@ -166,7 +102,10 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
         }
         buf.clear();
     }
-    Ok((definitions_id.ok_or(Error::MissingDefinitions)?, data))
+    Ok((
+        builder.definitions_id.ok_or(Error::MissingDefinitions)?,
+        builder.data,
+    ))
 }
 
 fn collect_attributes<'a>(bs: &'a quick_xml::events::BytesStart<'_>) -> HashMap<&'a [u8], String> {
@@ -204,6 +143,105 @@ fn check_unsupported(bpmn: &Bpmn) -> Result<(), Error> {
         )),
         _ => return Ok(()),
     })
+}
+
+#[derive(Default)]
+struct DataBuilder {
+    data: HashMap<String, HashMap<String, Bpmn>>,
+    process_stack: Vec<HashMap<String, Bpmn>>,
+    stack: Vec<Bpmn>,
+    definitions_id: Option<String>,
+}
+
+impl DataBuilder {
+    fn add(&mut self, bpmn: Bpmn) {
+        self.stack.push(bpmn);
+    }
+
+    fn add_new_process(&mut self, bpmn: Bpmn) {
+        self.process_stack.push(Default::default());
+        self.add(bpmn);
+    }
+
+    fn add_to_process(&mut self, bpmn: Bpmn) -> Result<(), Error> {
+        if let Some(process) = self.process_stack.last_mut() {
+            process.insert(bpmn.id()?.into(), bpmn);
+        }
+        Ok(())
+    }
+
+    fn update_symbol(&mut self, bpmn_type: &[u8]) {
+        if let Some(Bpmn::Event { symbol, .. }) = self.stack.last_mut() {
+            *symbol = bpmn_type.try_into().ok();
+        }
+    }
+
+    fn add_direction(&mut self, direction: &[u8]) {
+        if let Some((
+            Bpmn::Direction {
+                text: Some(value), ..
+            },
+            parent,
+        )) = self.stack.pop().zip(self.stack.last_mut())
+        {
+            match direction {
+                OUTGOING => parent.add_output(value),
+                _ => parent.add_input(value),
+            }
+        }
+    }
+
+    fn update_start_id(&mut self) -> Result<(), Error> {
+        if let Some((
+            bpmn,
+            Bpmn::Process { start_id, .. }
+            | Bpmn::Activity {
+                aktivity: ActivityType::SubProcess,
+                start_id,
+                ..
+            },
+        )) = self.stack.pop().zip(self.stack.last_mut())
+        {
+            // Update parent process or subprocess start_id
+            *start_id = Some(bpmn.id()?.into());
+            self.add_to_process(bpmn)?
+        }
+        Ok(())
+    }
+
+    fn add_text(&mut self, value: String) -> Result<(), Error> {
+        if let Some(Bpmn::Direction { text, .. }) = self.stack.last_mut() {
+            *text = Some(value);
+        }
+        Ok(())
+    }
+
+    fn end(&mut self) -> Result<(), Error> {
+        if let Some(bpmn) = self.stack.pop() {
+            check_unsupported(&bpmn)?;
+            self.add_to_process(bpmn)?
+        }
+        Ok(())
+    }
+
+    fn end_process(&mut self) -> Result<(), Error> {
+        if let Some(bpmn) = self.stack.pop() {
+            if let Some(process) = self.process_stack.pop() {
+                let id = bpmn.id()?.to_string();
+                // Put the Bpmn model in parent scope and in 'data' it's related process data.
+                // Definitions collect all Processes
+                // Process collect all related sub processes
+                if let Some(parent_process) = self.process_stack.last_mut() {
+                    parent_process.insert(id.clone(), bpmn);
+                } else {
+                    // No parent, must be Definitions.
+                    self.definitions_id = Some(id.clone());
+                }
+                self.data.insert(id, process);
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
