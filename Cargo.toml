@@ -11,11 +11,14 @@ keywords = ["BPMN", "process"]
 
 include = ["Cargo.toml", "LICENSE", "/src", "/examples"]
 
+[lib]
+doctest = false
+
+[lints.rust]
+unsafe_code = "forbid"
+
 [[example]]
 name = "simple"
-
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 quick-xml = "0.36"
