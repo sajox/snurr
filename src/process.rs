@@ -41,6 +41,14 @@ pub struct Process {
 
 impl Process {
     /// Create new process and initialize it from the BPMN file path.
+    /// ```
+    /// use snurr::Process;
+    ///
+    /// fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let bpmn = Process::new("examples/example.bpmn")?;
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn new(path: impl AsRef<Path>) -> Result<Self, Error> {
         let (definitions_id, mut data) = read_bpmn_file(path)?;
 
@@ -116,6 +124,22 @@ impl Process {
     }
 
     /// Run the process and return the `ProcessResult` or an `Error`.
+    /// ```
+    /// use snurr::{Process, Eventhandler};
+    ///
+    /// #[derive(Debug, Default)]
+    /// struct Counter {
+    ///     count: u32,
+    /// }
+    ///
+    /// fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let bpmn = Process::new("examples/example.bpmn")?;
+    ///     let handler: Eventhandler<Counter> = Eventhandler::default();
+    ///     // Register Task and Gateways to handler here...
+    ///     let pr = bpmn.run(&handler, Counter::default())?;
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn run<T>(&self, handler: &Eventhandler<T>, data: T) -> Result<ProcessResult<T>, Error>
     where
         T: Send + std::fmt::Debug,

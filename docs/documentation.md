@@ -12,14 +12,14 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
 
 ```toml
 [dependencies]
-snurr = { git = "https://github.com/sajox/snurr.git"}
+snurr = "0.3"
 ```
 
 With parallel feature enabled, new threads are spawned with parallel, inclusive, task and event forks.
 
 ```toml
 [dependencies]
-snurr = { git = "https://github.com/sajox/snurr.git", features = ["parallel"] }
+snurr = { version = "0.3", features = ["parallel"] }
 ```
 
 
@@ -40,13 +40,7 @@ struct Counter {
 
 ```rust
 let bpmn = Process::new("example.bpmn")?;
-
-// Inspect the created process
-dbg!(&bpmn);
-
 let mut handler: Eventhandler<Counter> = Eventhandler::default();
-
-// Run the process
 let process_result = bpmn.run(&handler, Counter::default())?;
 ```
 
@@ -70,8 +64,8 @@ pub fn create_handler<T>() -> snurr::Eventhandler<T> {
     let mut handler: snurr::Eventhandler<T> = snurr::Eventhandler::default();
     handler.add_task("Count 1", |input| Ok(()));
 
-    // "equal to 3" output id(s) ["Flow_1h0jtl6", "Flow_0rsqhpi"]
-    handler.add_gateway("equal to 3", |input| vec!["NO", "YES"]);
+    // "equal to 3", Outputs { names: [Some("YES"), Some("NO")], ids: ["Flow_1h0jtl6", "Flow_0rsqhpi"] }
+    handler.add_gateway("equal to 3", |input| vec!["YES", "NO"]);
 
     handler
 }

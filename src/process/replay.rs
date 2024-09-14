@@ -7,6 +7,37 @@ pub(super) const TASK: &str = "Task";
 
 impl Process {
     /// Replay a trace from a process run. It will be sequential. Only Tasks and gateways is traced that might mutate data.
+    /// ```
+    /// use snurr::{Process, Eventhandler};
+    ///
+    /// #[derive(Debug, Default, PartialEq, Eq)]
+    /// struct Counter {
+    ///     count: u32,
+    /// }
+    ///
+    /// fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let bpmn = Process::new("examples/example.bpmn")?;
+    ///     let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    ///     handler.add_task("Count 1", |input| {
+    ///         input.lock().unwrap().count += 1;
+    ///         Ok(())
+    ///     });
+    ///    
+    ///     handler.add_gateway("equal to 3", |input| {
+    ///         let result = if input.lock().unwrap().count == 3 {
+    ///             "YES"
+    ///         } else {
+    ///             "NO"
+    ///         };
+    ///         vec![result]
+    ///     });
+    ///
+    ///     let pr = bpmn.run(&handler, Counter::default())?;
+    ///     let trace_result = Process::replay_trace(&handler, Counter::default(), &pr.trace);
+    ///     assert_eq!(pr.result, trace_result);
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn replay_trace<T>(
         handler: &Eventhandler<T>,
         data: T,

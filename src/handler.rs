@@ -45,6 +45,20 @@ impl<T> Eventhandler<T> {
     }
 
     /// Add a task to the event handler by name or id with corresponding closure.
+    /// ```
+    /// use snurr::Eventhandler;
+    ///
+    /// #[derive(Debug, Default)]
+    /// struct Counter {
+    ///     count: u32,
+    /// }
+    ///
+    /// let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    /// handler.add_task("Count 1", |input| {
+    ///     input.lock().unwrap().count += 1;
+    ///     Ok(())
+    /// });
+    /// ```
     pub fn add_task<F>(&mut self, name: impl Into<String>, func: F)
     where
         F: Fn(Data<T>) -> TaskResult + 'static + Sync,
@@ -62,6 +76,24 @@ impl<T> Eventhandler<T> {
     }
 
     /// Add a gateway to the event handler by name or id with corresponding closure.
+    /// ```
+    /// use snurr::Eventhandler;
+    ///
+    /// #[derive(Debug, Default)]
+    /// struct Counter {
+    ///     count: u32,
+    /// }
+    ///
+    /// let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    /// handler.add_gateway("equal to 3", |input| {
+    ///     let result = if input.lock().unwrap().count == 3 {
+    ///         "YES"
+    ///     } else {
+    ///         "NO"
+    ///     };
+    ///     vec![result]
+    /// });
+    /// ```
     pub fn add_gateway<F>(&mut self, name: impl Into<String>, func: F)
     where
         F: Fn(Data<T>) -> Vec<&'static str> + 'static + Sync,

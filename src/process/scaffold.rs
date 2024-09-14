@@ -9,6 +9,15 @@ use crate::{
 impl Process {
     /// Generate code from all the task and gateways to the given file path.
     /// No file with same name is allowed to exist at the target location.
+    /// ```
+    /// use snurr::Process;
+    ///
+    /// fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let bpmn = Process::new("examples/example.bpmn")?;
+    ///     bpmn.scaffold("examples/scaffold.rs")?;
+    ///     Ok(())
+    /// }
+    /// ```
     pub fn scaffold(&self, path: impl AsRef<Path>) -> Result<(), Error> {
         let mut scaffold = Scaffold::default();
         self.data

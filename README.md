@@ -65,21 +65,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 If RUST_LOG=info is set when running [example](#usage)
 
 ```
- INFO  snurr::process > StartEvent: Begin process
- INFO  snurr::process > SequenceFlow: count
- INFO  snurr::process > Task: Count 1
- INFO  snurr::process > SequenceFlow: control
- INFO  snurr::process > ExclusiveGateway: equal to 3
- INFO  snurr::process > SequenceFlow: NO
- INFO  snurr::process > Task: Count 1
- INFO  snurr::process > SequenceFlow: control
- INFO  snurr::process > ExclusiveGateway: equal to 3
- INFO  snurr::process > SequenceFlow: NO
- INFO  snurr::process > Task: Count 1
- INFO  snurr::process > SequenceFlow: control
- INFO  snurr::process > ExclusiveGateway: equal to 3
- INFO  snurr::process > SequenceFlow: YES
- INFO  snurr::process > EndEvent: End process
+ INFO  snurr::process::engine > Start: Begin process
+ INFO  snurr::process::engine > SequenceFlow: count
+ INFO  snurr::process::engine > Task: Count 1
+ INFO  snurr::process::engine > SequenceFlow: control
+ INFO  snurr::process::engine > Exclusive: equal to 3
+ INFO  snurr::process::engine > SequenceFlow: NO
+ INFO  snurr::process::engine > Task: Count 1
+ INFO  snurr::process::engine > SequenceFlow: control
+ INFO  snurr::process::engine > Exclusive: equal to 3
+ INFO  snurr::process::engine > SequenceFlow: NO
+ INFO  snurr::process::engine > Task: Count 1
+ INFO  snurr::process::engine > SequenceFlow: control
+ INFO  snurr::process::engine > Exclusive: equal to 3
+ INFO  snurr::process::engine > SequenceFlow: YES
+ INFO  snurr::process::engine > End: End process
 Result: Counter { count: 3 }
 ```
 
