@@ -85,10 +85,11 @@ impl<'a> Scaffold<'a> {
     /// No file is allowed to exist at the target location.
     fn create(&self, path: impl AsRef<Path>) -> Result<(), Error> {
         let mut content = vec![];
-        content.push("pub fn create_handler<T>() -> snurr::Eventhandler<T> {".into());
         content.push(
-            "    let mut handler: snurr::Eventhandler<T> = snurr::Eventhandler::default();".into(),
+            "// Replace the '()' in the Eventhandler<()> return type with your own type.".into(),
         );
+        content.push("pub fn create_handler() -> snurr::Eventhandler<()> {".into());
+        content.push("    let mut handler = snurr::Eventhandler::default();".into());
 
         // First all tasks
         for task in self.tasks.iter() {
