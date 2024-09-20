@@ -54,7 +54,7 @@ impl Process {
                             EventType::Start
                             | EventType::IntermediateCatch
                             | EventType::Boundary => {
-                                parallelize_helper!(outputs.into(), recursion)
+                                parallelize_helper!(outputs.ids(), recursion)
                             }
                             EventType::IntermediateThrow => {
                                 match (name.as_ref(), symbol.as_ref()) {
@@ -63,7 +63,7 @@ impl Process {
                                     }
                                     // Follow outputs for other throw events
                                     (Some(_), _) => {
-                                        parallelize_helper!(outputs.into(), recursion)
+                                        parallelize_helper!(outputs.ids(), recursion)
                                     }
                                     _ => Err(Error::MissingNameIntermediateThrowEvent(id.into()))?,
                                 }
@@ -92,7 +92,7 @@ impl Process {
                             ActivityType::Task => {
                                 let _ = sender.send((replay::TASK, name_or_id.to_owned()));
                                 match handler.run_task(name_or_id, Arc::clone(&data)) {
-                                    Ok(_) => parallelize_helper!(outputs.into(), recursion),
+                                    Ok(_) => parallelize_helper!(outputs.ids(), recursion),
                                     Err(symbol) => self
                                         .boundary_lookup(id, &symbol)
                                         .ok_or_else(|| Error::MissingBoundary(name_or_id.into()))?,
@@ -119,7 +119,7 @@ impl Process {
                                     // Boundary id returned
                                     &[id, ..] => id,
                                     // Continue from subprocess
-                                    _ => parallelize_helper!(outputs.into(), recursion),
+                                    _ => parallelize_helper!(outputs.ids(), recursion),
                                 }
                             }
                         }
@@ -195,7 +195,7 @@ impl Process {
 
                                 parallelize_helper!(responses, recursion)
                             }
-                            GatewayType::Parallel => parallelize_helper!(outputs.into(), recursion),
+                            GatewayType::Parallel => parallelize_helper!(outputs.ids(), recursion),
                         }
                     }
                     Bpmn::SequenceFlow {

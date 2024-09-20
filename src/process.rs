@@ -7,6 +7,7 @@ mod trace;
 use std::{
     collections::HashMap,
     path::Path,
+    str::FromStr,
     sync::{Arc, Mutex},
 };
 use trace::{tracer, Trace};
@@ -14,7 +15,7 @@ use trace::{tracer, Trace};
 use crate::{
     error::Error,
     model::{Bpmn, EventType},
-    reader::read_bpmn_file,
+    reader::{read_bpmn_file, read_bpmn_str},
     Eventhandler, Symbol,
 };
 
@@ -50,8 +51,12 @@ impl Process {
     /// }
     /// ```
     pub fn new(path: impl AsRef<Path>) -> Result<Self, Error> {
-        let (definitions_id, mut data) = read_bpmn_file(path)?;
+        Self::assemble_data(read_bpmn_file(path)?)
+    }
 
+    fn assemble_data(
+        (definitions_id, mut data): (String, HashMap<String, HashMap<String, Bpmn>>),
+    ) -> Result<Self, Error> {
         // Collect all referencing output names
         let mut gateway_ids: HashMap<String, HashMap<String, String>> = HashMap::new();
 
@@ -177,6 +182,25 @@ impl Process {
                 .map_err(|_| Error::NoResult)?,
             trace: trace.finish(),
         })
+    }
+}
+
+impl FromStr for Process {
+    type Err = Error;
+
+    /// Create new process and initialize it from a BPMN `&str`.
+    /// ```
+    /// use snurr::Process;
+    ///
+    /// static BPMN_DATA: &str = include_str!("../examples/example.bpmn");
+    ///
+    /// fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let bpmn: Process = BPMN_DATA.parse()?;
+    ///     Ok(())
+    /// }
+    /// ```
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::assemble_data(read_bpmn_str(s)?)
     }
 }
 

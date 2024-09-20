@@ -1,3 +1,4 @@
+use std::io::BufRead;
 use std::{collections::HashMap, path::Path};
 
 use log::error;
@@ -9,10 +10,17 @@ use crate::model::*;
 
 type ReaderResult = Result<(String, HashMap<String, HashMap<String, Bpmn>>), Error>;
 
-// Read BPMN file and return the ReaderResult containing a tuple with definitions ID and BPMN data.
+pub(crate) fn read_bpmn_str(s: &str) -> ReaderResult {
+    read_bpmn(Reader::from_str(s))
+}
+
 pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
+    read_bpmn(Reader::from_file(path)?)
+}
+
+// Read BPMN file and return the ReaderResult containing a tuple with definitions ID and BPMN data.
+fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> ReaderResult {
     let mut builder = DataBuilder::default();
-    let mut reader = Reader::from_file(path)?;
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
