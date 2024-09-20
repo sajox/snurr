@@ -18,7 +18,7 @@ pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
     read_bpmn(Reader::from_file(path)?)
 }
 
-// Read BPMN file and return the ReaderResult containing a tuple with definitions ID and BPMN data.
+// Read BPMN content and return the ReaderResult containing a tuple with definitions ID and BPMN data.
 fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> ReaderResult {
     let mut builder = DataBuilder::default();
     let mut buf = Vec::new();
