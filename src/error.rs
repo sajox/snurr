@@ -65,4 +65,7 @@ pub enum Error {
 
     #[error("not supported")]
     NotSupported(String),
+
+    #[error("send error")]
+    Send(#[from] std::sync::mpsc::SendError<(&'static str, String)>),
 }

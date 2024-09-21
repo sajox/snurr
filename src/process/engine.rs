@@ -90,7 +90,7 @@ impl Process {
                         info!("{}: {}", aktivity, name_or_id);
                         match aktivity {
                             ActivityType::Task => {
-                                let _ = sender.send((replay::TASK, name_or_id.to_owned()));
+                                sender.send((replay::TASK, name_or_id.to_owned()))?;
                                 match handler.run_task(name_or_id, Arc::clone(&data)) {
                                     Ok(_) => parallelize_helper!(outputs.ids(), recursion),
                                     Err(symbol) => self
@@ -117,7 +117,7 @@ impl Process {
                                     .as_slice()
                                 {
                                     // Boundary id returned
-                                    &[id, ..] => id,
+                                    [id, ..] => id,
                                     // Continue from subprocess
                                     _ => parallelize_helper!(outputs.ids(), recursion),
                                 }
@@ -134,17 +134,15 @@ impl Process {
                     } if outputs.len() <= 1 => {
                         let name_or_id = name.as_ref().unwrap_or(id);
                         info!("{}: {}", gateway, name_or_id);
-                        let _ = sender.send((replay::GATEWAY, name_or_id.to_owned()));
+                        sender.send((replay::GATEWAY, name_or_id.to_owned()))?;
+
+                        let first = outputs
+                            .first()
+                            .ok_or_else(|| Error::MissingOutput(gateway.to_string()))?;
                         match gateway {
-                            GatewayType::Exclusive => outputs
-                                .first()
-                                .ok_or_else(|| Error::MissingOutput(gateway.to_string()))?,
+                            GatewayType::Exclusive => first,
                             GatewayType::Inclusive | GatewayType::Parallel => {
-                                results.push(
-                                    outputs
-                                        .first()
-                                        .ok_or_else(|| Error::MissingOutput(gateway.to_string()))?,
-                                );
+                                results.push(first);
                                 continue;
                             }
                         }
@@ -160,7 +158,8 @@ impl Process {
                     } if outputs.len() > 1 => {
                         let name_or_id = name.as_ref().unwrap_or(id);
                         info!("{}: {}", gateway, name_or_id);
-                        let _ = sender.send((replay::GATEWAY, name_or_id.to_owned()));
+                        sender.send((replay::GATEWAY, name_or_id.to_owned()))?;
+
                         match gateway {
                             GatewayType::Exclusive => {
                                 // Default to first outgoing if function is not set.
@@ -175,25 +174,22 @@ impl Process {
                                     .ok_or_else(|| Error::MissingId(id.into()))?
                             }
                             GatewayType::Inclusive => {
-                                let mut responses =
-                                    handler.run_gateway(name_or_id, Arc::clone(&data));
-                                // If empty. Add default or first output.
+                                let responses = handler.run_gateway(name_or_id, Arc::clone(&data));
                                 if responses.is_empty() {
-                                    if let Some(resp) = default.as_ref().or_else(|| outputs.first())
-                                    {
-                                        responses.push(resp);
-                                    }
+                                    default
+                                        .as_ref()
+                                        .or_else(|| outputs.first())
+                                        .ok_or_else(|| Error::MissingId(id.into()))?
+                                } else {
+                                    // Run all chosen paths
+                                    let responses = responses
+                                        .iter()
+                                        .map(|response| {
+                                            outputs.name_to_id(response).unwrap_or(response)
+                                        })
+                                        .collect();
+                                    parallelize_helper!(responses, recursion)
                                 }
-
-                                // Run all chosen paths
-                                let responses = responses
-                                    .iter()
-                                    .map(|response| {
-                                        outputs.name_to_id(response).unwrap_or(response)
-                                    })
-                                    .collect();
-
-                                parallelize_helper!(responses, recursion)
                             }
                             GatewayType::Parallel => parallelize_helper!(outputs.ids(), recursion),
                         }

@@ -42,7 +42,7 @@ pub(super) fn maybe_parallelize<'a>(
 macro_rules! parallelize_helper {
     ($outputs:expr, $func:expr) => {{
         match crate::process::parallel::maybe_parallelize($outputs, $func)?.as_slice() {
-            &[id, ..] => id,
+            [id, ..] => id,
             _ => continue,
         }
     }};
