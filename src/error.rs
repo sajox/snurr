@@ -1,71 +1,56 @@
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("missing id")]
+    #[error("BPMN type {0} missing id")]
     MissingId(String),
 
-    #[error("missing output")]
-    MissingOutput(String),
+    #[error("{0} with name or id {1} has no output")]
+    MissingOutput(String, String),
 
-    #[error("missing process start")]
-    MissingProcessStart,
+    #[error("could not find BPMN data with id {0}")]
+    MisssingBpmnData(String),
 
-    #[error("missing process")]
-    MissingProcess,
+    #[error("(sub)process missing start id {0}")]
+    MissingProcessStart(String),
 
-    #[error("missing definitions")]
-    MissingDefinitions,
+    #[error("could not find process data with id {0}")]
+    MissingProcessData(String),
 
-    #[error("missing sub process")]
-    MissingSubProcess,
+    #[error("missing definitions id")]
+    MissingDefinitionsId,
 
-    #[error("missing targetRef")]
+    #[error("sequenceFlow missing targetRef")]
     MissingTargetRef,
 
-    #[error("missing sourceRef")]
+    #[error("sequenceFlow missing sourceRef")]
     MissingSourceRef,
 
-    #[error("missing bpmn type {0}")]
-    MissingBpmnType(String),
+    #[error("type {0} not implemented")]
+    TypeNotImplemented(String),
 
-    #[error("missing boundary")]
-    MissingBoundary(String),
+    #[error("could not find {0} boundary symbol attached to {1}")]
+    MissingBoundary(String, String),
 
-    #[error("missing name intermediate throw event")]
-    MissingNameIntermediateThrowEvent(String),
+    #[error("missing intermediate throw event name on {0}")]
+    MissingIntermediateThrowEventName(String),
 
-    #[error("missing intermediate catch event")]
-    MissingIntermediateCatchEvent(String),
+    #[error("missing intermediate catch event symbol {0} with name {1}")]
+    MissingIntermediateCatchEvent(String, String),
 
-    #[error("file error")]
-    File(#[from] quick_xml::Error),
+    #[error("couldn't extract process result")]
+    NoProcessResult,
 
-    #[error("io error")]
-    Io(#[from] std::io::Error),
-
-    #[error("bad event type")]
-    BadEventType,
-
-    #[error("bad symbol type")]
-    BadSymbolType,
-
-    #[error("bad activity type")]
-    BadActivityType,
-
-    #[error("bad gateway type")]
-    BadGatewayType,
-
-    #[error("bad direction type")]
-    BadDirectionType,
-
-    #[error("couldn't extract result")]
-    NoResult,
-
-    #[error("malformed utf8")]
-    Utf8(#[from] std::str::Utf8Error),
-
-    #[error("not supported")]
+    #[error("{0} not supported")]
     NotSupported(String),
 
-    #[error("send error")]
+    #[error(transparent)]
+    File(#[from] quick_xml::Error),
+
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+
+    #[error(transparent)]
+    Utf8(#[from] std::str::Utf8Error),
+
+    #[error(transparent)]
     Send(#[from] std::sync::mpsc::SendError<(&'static str, String)>),
 }

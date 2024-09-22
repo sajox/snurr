@@ -156,7 +156,7 @@ impl Process {
         for (_, bpmn) in self
             .data
             .get(&self.definitions_id)
-            .ok_or(Error::MissingDefinitions)?
+            .ok_or(Error::MissingDefinitionsId)?
             .iter()
         {
             if let Bpmn::Process {
@@ -167,7 +167,9 @@ impl Process {
             {
                 self.execute(
                     vec![start_id],
-                    self.data.get_key_value(id).ok_or(Error::MissingProcess)?,
+                    self.data
+                        .get_key_value(id)
+                        .ok_or_else(|| Error::MissingProcessData(id.into()))?,
                     handler,
                     Arc::clone(&data),
                     trace.sender(),
@@ -177,9 +179,9 @@ impl Process {
 
         Ok(ProcessResult {
             result: Arc::into_inner(data)
-                .ok_or(Error::NoResult)?
+                .ok_or(Error::NoProcessResult)?
                 .into_inner()
-                .map_err(|_| Error::NoResult)?,
+                .map_err(|_| Error::NoProcessResult)?,
             trace: trace.finish(),
         })
     }

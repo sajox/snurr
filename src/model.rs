@@ -79,7 +79,11 @@ impl TryFrom<&[u8]> for EventType {
             INTERMEDIATE_CATCH_EVENT => EventType::IntermediateCatch,
             INTERMEDIATE_THROW_EVENT => EventType::IntermediateThrow,
             START_EVENT => EventType::Start,
-            _ => return Err(Error::BadEventType),
+            _ => {
+                return Err(Error::TypeNotImplemented(
+                    std::str::from_utf8(value)?.into(),
+                ))
+            }
         })
     }
 }
@@ -104,7 +108,11 @@ impl TryFrom<&[u8]> for ActivityType {
             SUB_PROCESS | TRANSACTION => ActivityType::SubProcess,
             TASK | SCRIPT_TASK | USER_TASK | SERVICE_TASK | CALL_ACTIVITY | RECEIVE_TASK
             | SEND_TASK | MANUAL_TASK | BUSINESS_RULE_TASK => ActivityType::Task,
-            _ => return Err(Error::BadActivityType),
+            _ => {
+                return Err(Error::TypeNotImplemented(
+                    std::str::from_utf8(value)?.into(),
+                ))
+            }
         })
     }
 }
@@ -130,7 +138,11 @@ impl TryFrom<&[u8]> for GatewayType {
             EXCLUSIVE_GATEWAY => GatewayType::Exclusive,
             INCLUSIVE_GATEWAY => GatewayType::Inclusive,
             PARALLEL_GATEWAY => GatewayType::Parallel,
-            _ => return Err(Error::BadGatewayType),
+            _ => {
+                return Err(Error::TypeNotImplemented(
+                    std::str::from_utf8(value)?.into(),
+                ))
+            }
         })
     }
 }
@@ -154,7 +166,11 @@ impl TryFrom<&[u8]> for DirectionType {
         Ok(match value {
             INCOMING => DirectionType::Incoming,
             OUTGOING => DirectionType::Outgoing,
-            _ => return Err(Error::BadDirectionType),
+            _ => {
+                return Err(Error::TypeNotImplemented(
+                    std::str::from_utf8(value)?.into(),
+                ))
+            }
         })
     }
 }
@@ -201,7 +217,11 @@ impl TryFrom<&[u8]> for Symbol {
             SIGNAL_EVENT_DEFINITION => Symbol::Signal,
             TERMINATE_EVENT_DEFINITION => Symbol::Terminate,
             TIMER_EVENT_DEFINITION => Symbol::Timer,
-            _ => return Err(Error::BadSymbolType),
+            _ => {
+                return Err(Error::TypeNotImplemented(
+                    std::str::from_utf8(value)?.into(),
+                ))
+            }
         };
         Ok(ty)
     }
@@ -367,7 +387,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                 direction: bpmn_type.try_into()?,
                 text: None,
             },
-            _ => return Err(Error::MissingBpmnType(bpmn_type_str.into())),
+            _ => return Err(Error::TypeNotImplemented(bpmn_type_str.into())),
         };
         Ok(ty)
     }

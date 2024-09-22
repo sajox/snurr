@@ -36,11 +36,11 @@ impl Process {
             queue.push_back(
                 match process_data
                     .get(next_id)
-                    .ok_or_else(|| Error::MissingId(next_id.to_string()))?
+                    .ok_or_else(|| Error::MisssingBpmnData(next_id.to_string()))?
                 {
-                    Bpmn::Process { start_id, .. } => {
-                        start_id.as_ref().ok_or(Error::MissingProcessStart)?
-                    }
+                    Bpmn::Process { id, start_id, .. } => start_id
+                        .as_ref()
+                        .ok_or_else(|| Error::MissingProcessStart(id.into()))?,
                     Bpmn::Event {
                         event,
                         symbol,
@@ -65,7 +65,7 @@ impl Process {
                                     (Some(_), _) => {
                                         parallelize_helper!(outputs.ids(), recursion)
                                     }
-                                    _ => Err(Error::MissingNameIntermediateThrowEvent(id.into()))?,
+                                    _ => Err(Error::MissingIntermediateThrowEventName(id.into()))?,
                                 }
                             }
                             EventType::End => {
@@ -93,22 +93,27 @@ impl Process {
                                 sender.send((replay::TASK, name_or_id.to_owned()))?;
                                 match handler.run_task(name_or_id, Arc::clone(&data)) {
                                     Ok(_) => parallelize_helper!(outputs.ids(), recursion),
-                                    Err(symbol) => self
-                                        .boundary_lookup(id, &symbol)
-                                        .ok_or_else(|| Error::MissingBoundary(name_or_id.into()))?,
+                                    Err(symbol) => {
+                                        self.boundary_lookup(id, &symbol).ok_or_else(|| {
+                                            Error::MissingBoundary(
+                                                symbol.to_string(),
+                                                name_or_id.into(),
+                                            )
+                                        })?
+                                    }
                                 }
                             }
                             ActivityType::SubProcess => {
                                 let sub_process = self
                                     .data
                                     .get_key_value(id)
-                                    .ok_or(Error::MissingSubProcess)?;
+                                    .ok_or_else(|| Error::MissingProcessData(id.into()))?;
 
                                 match self
                                     .execute(
-                                        vec![start_id
-                                            .as_ref()
-                                            .ok_or(Error::MissingProcessStart)?],
+                                        vec![start_id.as_ref().ok_or_else(|| {
+                                            Error::MissingProcessStart(id.into())
+                                        })?],
                                         sub_process,
                                         handler,
                                         Arc::clone(&data),
@@ -136,9 +141,9 @@ impl Process {
                         info!("{}: {}", gateway, name_or_id);
                         sender.send((replay::GATEWAY, name_or_id.to_owned()))?;
 
-                        let first = outputs
-                            .first()
-                            .ok_or_else(|| Error::MissingOutput(gateway.to_string()))?;
+                        let first = outputs.first().ok_or_else(|| {
+                            Error::MissingOutput(gateway.to_string(), name_or_id.to_string())
+                        })?;
                         match gateway {
                             GatewayType::Exclusive => first,
                             GatewayType::Inclusive | GatewayType::Parallel => {
@@ -171,15 +176,24 @@ impl Process {
                                     })
                                     .or(default.as_deref())
                                     .or_else(|| outputs.first().map(|x| x.as_str()))
-                                    .ok_or_else(|| Error::MissingId(id.into()))?
+                                    .ok_or_else(|| {
+                                        Error::MissingOutput(
+                                            gateway.to_string(),
+                                            name_or_id.to_string(),
+                                        )
+                                    })?
                             }
                             GatewayType::Inclusive => {
                                 let responses = handler.run_gateway(name_or_id, Arc::clone(&data));
                                 if responses.is_empty() {
-                                    default
-                                        .as_ref()
-                                        .or_else(|| outputs.first())
-                                        .ok_or_else(|| Error::MissingId(id.into()))?
+                                    default.as_ref().or_else(|| outputs.first()).ok_or_else(
+                                        || {
+                                            Error::MissingOutput(
+                                                gateway.to_string(),
+                                                name_or_id.to_string(),
+                                            )
+                                        },
+                                    )?
                                 } else {
                                     // Run all chosen paths
                                     let responses = responses
@@ -203,7 +217,7 @@ impl Process {
                         info!("SequenceFlow: {}", name.as_ref().unwrap_or(id));
                         target_ref
                     }
-                    _ => return Err(Error::MissingBpmnType("Type not handled.".into())),
+                    bpmn => return Err(Error::TypeNotImplemented(format!("{bpmn:?}"))),
                 },
             );
         }
@@ -224,6 +238,8 @@ impl Process {
         self.catch_events_ids
             .get(throw_event_name)
             .and_then(|map| map.get(symbol))
-            .ok_or_else(|| Error::MissingIntermediateCatchEvent(throw_event_name.into()))
+            .ok_or_else(|| {
+                Error::MissingIntermediateCatchEvent(symbol.to_string(), throw_event_name.into())
+            })
     }
 }
