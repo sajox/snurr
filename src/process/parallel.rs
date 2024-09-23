@@ -38,11 +38,20 @@ pub(super) fn maybe_parallelize<'a>(
     }
 }
 
-// Early return if no id is found.
 macro_rules! parallelize_helper {
     ($outputs:expr, $func:expr) => {{
         match crate::process::parallel::maybe_parallelize($outputs, $func)?.as_slice() {
-            [id, ..] => id,
+            // Test if diagram is balanced in debug mode.
+            // Check if all result ids is the same. If not. Match on row below.
+            #[cfg(debug_assertions)]
+            arr @ [id, ..] if arr.iter().all(|item| item == id) => id,
+            _arr @ [id, ..] => {
+                #[cfg(debug_assertions)]
+                log::error!("unbalanced BPMN diagram detected! {:?}", _arr);
+                id
+            }
+
+            // Early return if no id is found.
             _ => continue,
         }
     }};
