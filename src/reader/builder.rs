@@ -4,9 +4,15 @@ use std::collections::HashMap;
 use super::ReaderResult;
 
 #[derive(Default)]
+struct ProcessData {
+    process: HashMap<String, Bpmn>,
+    sequence_flows: Vec<Bpmn>,
+}
+
+#[derive(Default)]
 pub(super) struct DataBuilder {
     data: HashMap<String, HashMap<String, Bpmn>>,
-    process_stack: Vec<HashMap<String, Bpmn>>,
+    process_stack: Vec<ProcessData>,
     stack: Vec<Bpmn>,
     definitions_id: Option<String>,
 }
@@ -16,14 +22,20 @@ impl DataBuilder {
         self.stack.push(bpmn);
     }
 
+    pub(super) fn add_sequence_flow(&mut self, bpmn: Bpmn) {
+        if let Some(current) = self.process_stack.last_mut() {
+            current.sequence_flows.push(bpmn)
+        }
+    }
+
     pub(super) fn add_new_process(&mut self, bpmn: Bpmn) {
         self.process_stack.push(Default::default());
         self.add(bpmn);
     }
 
     pub(super) fn add_to_process(&mut self, bpmn: Bpmn) -> Result<(), Error> {
-        if let Some(process) = self.process_stack.last_mut() {
-            process.insert(bpmn.id()?.into(), bpmn);
+        if let Some(current) = self.process_stack.last_mut() {
+            current.process.insert(bpmn.id()?.into(), bpmn);
         }
         Ok(())
     }
@@ -84,18 +96,20 @@ impl DataBuilder {
 
     pub(super) fn end_process(&mut self) -> Result<(), Error> {
         if let Some(bpmn) = self.stack.pop() {
-            if let Some(process) = self.process_stack.pop() {
+            if let Some(mut current) = self.process_stack.pop() {
+                self.register_gateway_names_and_add(current.sequence_flows, &mut current.process)?;
+
                 let id = bpmn.id()?.to_string();
                 // Put the Bpmn model in parent scope and in 'data' it's related process data.
                 // Definitions collect all Processes
                 // Process collect all related sub processes
-                if let Some(parent_process) = self.process_stack.last_mut() {
-                    parent_process.insert(id.clone(), bpmn);
+                if let Some(parent) = self.process_stack.last_mut() {
+                    parent.process.insert(id.clone(), bpmn);
                 } else {
                     // No parent, must be Definitions.
                     self.definitions_id = Some(id.clone());
                 }
-                self.data.insert(id, process);
+                self.data.insert(id, current.process);
             }
         }
         Ok(())
@@ -106,6 +120,32 @@ impl DataBuilder {
             self.definitions_id.ok_or(Error::MissingDefinitionsId)?,
             self.data,
         ))
+    }
+
+    // Register gateway names when current process finish. All data is then collected.
+    fn register_gateway_names_and_add(
+        &mut self,
+        sequence_flows: Vec<Bpmn>,
+        process: &mut HashMap<String, Bpmn>,
+    ) -> Result<(), Error> {
+        // Update gateway output names from sequence flow.
+        for sequence_flow in sequence_flows {
+            if let Bpmn::SequenceFlow {
+                id,
+                name: Some(name),
+                source_ref,
+                ..
+            } = &sequence_flow
+            {
+                if let Some(Bpmn::Gateway { outputs, .. }) = process.get_mut(source_ref) {
+                    outputs.register_name(id, name);
+                }
+            }
+
+            // Insert sequence flow to current process.
+            process.insert(sequence_flow.id()?.into(), sequence_flow);
+        }
+        Ok(())
     }
 }
 

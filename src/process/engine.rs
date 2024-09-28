@@ -175,7 +175,7 @@ impl Process {
                                         outputs.name_to_id(response).unwrap_or(response)
                                     })
                                     .or(default.as_deref())
-                                    .or_else(|| outputs.first().map(|x| x.as_str()))
+                                    .or_else(|| outputs.first())
                                     .ok_or_else(|| {
                                         Error::MissingOutput(
                                             gateway.to_string(),
@@ -186,7 +186,7 @@ impl Process {
                             GatewayType::Inclusive => {
                                 let responses = handler.run_gateway(name_or_id, Arc::clone(&data));
                                 if responses.is_empty() {
-                                    default.as_ref().or_else(|| outputs.first()).ok_or_else(
+                                    default.as_deref().or_else(|| outputs.first()).ok_or_else(
                                         || {
                                             Error::MissingOutput(
                                                 gateway.to_string(),

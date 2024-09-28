@@ -393,6 +393,8 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
     }
 }
 
+// When we add an output id we dont have the name yet. Later we register the name. The matching name and id has the same index in each list.
+// If the name is found then same index is used to fetch the id. A HashMap is not used as we want predictable order in scaffold.
 #[derive(Debug, Default)]
 pub(crate) struct Outputs {
     names: Vec<Option<String>>,
@@ -425,13 +427,13 @@ impl Outputs {
             .enumerate()
             .find(|(_, name)| name.as_deref() == Some(search_name.as_ref()))
         {
-            return self.ids.get(index).map(|s| s.as_str());
+            return self.ids.get(index).map(String::as_str);
         }
         None
     }
 
     pub(crate) fn names(&self) -> Vec<&str> {
-        self.names.iter().filter_map(|s| s.as_deref()).collect()
+        self.names.iter().filter_map(Option::as_deref).collect()
     }
 
     pub(crate) fn ids(&self) -> Vec<&str> {
@@ -442,7 +444,7 @@ impl Outputs {
         self.ids.len()
     }
 
-    pub(crate) fn first(&self) -> Option<&String> {
-        self.ids.first()
+    pub(crate) fn first(&self) -> Option<&str> {
+        self.ids.first().map(String::as_str)
     }
 }

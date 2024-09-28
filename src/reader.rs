@@ -73,10 +73,10 @@ fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> ReaderResult {
                         builder.update_symbol(bpmn_type);
                     }
                     bpmn_type @ SEQUENCE_FLOW => {
-                        builder.add_to_process(Bpmn::try_from((
+                        builder.add_sequence_flow(Bpmn::try_from((
                             bpmn_type,
                             collect_attributes(&bs),
-                        ))?)?;
+                        ))?);
                     }
                     _ => {}
                 }

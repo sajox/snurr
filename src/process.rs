@@ -55,11 +55,8 @@ impl Process {
     }
 
     fn assemble_data(
-        (definitions_id, mut data): (String, HashMap<String, HashMap<String, Bpmn>>),
+        (definitions_id, data): (String, HashMap<String, HashMap<String, Bpmn>>),
     ) -> Result<Self, Error> {
-        // Collect all referencing output names
-        let mut gateway_ids: HashMap<String, HashMap<String, String>> = HashMap::new();
-
         // Collect all boundary symbols attached to an activity id
         let mut activity_ids: HashMap<String, HashMap<Symbol, String>> = HashMap::new();
 
@@ -68,19 +65,6 @@ impl Process {
 
         data.values().for_each(|process: &HashMap<String, Bpmn>| {
             process.values().for_each(|bpmn| {
-                if let Bpmn::SequenceFlow {
-                    id,
-                    name: Some(name),
-                    source_ref,
-                    ..
-                } = bpmn
-                {
-                    if let Some(Bpmn::Gateway { .. }) = process.get(source_ref) {
-                        let entry = gateway_ids.entry(source_ref.into()).or_default();
-                        entry.insert(name.into(), id.into());
-                    }
-                }
-
                 if let Bpmn::Event {
                     event: EventType::Boundary,
                     symbol: Some(symbol),
@@ -103,19 +87,6 @@ impl Process {
                 {
                     let entry = catch_events_ids.entry(name.into()).or_default();
                     entry.insert(symbol.clone(), id.into());
-                }
-            });
-        });
-
-        // Update gateway outputs with name
-        data.values_mut().for_each(|process| {
-            process.values_mut().for_each(|bpmn| {
-                if let Bpmn::Gateway { id, outputs, .. } = bpmn {
-                    if let Some(map) = gateway_ids.get(id) {
-                        for (name, id) in map.iter() {
-                            outputs.register_name(id, name);
-                        }
-                    }
                 }
             });
         });
