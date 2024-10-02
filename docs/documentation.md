@@ -155,9 +155,7 @@ handler.add_gateway("CHOOSE", |input| {
 
 #### Default flow
 
-To choose the default flow, then return an empty vector. 
-
-**Note** if no default flow is defined then the first available is used. That to be able to test something without implementation.
+To choose the default flow, then return an empty vector.
 
 ```rust
 handler.add_gateway("Name or id", |input| {

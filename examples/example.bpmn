@@ -14,7 +14,7 @@
       <bpmn:incoming>Flow_1h0jtl6</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_10k1irn" name="control" sourceRef="Activity_1x3acv7" targetRef="Gateway_0mn9uig" />
-    <bpmn:exclusiveGateway id="Gateway_0mn9uig" name="equal to 3">
+    <bpmn:exclusiveGateway id="Gateway_0mn9uig" name="equal to 3" default="Flow_1h0jtl6">
       <bpmn:incoming>Flow_10k1irn</bpmn:incoming>
       <bpmn:outgoing>Flow_1h0jtl6</bpmn:outgoing>
       <bpmn:outgoing>Flow_0rsqhpi</bpmn:outgoing>
@@ -34,16 +34,16 @@
         <dc:Bounds x="280" y="60" width="100" height="80" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Gateway_0mn9uig_di" bpmnElement="Gateway_0mn9uig" isMarkerVisible="true">
-        <dc:Bounds x="445" y="75" width="50" height="50" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="446" y="45" width="49" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Event_1tfc3xd_di" bpmnElement="Event_1tfc3xd">
         <dc:Bounds x="592" y="82" width="36" height="36" />
         <bpmndi:BPMNLabel>
           <dc:Bounds x="579" y="125" width="62" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_0mn9uig_di" bpmnElement="Gateway_0mn9uig" isMarkerVisible="true">
+        <dc:Bounds x="445" y="75" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="446" y="45" width="49" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_0kwzv0p_di" bpmnElement="Flow_0kwzv0p">

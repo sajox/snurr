@@ -175,9 +175,8 @@ impl Process {
                                         outputs.name_to_id(response).unwrap_or(response)
                                     })
                                     .or(default.as_deref())
-                                    .or_else(|| outputs.first())
                                     .ok_or_else(|| {
-                                        Error::MissingOutput(
+                                        Error::MissingDefault(
                                             gateway.to_string(),
                                             name_or_id.to_string(),
                                         )
@@ -186,14 +185,12 @@ impl Process {
                             GatewayType::Inclusive => {
                                 let responses = handler.run_gateway(name_or_id, Arc::clone(&data));
                                 if responses.is_empty() {
-                                    default.as_deref().or_else(|| outputs.first()).ok_or_else(
-                                        || {
-                                            Error::MissingOutput(
-                                                gateway.to_string(),
-                                                name_or_id.to_string(),
-                                            )
-                                        },
-                                    )?
+                                    default.as_deref().ok_or_else(|| {
+                                        Error::MissingDefault(
+                                            gateway.to_string(),
+                                            name_or_id.to_string(),
+                                        )
+                                    })?
                                 } else {
                                     // Run all chosen paths
                                     let responses = responses
