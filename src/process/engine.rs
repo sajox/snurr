@@ -79,7 +79,7 @@ impl Process {
                         }
                     }
                     Bpmn::Activity {
-                        aktivity,
+                        activity,
                         id,
                         name,
                         outputs,
@@ -87,8 +87,8 @@ impl Process {
                         ..
                     } => {
                         let name_or_id = name.as_ref().unwrap_or(id);
-                        info!("{}: {}", aktivity, name_or_id);
-                        match aktivity {
+                        info!("{}: {}", activity, name_or_id);
+                        match activity {
                             ActivityType::Task => {
                                 sender.send((replay::TASK, name_or_id.to_owned()))?;
                                 match handler.run_task(name_or_id, Arc::clone(&data)) {

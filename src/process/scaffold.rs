@@ -25,7 +25,7 @@ impl Process {
             .for_each(|process: &HashMap<String, Bpmn>| {
                 process.values().for_each(|bpmn| {
                     if let Bpmn::Activity {
-                        aktivity: ActivityType::Task,
+                        activity: ActivityType::Task,
                         id,
                         ..
                     } = bpmn

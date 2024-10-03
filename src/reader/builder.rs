@@ -66,7 +66,7 @@ impl DataBuilder {
             bpmn,
             Bpmn::Process { start_id, .. }
             | Bpmn::Activity {
-                aktivity: ActivityType::SubProcess,
+                activity: ActivityType::SubProcess,
                 start_id,
                 ..
             },

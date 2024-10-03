@@ -230,14 +230,11 @@ impl TryFrom<&[u8]> for Symbol {
 #[derive(Debug)]
 pub(crate) enum Bpmn {
     Activity {
-        aktivity: ActivityType,
+        activity: ActivityType,
         id: String,
         name: Option<String>,
         outputs: Outputs,
-        inputs: Vec<String>,
-
-        // Only used by subprocess type
-        start_id: Option<String>,
+        start_id: Option<String>, // Only used by SubProcess type
     },
     Definitions {
         id: String,
@@ -254,7 +251,6 @@ pub(crate) enum Bpmn {
         attached_to_ref: Option<String>,
         _cancel_activity: Option<String>,
         outputs: Outputs,
-        inputs: Vec<String>,
     },
     Gateway {
         gateway: GatewayType,
@@ -299,11 +295,10 @@ impl Bpmn {
         }
     }
 
+    // Only use input to check unsupported join and fork
     pub(crate) fn add_input(&mut self, text: String) {
         match self {
-            Bpmn::Event { inputs, .. }
-            | Bpmn::Gateway { inputs, .. }
-            | Bpmn::Activity { inputs, .. } => inputs.push(text),
+            Bpmn::Gateway { inputs, .. } => inputs.push(text),
             _ => {}
         }
     }
@@ -346,18 +341,16 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                 attached_to_ref: attributes.remove(ATTRIB_ATTACHED_TO_REF),
                 _cancel_activity: attributes.remove(ATTRIB_CANCEL_ACTIVITY),
                 outputs: Default::default(),
-                inputs: Default::default(),
             },
             TASK | SCRIPT_TASK | USER_TASK | SERVICE_TASK | CALL_ACTIVITY | RECEIVE_TASK
             | SEND_TASK | MANUAL_TASK | BUSINESS_RULE_TASK | SUB_PROCESS | TRANSACTION => {
                 Bpmn::Activity {
-                    aktivity: bpmn_type.try_into()?,
+                    activity: bpmn_type.try_into()?,
                     id: attributes
                         .remove(ATTRIB_ID)
                         .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
                     name: attributes.remove(ATTRIB_NAME),
                     outputs: Default::default(),
-                    inputs: Default::default(),
                     start_id: None,
                 }
             }
