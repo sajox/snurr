@@ -10,8 +10,8 @@ impl Process {
     pub(super) fn maybe_parallelize<'a, T>(
         &'a self,
         start_ids: Vec<&'a str>,
-        data: &'a ExecuteData<'a, T>,
-    ) -> Result<Option<&'a str>, Error>
+        data: &ExecuteData<'a, T>,
+    ) -> Result<Option<&str>, Error>
     where
         T: Send,
     {

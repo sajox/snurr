@@ -15,9 +15,9 @@ use crate::{
 impl Process {
     pub(super) fn execute<'a, T>(
         &'a self,
-        start_ids: Vec<&'a str>,
+        start_ids: Vec<&str>,
         data: &ExecuteData<'a, T>,
-    ) -> ExecuteResult<'a>
+    ) -> ExecuteResult<'_>
     where
         T: Send,
     {
