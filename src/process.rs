@@ -4,6 +4,7 @@ mod replay;
 mod scaffold;
 mod trace;
 
+use engine::ExecuteData;
 use std::{
     collections::HashMap,
     path::Path,
@@ -18,8 +19,6 @@ use crate::{
     reader::{read_bpmn_file, read_bpmn_str},
     Eventhandler, Symbol,
 };
-
-pub(crate) type ExecuteResult<'a> = Result<Vec<&'a str>, Error>;
 
 /// Process result from a process run.
 #[derive(Debug)]
@@ -118,7 +117,7 @@ impl Process {
     /// ```
     pub fn run<T>(&self, handler: &Eventhandler<T>, data: T) -> Result<ProcessResult<T>, Error>
     where
-        T: Send + std::fmt::Debug,
+        T: Send,
     {
         let data = Arc::new(Mutex::new(data));
         let trace: Trace<(&str, String)> = tracer();
@@ -136,14 +135,20 @@ impl Process {
                 ..
             } = bpmn
             {
+                let (process_id, process_data) = self
+                    .data
+                    .get_key_value(id)
+                    .ok_or_else(|| Error::MissingProcessData(id.into()))?;
+
                 self.execute(
                     vec![start_id],
-                    self.data
-                        .get_key_value(id)
-                        .ok_or_else(|| Error::MissingProcessData(id.into()))?,
-                    handler,
-                    Arc::clone(&data),
-                    trace.sender(),
+                    &ExecuteData::new(
+                        process_id,
+                        process_data,
+                        handler,
+                        Arc::clone(&data),
+                        trace.sender(),
+                    ),
                 )?;
             }
         }
