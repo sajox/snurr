@@ -12,14 +12,14 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
 
 ```toml
 [dependencies]
-snurr = "0.4"
+snurr = "0.5"
 ```
 
 With parallel feature enabled, new threads are spawned with parallel, inclusive, task and event forks.
 
 ```toml
 [dependencies]
-snurr = { version = "0.4", features = ["parallel"] }
+snurr = { version = "0.5", features = ["parallel"] }
 ```
 
 
