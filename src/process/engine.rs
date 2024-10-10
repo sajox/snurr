@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::VecDeque,
     sync::{mpsc::Sender, Arc},
 };
 
@@ -15,32 +15,29 @@ use crate::{
 impl Process {
     pub(super) fn execute<'a, T>(
         &'a self,
-        start_ids: Vec<&str>,
+        start_ids: Vec<&usize>,
         data: &ExecuteData<'a, T>,
     ) -> ExecuteResult<'_>
     where
         T: Send,
     {
-        let mut results: Vec<&str> = vec![];
+        let mut results: Vec<&usize> = vec![];
         let mut queue = VecDeque::from(start_ids);
         while let Some(current_id) = queue.pop_front() {
             let next_id = match data
                 .process_data
-                .get(current_id)
+                .get(*current_id)
                 .ok_or_else(|| Error::MisssingBpmnData(current_id.to_string()))?
             {
-                Bpmn::Process { id, start_id, .. } => start_id
-                    .as_ref()
-                    .ok_or_else(|| Error::MissingProcessStart(id.into()))?,
                 Bpmn::Event {
                     event,
                     symbol,
-                    id,
+                    id: (bpmn_id, _),
                     name,
                     outputs,
                     ..
                 } => {
-                    info!("{}: {}", event, name.as_ref().unwrap_or(id));
+                    info!("{}: {}", event, name.as_ref().unwrap_or(bpmn_id));
                     match event {
                         EventType::Start | EventType::IntermediateCatch | EventType::Boundary => {
                             parallelize_helper!(self, outputs.ids(), data)
@@ -54,14 +51,14 @@ impl Process {
                                 (Some(_), _) => {
                                     parallelize_helper!(self, outputs.ids(), data)
                                 }
-                                _ => Err(Error::MissingIntermediateThrowEventName(id.into()))?,
+                                _ => Err(Error::MissingIntermediateThrowEventName(bpmn_id.into()))?,
                             }
                         }
                         EventType::End => {
-                            if let Some(boundary_id) = symbol.as_ref().and_then(|symbol| {
-                                self.boundary_lookup(data.process_id, symbol)
-                                    .map(String::as_str)
-                            }) {
+                            if let Some(boundary_id) = symbol
+                                .as_ref()
+                                .and_then(|symbol| self.boundary_lookup(data.process_id, symbol))
+                            {
                                 results.push(boundary_id);
                             }
                             continue;
@@ -73,7 +70,6 @@ impl Process {
                     id,
                     name,
                     outputs,
-                    start_id,
                     ..
                 } => {
                     let name_or_id = name.as_ref().unwrap_or(id);
@@ -102,12 +98,7 @@ impl Process {
                                 .ok_or_else(|| Error::MissingProcessData(id.into()))?;
 
                             match self
-                                .execute(
-                                    vec![start_id
-                                        .as_ref()
-                                        .ok_or_else(|| Error::MissingProcessStart(id.into()))?],
-                                    &data.update(process_id, process_data),
-                                )?
+                                .execute(vec![&0], &data.update(process_id, process_data))?
                                 .as_slice()
                             {
                                 // Boundary id returned
@@ -148,7 +139,7 @@ impl Process {
                     gateway,
                     id,
                     name,
-                    default,
+                    default: (_, default_lid),
                     outputs,
                     ..
                 } if outputs.len() > 1 => {
@@ -162,8 +153,8 @@ impl Process {
                             let responses = data.handler.run_gateway(name_or_id, data.user_data());
                             responses
                                 .first()
-                                .map(|response| outputs.name_to_id(response).unwrap_or(response))
-                                .or(default.as_deref())
+                                .and_then(|response| outputs.name_to_id(response))
+                                .or(default_lid.as_ref())
                                 .ok_or_else(|| {
                                     Error::MissingDefault(
                                         gateway.to_string(),
@@ -174,7 +165,7 @@ impl Process {
                         GatewayType::Inclusive => {
                             let responses = data.handler.run_gateway(name_or_id, data.user_data());
                             if responses.is_empty() {
-                                default.as_deref().ok_or_else(|| {
+                                default_lid.as_ref().ok_or_else(|| {
                                     Error::MissingDefault(
                                         gateway.to_string(),
                                         name_or_id.to_string(),
@@ -184,9 +175,7 @@ impl Process {
                                 // Run all chosen paths
                                 let responses: Vec<_> = responses
                                     .iter()
-                                    .map(|response| {
-                                        outputs.name_to_id(response).unwrap_or(response)
-                                    })
+                                    .filter_map(|response| outputs.name_to_id(response))
                                     .collect();
                                 parallelize_helper!(self, responses, data)
                             }
@@ -199,11 +188,11 @@ impl Process {
                 Bpmn::SequenceFlow {
                     id,
                     name,
-                    target_ref,
+                    target_ref: (_, lid),
                     ..
                 } => {
                     info!("SequenceFlow: {}", name.as_ref().unwrap_or(id));
-                    target_ref
+                    lid
                 }
                 bpmn => return Err(Error::TypeNotImplemented(format!("{bpmn:?}"))),
             };
@@ -212,17 +201,13 @@ impl Process {
         Ok(results)
     }
 
-    fn boundary_lookup(&self, activity_id: &str, symbol: &Symbol) -> Option<&String> {
+    fn boundary_lookup(&self, activity_id: &str, symbol: &Symbol) -> Option<&usize> {
         self.activity_ids
             .get(activity_id)
             .and_then(|map| map.get(symbol))
     }
 
-    fn catch_event_lookup(
-        &self,
-        throw_event_name: &str,
-        symbol: &Symbol,
-    ) -> Result<&String, Error> {
+    fn catch_event_lookup(&self, throw_event_name: &str, symbol: &Symbol) -> Result<&usize, Error> {
         self.catch_events_ids
             .get(throw_event_name)
             .and_then(|map| map.get(symbol))
@@ -232,12 +217,12 @@ impl Process {
     }
 }
 
-pub(super) type ExecuteResult<'a> = Result<Vec<&'a str>, Error>;
+pub(super) type ExecuteResult<'a> = Result<Vec<&'a usize>, Error>;
 
 // Data for the execution engine.
 pub(super) struct ExecuteData<'a, T> {
     process_id: &'a str,
-    process_data: &'a HashMap<String, Bpmn>,
+    process_data: &'a Vec<Bpmn>,
     handler: &'a Eventhandler<T>,
     user_data: Data<T>,
     trace: Sender<(&'static str, String)>,
@@ -246,7 +231,7 @@ pub(super) struct ExecuteData<'a, T> {
 impl<'a, T> ExecuteData<'a, T> {
     pub(super) fn new(
         process_id: &'a str,
-        process_data: &'a HashMap<String, Bpmn>,
+        process_data: &'a Vec<Bpmn>,
         handler: &'a Eventhandler<T>,
         user_data: Data<T>,
         trace: Sender<(&'static str, String)>,
@@ -261,7 +246,7 @@ impl<'a, T> ExecuteData<'a, T> {
     }
 
     // When we change to a sub process we must change process id and data.
-    fn update(&self, process_id: &'a str, process_data: &'a HashMap<String, Bpmn>) -> Self {
+    fn update(&self, process_id: &'a str, process_data: &'a Vec<Bpmn>) -> Self {
         Self {
             process_id,
             process_data,

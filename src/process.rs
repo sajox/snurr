@@ -33,10 +33,10 @@ pub struct ProcessResult<T> {
 /// Process that contains information from the BPMN file
 #[derive(Debug)]
 pub struct Process {
-    data: HashMap<String, HashMap<String, Bpmn>>,
+    data: HashMap<String, Vec<Bpmn>>,
     definitions_id: String,
-    activity_ids: HashMap<String, HashMap<Symbol, String>>,
-    catch_events_ids: HashMap<String, HashMap<Symbol, String>>,
+    activity_ids: HashMap<String, HashMap<Symbol, usize>>,
+    catch_events_ids: HashMap<String, HashMap<Symbol, usize>>,
 }
 
 impl Process {
@@ -54,38 +54,38 @@ impl Process {
     }
 
     fn assemble_data(
-        (definitions_id, data): (String, HashMap<String, HashMap<String, Bpmn>>),
+        (definitions_id, data): (String, HashMap<String, Vec<Bpmn>>),
     ) -> Result<Self, Error> {
         // Collect all boundary symbols attached to an activity id
-        let mut activity_ids: HashMap<String, HashMap<Symbol, String>> = HashMap::new();
+        let mut activity_ids: HashMap<String, HashMap<Symbol, usize>> = HashMap::new();
 
         // Collect all IntermediateCatchEvents
-        let mut catch_events_ids: HashMap<String, HashMap<Symbol, String>> = HashMap::new();
+        let mut catch_events_ids: HashMap<String, HashMap<Symbol, usize>> = HashMap::new();
 
-        data.values().for_each(|process: &HashMap<String, Bpmn>| {
-            process.values().for_each(|bpmn| {
+        data.values().for_each(|process: &Vec<Bpmn>| {
+            process.iter().for_each(|bpmn| {
                 if let Bpmn::Event {
+                    id: (_, lid),
                     event: EventType::Boundary,
                     symbol: Some(symbol),
-                    id,
-                    attached_to_ref: Some(attached_to_ref),
+                    attached_to_ref: (Some(attached_to_ref), _),
                     ..
                 } = bpmn
                 {
                     let entry = activity_ids.entry(attached_to_ref.into()).or_default();
-                    entry.insert(symbol.clone(), id.into());
+                    entry.insert(symbol.clone(), *lid);
                 }
 
                 if let Bpmn::Event {
+                    id: (_, lid),
                     event: EventType::IntermediateCatch,
                     symbol: Some(symbol),
-                    id,
                     name: Some(name),
                     ..
                 } = bpmn
                 {
                     let entry = catch_events_ids.entry(name.into()).or_default();
-                    entry.insert(symbol.clone(), id.into());
+                    entry.insert(symbol.clone(), *lid);
                 }
             });
         });
@@ -123,25 +123,20 @@ impl Process {
         let trace: Trace<(&str, String)> = tracer();
 
         // Run every process specified in the diagram
-        for (_, bpmn) in self
+        for bpmn in self
             .data
             .get(&self.definitions_id)
             .ok_or(Error::MissingDefinitionsId)?
             .iter()
         {
-            if let Bpmn::Process {
-                id,
-                start_id: Some(start_id),
-                ..
-            } = bpmn
-            {
+            if let Bpmn::Process { id, .. } = bpmn {
                 let (process_id, process_data) = self
                     .data
                     .get_key_value(id)
                     .ok_or_else(|| Error::MissingProcessData(id.into()))?;
 
                 self.execute(
-                    vec![start_id],
+                    vec![&0],
                     &ExecuteData::new(
                         process_id,
                         process_data,

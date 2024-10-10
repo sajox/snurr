@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::Write, path::Path};
+use std::{io::Write, path::Path};
 
 use crate::{
     error::Error,
@@ -20,36 +20,34 @@ impl Process {
     /// ```
     pub fn scaffold(&self, path: impl AsRef<Path>) -> Result<(), Error> {
         let mut scaffold = Scaffold::default();
-        self.data
-            .values()
-            .for_each(|process: &HashMap<String, Bpmn>| {
-                process.values().for_each(|bpmn| {
-                    if let Bpmn::Activity {
-                        activity: ActivityType::Task,
-                        id,
-                        ..
-                    } = bpmn
-                    {
-                        let symbols = if let Some(map) = self.activity_ids.get(id) {
-                            map.keys().collect::<Vec<&Symbol>>()
-                        } else {
-                            Vec::new()
-                        };
-                        scaffold.add_task(bpmn, symbols);
-                    }
+        self.data.values().for_each(|process: &Vec<Bpmn>| {
+            process.iter().for_each(|bpmn| {
+                if let Bpmn::Activity {
+                    activity: ActivityType::Task,
+                    id,
+                    ..
+                } = bpmn
+                {
+                    let symbols = if let Some(map) = self.activity_ids.get(id) {
+                        map.keys().collect::<Vec<&Symbol>>()
+                    } else {
+                        Vec::new()
+                    };
+                    scaffold.add_task(bpmn, symbols);
+                }
 
-                    if let Bpmn::Gateway {
-                        gateway: GatewayType::Exclusive | GatewayType::Inclusive,
-                        outputs,
-                        ..
-                    } = bpmn
-                    {
-                        if outputs.len() > 1 {
-                            scaffold.add_gateway(bpmn);
-                        }
+                if let Bpmn::Gateway {
+                    gateway: GatewayType::Exclusive | GatewayType::Inclusive,
+                    outputs,
+                    ..
+                } = bpmn
+                {
+                    if outputs.len() > 1 {
+                        scaffold.add_gateway(bpmn);
                     }
-                });
+                }
             });
+        });
 
         scaffold.create(path)
     }

@@ -11,7 +11,7 @@ use quick_xml::reader::Reader;
 use crate::error::Error;
 use crate::model::*;
 
-type ReaderResult = Result<(String, HashMap<String, HashMap<String, Bpmn>>), Error>;
+type ReaderResult = Result<(String, HashMap<String, Vec<Bpmn>>), Error>;
 
 pub(crate) fn read_bpmn_str(s: &str) -> ReaderResult {
     read_bpmn(Reader::from_str(s))
@@ -73,18 +73,16 @@ fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> ReaderResult {
                         builder.update_symbol(bpmn_type);
                     }
                     bpmn_type @ SEQUENCE_FLOW => {
-                        builder.add_sequence_flow(Bpmn::try_from((
-                            bpmn_type,
-                            collect_attributes(&bs),
-                        ))?);
+                        builder
+                            .add_to_process(Bpmn::try_from((bpmn_type, collect_attributes(&bs)))?);
                     }
                     _ => {}
                 }
             }
             Ok(Event::End(be)) => match be.local_name().as_ref() {
                 direction @ (OUTGOING | INCOMING) => builder.add_direction(direction),
-                START_EVENT => builder.update_start_id()?,
-                END_EVENT
+                START_EVENT
+                | END_EVENT
                 | BOUNDARY_EVENT
                 | INTERMEDIATE_CATCH_EVENT
                 | INTERMEDIATE_THROW_EVENT
@@ -105,7 +103,7 @@ fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> ReaderResult {
                 _ => {}
             },
             Ok(Event::Text(bt)) => {
-                builder.add_text(bt.unescape()?.into_owned())?;
+                builder.add_text(bt.unescape()?.into_owned());
             }
 
             // Ignore other XML events

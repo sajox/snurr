@@ -4,15 +4,9 @@ use std::collections::HashMap;
 use super::ReaderResult;
 
 #[derive(Default)]
-struct ProcessData {
-    process: HashMap<String, Bpmn>,
-    sequence_flows: Vec<Bpmn>,
-}
-
-#[derive(Default)]
 pub(super) struct DataBuilder {
-    data: HashMap<String, HashMap<String, Bpmn>>,
-    process_stack: Vec<ProcessData>,
+    data: HashMap<String, Vec<Bpmn>>,
+    process_stack: Vec<Vec<Bpmn>>,
     stack: Vec<Bpmn>,
     definitions_id: Option<String>,
 }
@@ -22,22 +16,15 @@ impl DataBuilder {
         self.stack.push(bpmn);
     }
 
-    pub(super) fn add_sequence_flow(&mut self, bpmn: Bpmn) {
-        if let Some(current) = self.process_stack.last_mut() {
-            current.sequence_flows.push(bpmn)
-        }
-    }
-
     pub(super) fn add_new_process(&mut self, bpmn: Bpmn) {
         self.process_stack.push(Default::default());
         self.add(bpmn);
     }
 
-    pub(super) fn add_to_process(&mut self, bpmn: Bpmn) -> Result<(), Error> {
+    pub(super) fn add_to_process(&mut self, bpmn: Bpmn) {
         if let Some(current) = self.process_stack.last_mut() {
-            current.process.insert(bpmn.id()?.into(), bpmn);
+            current.push(bpmn);
         }
-        Ok(())
     }
 
     pub(super) fn update_symbol(&mut self, bpmn_type: &[u8]) {
@@ -61,35 +48,16 @@ impl DataBuilder {
         }
     }
 
-    pub(super) fn update_start_id(&mut self) -> Result<(), Error> {
-        if let Some((
-            bpmn,
-            Bpmn::Process { start_id, .. }
-            | Bpmn::Activity {
-                activity: ActivityType::SubProcess,
-                start_id,
-                ..
-            },
-        )) = self.stack.pop().zip(self.stack.last_mut())
-        {
-            // Update parent process or subprocess start_id
-            *start_id = Some(bpmn.id()?.into());
-            self.add_to_process(bpmn)?
-        }
-        Ok(())
-    }
-
-    pub(super) fn add_text(&mut self, value: String) -> Result<(), Error> {
+    pub(super) fn add_text(&mut self, value: String) {
         if let Some(Bpmn::Direction { text, .. }) = self.stack.last_mut() {
             *text = Some(value);
         }
-        Ok(())
     }
 
     pub(super) fn end(&mut self) -> Result<(), Error> {
         if let Some(bpmn) = self.stack.pop() {
             check_unsupported(&bpmn)?;
-            self.add_to_process(bpmn)?
+            self.add_to_process(bpmn);
         }
         Ok(())
     }
@@ -97,22 +65,79 @@ impl DataBuilder {
     pub(super) fn end_process(&mut self) -> Result<(), Error> {
         if let Some(bpmn) = self.stack.pop() {
             if let Some(mut current) = self.process_stack.pop() {
-                self.register_gateway_names_and_add(current.sequence_flows, &mut current.process)?;
-
+                self.register_data(&mut current);
                 let id = bpmn.id()?.to_string();
                 // Put the Bpmn model in parent scope and in 'data' it's related process data.
                 // Definitions collect all Processes
                 // Process collect all related sub processes
                 if let Some(parent) = self.process_stack.last_mut() {
-                    parent.process.insert(id.clone(), bpmn);
+                    parent.push(bpmn);
                 } else {
                     // No parent, must be Definitions.
                     self.definitions_id = Some(id.clone());
                 }
-                self.data.insert(id, current.process);
+                self.data.insert(id, current);
             }
         }
+
         Ok(())
+    }
+
+    // Fill gateway names and local id (lid)
+    fn register_data(&mut self, data: &mut [Bpmn]) {
+        // Collect Bpmn id, index and name
+        let map: HashMap<String, (usize, Option<String>)> = data
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, bpmn)| {
+                let (id, name) = match bpmn {
+                    Bpmn::Activity { id, .. }
+                    | Bpmn::Event { id: (id, _), .. }
+                    | Bpmn::Gateway { id, .. } => (id.to_string(), None),
+                    Bpmn::SequenceFlow { id, name, .. } => (id.to_string(), name.clone()),
+                    _ => return None,
+                };
+                Some((id, (idx, name)))
+            })
+            .collect();
+
+        // Register
+        data.iter_mut().for_each(|bpmn| match bpmn {
+            Bpmn::Activity { outputs, .. } => outputs.register(&map),
+            Bpmn::Event {
+                id: (bpmn_id, lid),
+                outputs,
+                attached_to_ref: (ref_id, ref_lid),
+                ..
+            } => {
+                outputs.register(&map);
+                if let Some((idx, _)) = ref_id.as_ref().and_then(|value| map.get(value)) {
+                    *ref_lid = Some(*idx);
+                }
+                if let Some((idx, _)) = map.get(bpmn_id) {
+                    *lid = *idx;
+                }
+            }
+            Bpmn::Gateway {
+                default: (bpmn_id, lid),
+                outputs,
+                ..
+            } => {
+                outputs.register(&map);
+                if let Some((idx, _)) = bpmn_id.as_ref().and_then(|f| map.get(f)) {
+                    *lid = Some(*idx);
+                }
+            }
+            Bpmn::SequenceFlow {
+                target_ref: (bpmn_id, lid),
+                ..
+            } => {
+                if let Some((idx, _)) = map.get(bpmn_id) {
+                    *lid = *idx;
+                }
+            }
+            _ => {}
+        });
     }
 
     pub(super) fn finish(self) -> ReaderResult {
@@ -120,32 +145,6 @@ impl DataBuilder {
             self.definitions_id.ok_or(Error::MissingDefinitionsId)?,
             self.data,
         ))
-    }
-
-    // Register gateway names when current process finish. All data is then collected.
-    fn register_gateway_names_and_add(
-        &mut self,
-        sequence_flows: Vec<Bpmn>,
-        process: &mut HashMap<String, Bpmn>,
-    ) -> Result<(), Error> {
-        // Update gateway output names from sequence flow.
-        for sequence_flow in sequence_flows {
-            if let Bpmn::SequenceFlow {
-                id,
-                name: Some(name),
-                source_ref,
-                ..
-            } = &sequence_flow
-            {
-                if let Some(Bpmn::Gateway { outputs, .. }) = process.get_mut(source_ref) {
-                    outputs.register_name(id, name);
-                }
-            }
-
-            // Insert sequence flow to current process.
-            process.insert(sequence_flow.id()?.into(), sequence_flow);
-        }
-        Ok(())
     }
 }
 

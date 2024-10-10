@@ -234,7 +234,6 @@ pub(crate) enum Bpmn {
         id: String,
         name: Option<String>,
         outputs: Outputs,
-        start_id: Option<String>, // Only used by SubProcess type
     },
     Definitions {
         id: String,
@@ -246,9 +245,9 @@ pub(crate) enum Bpmn {
     Event {
         event: EventType,
         symbol: Option<Symbol>,
-        id: String,
+        id: (String, usize),
         name: Option<String>,
-        attached_to_ref: Option<String>,
+        attached_to_ref: (Option<String>, Option<usize>),
         _cancel_activity: Option<String>,
         outputs: Outputs,
     },
@@ -256,20 +255,19 @@ pub(crate) enum Bpmn {
         gateway: GatewayType,
         id: String,
         name: Option<String>,
-        default: Option<String>,
+        default: (Option<String>, Option<usize>),
         outputs: Outputs,
         inputs: Vec<String>,
     },
     Process {
         id: String,
         _is_executable: bool,
-        start_id: Option<String>,
     },
     SequenceFlow {
         id: String,
         name: Option<String>,
-        source_ref: String,
-        target_ref: String,
+        _source_ref: String,
+        target_ref: (String, usize),
     },
 }
 
@@ -278,7 +276,7 @@ impl Bpmn {
         match self {
             Bpmn::Definitions { id, .. }
             | Bpmn::Process { id, .. }
-            | Bpmn::Event { id, .. }
+            | Bpmn::Event { id: (id, _), .. }
             | Bpmn::Activity { id, .. }
             | Bpmn::Gateway { id, .. }
             | Bpmn::SequenceFlow { id, .. } => Ok(id),
@@ -324,7 +322,6 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     .remove(ATTRIB_IS_EXECUTABLE)
                     .and_then(|s| s.parse::<bool>().ok())
                     .unwrap_or_default(),
-                start_id: None,
             },
             START_EVENT
             | END_EVENT
@@ -333,11 +330,17 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
             | INTERMEDIATE_THROW_EVENT => Bpmn::Event {
                 event: bpmn_type.try_into()?,
                 symbol: None,
-                id: attributes
-                    .remove(ATTRIB_ID)
-                    .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
+                id: (
+                    attributes
+                        .remove(ATTRIB_ID)
+                        .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
+                    Default::default(),
+                ),
                 name: attributes.remove(ATTRIB_NAME),
-                attached_to_ref: attributes.remove(ATTRIB_ATTACHED_TO_REF),
+                attached_to_ref: (
+                    attributes.remove(ATTRIB_ATTACHED_TO_REF),
+                    Default::default(),
+                ),
                 _cancel_activity: attributes.remove(ATTRIB_CANCEL_ACTIVITY),
                 outputs: Default::default(),
             },
@@ -350,7 +353,6 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                         .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
                     name: attributes.remove(ATTRIB_NAME),
                     outputs: Default::default(),
-                    start_id: None,
                 }
             }
             EXCLUSIVE_GATEWAY | PARALLEL_GATEWAY | INCLUSIVE_GATEWAY => Bpmn::Gateway {
@@ -359,7 +361,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     .remove(ATTRIB_ID)
                     .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
                 name: attributes.remove(ATTRIB_NAME),
-                default: attributes.remove(ATTRIB_DEFAULT),
+                default: (attributes.remove(ATTRIB_DEFAULT), Default::default()),
                 outputs: Default::default(),
                 inputs: Default::default(),
             },
@@ -368,12 +370,15 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     .remove(ATTRIB_ID)
                     .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
                 name: attributes.remove(ATTRIB_NAME),
-                source_ref: attributes
+                _source_ref: attributes
                     .remove(ATTRIB_SOURCE_REF)
                     .ok_or(Error::MissingSourceRef)?,
-                target_ref: attributes
-                    .remove(ATTRIB_TARGET_REF)
-                    .ok_or(Error::MissingTargetRef)?,
+                target_ref: (
+                    attributes
+                        .remove(ATTRIB_TARGET_REF)
+                        .ok_or(Error::MissingTargetRef)?,
+                    Default::default(),
+                ),
             },
             INCOMING | OUTGOING => Bpmn::Direction {
                 direction: bpmn_type.try_into()?,
@@ -390,6 +395,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
 #[derive(Debug, Default)]
 pub(crate) struct Outputs {
     names: Vec<Option<String>>,
+    lids: Vec<usize>,
     ids: Vec<String>,
 }
 
@@ -397,29 +403,22 @@ impl Outputs {
     fn add(&mut self, output_id: impl Into<String>) {
         self.ids.push(output_id.into());
         self.names.push(None);
+        self.lids.push(0);
     }
 
-    pub(crate) fn register_name(&mut self, search_id: impl AsRef<str>, name: impl Into<String>) {
-        if let Some((index, _)) = self
-            .ids
-            .iter()
-            .enumerate()
-            .find(|(_, id)| id.as_str() == search_id.as_ref())
-        {
-            if let Some(value) = self.names.get_mut(index) {
-                *value = Some(name.into())
+    pub(crate) fn name_to_id(&self, search_name: impl AsRef<str>) -> Option<&usize> {
+        for index in 0..self.lids.len() {
+            if self
+                .names
+                .get(index)
+                .map_or(false, |v| v.as_deref() == Some(search_name.as_ref()))
+                || self
+                    .ids
+                    .get(index)
+                    .map_or(false, |v| v.as_str() == search_name.as_ref())
+            {
+                return self.lids.get(index);
             }
-        }
-    }
-
-    pub(crate) fn name_to_id(&self, search_name: impl AsRef<str>) -> Option<&str> {
-        if let Some((index, _)) = self
-            .names
-            .iter()
-            .enumerate()
-            .find(|(_, name)| name.as_deref() == Some(search_name.as_ref()))
-        {
-            return self.ids.get(index).map(String::as_str);
         }
         None
     }
@@ -428,15 +427,24 @@ impl Outputs {
         self.names.iter().filter_map(Option::as_deref).collect()
     }
 
-    pub(crate) fn ids(&self) -> Vec<&str> {
-        self.ids.iter().map(String::as_str).collect()
+    pub(crate) fn ids(&self) -> Vec<&usize> {
+        self.lids.iter().collect()
     }
 
     pub(crate) fn len(&self) -> usize {
         self.ids.len()
     }
 
-    pub(crate) fn first(&self) -> Option<&str> {
-        self.ids.first().map(String::as_str)
+    pub(crate) fn first(&self) -> Option<&usize> {
+        self.lids.first()
+    }
+
+    pub(crate) fn register(&mut self, map: &HashMap<String, (usize, Option<String>)>) {
+        for (idx, value) in self.ids.iter().enumerate() {
+            if let Some((lid, name)) = map.get(value) {
+                self.lids[idx] = *lid;
+                self.names[idx] = name.clone();
+            }
+        }
     }
 }

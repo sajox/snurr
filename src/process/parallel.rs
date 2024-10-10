@@ -9,15 +9,15 @@ impl Process {
     // next id is returned to continue on. Thread terminates on a Parallel or Inclusive Join and End events.
     pub(super) fn maybe_parallelize<'a, T>(
         &'a self,
-        start_ids: Vec<&'a str>,
+        start_ids: Vec<&'a usize>,
         data: &ExecuteData<'a, T>,
-    ) -> Result<Option<&str>, Error>
+    ) -> Result<Option<&usize>, Error>
     where
         T: Send,
     {
         let result: ExecuteResult<'_> = {
             if start_ids.len() <= 1 {
-                return Ok(start_ids.first().copied());
+                return Ok(start_ids.first().map(|v| &**v));
             } else {
                 #[cfg(feature = "parallel")]
                 {
