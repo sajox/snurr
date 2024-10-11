@@ -92,7 +92,10 @@ impl DataBuilder {
             .filter_map(|(idx, bpmn)| {
                 let (id, name) = match bpmn {
                     Bpmn::Activity { id, .. }
-                    | Bpmn::Event { id: (id, _), .. }
+                    | Bpmn::Event {
+                        id: BpmnLocal(id, _),
+                        ..
+                    }
                     | Bpmn::Gateway { id, .. } => (id.to_string(), None),
                     Bpmn::SequenceFlow { id, name, .. } => (id.to_string(), name.clone()),
                     _ => return None,
@@ -101,40 +104,31 @@ impl DataBuilder {
             })
             .collect();
 
-        // Register
+        // Register Vec index and gateway names
         data.iter_mut().for_each(|bpmn| match bpmn {
             Bpmn::Activity { outputs, .. } => outputs.register(&map),
             Bpmn::Event {
-                id: (bpmn_id, lid),
+                id,
                 outputs,
-                attached_to_ref: (ref_id, ref_lid),
+                attached_to_ref,
                 ..
             } => {
                 outputs.register(&map);
-                if let Some((idx, _)) = ref_id.as_ref().and_then(|value| map.get(value)) {
-                    *ref_lid = Some(*idx);
-                }
-                if let Some((idx, _)) = map.get(bpmn_id) {
-                    *lid = *idx;
+                fill_lid(id, &map);
+                if let Some(attached_to_ref) = attached_to_ref {
+                    fill_lid(attached_to_ref, &map);
                 }
             }
             Bpmn::Gateway {
-                default: (bpmn_id, lid),
-                outputs,
-                ..
+                default, outputs, ..
             } => {
                 outputs.register(&map);
-                if let Some((idx, _)) = bpmn_id.as_ref().and_then(|f| map.get(f)) {
-                    *lid = Some(*idx);
+                if let Some(default) = default {
+                    fill_lid(default, &map);
                 }
             }
-            Bpmn::SequenceFlow {
-                target_ref: (bpmn_id, lid),
-                ..
-            } => {
-                if let Some((idx, _)) = map.get(bpmn_id) {
-                    *lid = *idx;
-                }
+            Bpmn::SequenceFlow { target_ref, .. } => {
+                fill_lid(target_ref, &map);
             }
             _ => {}
         });
@@ -145,6 +139,12 @@ impl DataBuilder {
             self.definitions_id.ok_or(Error::MissingDefinitionsId)?,
             self.data,
         ))
+    }
+}
+
+fn fill_lid(BpmnLocal(bid, lid): &mut BpmnLocal, map: &HashMap<String, (usize, Option<String>)>) {
+    if let Some((idx, _)) = map.get(bid) {
+        *lid = *idx;
     }
 }
 

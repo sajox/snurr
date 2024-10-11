@@ -7,7 +7,7 @@ use log::info;
 
 use crate::{
     error::Error,
-    model::{ActivityType, Bpmn, EventType, GatewayType},
+    model::{ActivityType, Bpmn, BpmnLocal, EventType, GatewayType},
     process::{parallel::parallelize_helper, replay},
     Data, Eventhandler, Process, Symbol,
 };
@@ -32,12 +32,12 @@ impl Process {
                 Bpmn::Event {
                     event,
                     symbol,
-                    id: (bpmn_id, _),
+                    id: BpmnLocal(bid, _),
                     name,
                     outputs,
                     ..
                 } => {
-                    info!("{}: {}", event, name.as_ref().unwrap_or(bpmn_id));
+                    info!("{}: {}", event, name.as_ref().unwrap_or(bid));
                     match event {
                         EventType::Start | EventType::IntermediateCatch | EventType::Boundary => {
                             parallelize_helper!(self, outputs.ids(), data)
@@ -51,7 +51,7 @@ impl Process {
                                 (Some(_), _) => {
                                     parallelize_helper!(self, outputs.ids(), data)
                                 }
-                                _ => Err(Error::MissingIntermediateThrowEventName(bpmn_id.into()))?,
+                                _ => Err(Error::MissingIntermediateThrowEventName(bid.into()))?,
                             }
                         }
                         EventType::End => {
@@ -139,7 +139,7 @@ impl Process {
                     gateway,
                     id,
                     name,
-                    default: (_, default_lid),
+                    default,
                     outputs,
                     ..
                 } if outputs.len() > 1 => {
@@ -151,21 +151,29 @@ impl Process {
                         GatewayType::Exclusive => {
                             // Default to first outgoing if function is not set.
                             let responses = data.handler.run_gateway(name_or_id, data.user_data());
-                            responses
-                                .first()
-                                .and_then(|response| outputs.name_to_id(response))
-                                .or(default_lid.as_ref())
-                                .ok_or_else(|| {
+                            if responses.is_empty() {
+                                default.as_ref().map(BpmnLocal::local).ok_or_else(|| {
                                     Error::MissingDefault(
                                         gateway.to_string(),
                                         name_or_id.to_string(),
                                     )
                                 })?
+                            } else {
+                                responses
+                                    .first()
+                                    .and_then(|response| outputs.name_to_id(response))
+                                    .ok_or_else(|| {
+                                        Error::MissingOutput(
+                                            gateway.to_string(),
+                                            name_or_id.to_string(),
+                                        )
+                                    })?
+                            }
                         }
                         GatewayType::Inclusive => {
                             let responses = data.handler.run_gateway(name_or_id, data.user_data());
                             if responses.is_empty() {
-                                default_lid.as_ref().ok_or_else(|| {
+                                default.as_ref().map(BpmnLocal::local).ok_or_else(|| {
                                     Error::MissingDefault(
                                         gateway.to_string(),
                                         name_or_id.to_string(),
@@ -188,7 +196,7 @@ impl Process {
                 Bpmn::SequenceFlow {
                     id,
                     name,
-                    target_ref: (_, lid),
+                    target_ref: BpmnLocal(_, lid),
                     ..
                 } => {
                     info!("SequenceFlow: {}", name.as_ref().unwrap_or(id));

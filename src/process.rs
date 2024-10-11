@@ -15,7 +15,7 @@ use trace::{tracer, Trace};
 
 use crate::{
     error::Error,
-    model::{Bpmn, EventType},
+    model::{Bpmn, BpmnLocal, EventType},
     reader::{read_bpmn_file, read_bpmn_str},
     Eventhandler, Symbol,
 };
@@ -65,19 +65,19 @@ impl Process {
         data.values().for_each(|process: &Vec<Bpmn>| {
             process.iter().for_each(|bpmn| {
                 if let Bpmn::Event {
-                    id: (_, lid),
+                    id: BpmnLocal(_, lid),
                     event: EventType::Boundary,
                     symbol: Some(symbol),
-                    attached_to_ref: (Some(attached_to_ref), _),
+                    attached_to_ref: Some(BpmnLocal(bref, _)),
                     ..
                 } = bpmn
                 {
-                    let entry = activity_ids.entry(attached_to_ref.into()).or_default();
+                    let entry = activity_ids.entry(bref.into()).or_default();
                     entry.insert(symbol.clone(), *lid);
                 }
 
                 if let Bpmn::Event {
-                    id: (_, lid),
+                    id: BpmnLocal(_, lid),
                     event: EventType::IntermediateCatch,
                     symbol: Some(symbol),
                     name: Some(name),

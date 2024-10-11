@@ -245,9 +245,9 @@ pub(crate) enum Bpmn {
     Event {
         event: EventType,
         symbol: Option<Symbol>,
-        id: (String, usize),
+        id: BpmnLocal,
         name: Option<String>,
-        attached_to_ref: (Option<String>, Option<usize>),
+        attached_to_ref: Option<BpmnLocal>,
         _cancel_activity: Option<String>,
         outputs: Outputs,
     },
@@ -255,7 +255,7 @@ pub(crate) enum Bpmn {
         gateway: GatewayType,
         id: String,
         name: Option<String>,
-        default: (Option<String>, Option<usize>),
+        default: Option<BpmnLocal>,
         outputs: Outputs,
         inputs: Vec<String>,
     },
@@ -267,7 +267,7 @@ pub(crate) enum Bpmn {
         id: String,
         name: Option<String>,
         _source_ref: String,
-        target_ref: (String, usize),
+        target_ref: BpmnLocal,
     },
 }
 
@@ -276,10 +276,10 @@ impl Bpmn {
         match self {
             Bpmn::Definitions { id, .. }
             | Bpmn::Process { id, .. }
-            | Bpmn::Event { id: (id, _), .. }
             | Bpmn::Activity { id, .. }
             | Bpmn::Gateway { id, .. }
             | Bpmn::SequenceFlow { id, .. } => Ok(id),
+            Bpmn::Event { id, .. } => Ok(id.bpmn()),
             Bpmn::Direction { direction, .. } => Err(Error::MissingId(direction.to_string())),
         }
     }
@@ -330,17 +330,12 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
             | INTERMEDIATE_THROW_EVENT => Bpmn::Event {
                 event: bpmn_type.try_into()?,
                 symbol: None,
-                id: (
-                    attributes
-                        .remove(ATTRIB_ID)
-                        .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
-                    Default::default(),
-                ),
+                id: attributes
+                    .remove(ATTRIB_ID)
+                    .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
+                    .into(),
                 name: attributes.remove(ATTRIB_NAME),
-                attached_to_ref: (
-                    attributes.remove(ATTRIB_ATTACHED_TO_REF),
-                    Default::default(),
-                ),
+                attached_to_ref: attributes.remove(ATTRIB_ATTACHED_TO_REF).map(Into::into),
                 _cancel_activity: attributes.remove(ATTRIB_CANCEL_ACTIVITY),
                 outputs: Default::default(),
             },
@@ -361,7 +356,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     .remove(ATTRIB_ID)
                     .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
                 name: attributes.remove(ATTRIB_NAME),
-                default: (attributes.remove(ATTRIB_DEFAULT), Default::default()),
+                default: attributes.remove(ATTRIB_DEFAULT).map(Into::into),
                 outputs: Default::default(),
                 inputs: Default::default(),
             },
@@ -373,12 +368,10 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                 _source_ref: attributes
                     .remove(ATTRIB_SOURCE_REF)
                     .ok_or(Error::MissingSourceRef)?,
-                target_ref: (
-                    attributes
-                        .remove(ATTRIB_TARGET_REF)
-                        .ok_or(Error::MissingTargetRef)?,
-                    Default::default(),
-                ),
+                target_ref: attributes
+                    .remove(ATTRIB_TARGET_REF)
+                    .ok_or(Error::MissingTargetRef)?
+                    .into(),
             },
             INCOMING | OUTGOING => Bpmn::Direction {
                 direction: bpmn_type.try_into()?,
@@ -446,5 +439,30 @@ impl Outputs {
                 self.names[idx] = name.clone();
             }
         }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct BpmnLocal(pub(crate) String, pub(crate) usize);
+
+impl Display for BpmnLocal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({} {})", self.0, self.1)
+    }
+}
+
+impl BpmnLocal {
+    pub(crate) fn bpmn(&self) -> &str {
+        &self.0
+    }
+
+    pub(crate) fn local(&self) -> &usize {
+        &self.1
+    }
+}
+
+impl From<String> for BpmnLocal {
+    fn from(value: String) -> Self {
+        Self(value, 0)
     }
 }
