@@ -383,60 +383,34 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
     }
 }
 
-// When we add an output id we dont have the name yet. Later we register the name. The matching name and id has the same index in each list.
-// If the name is found then same index is used to fetch the id. A HashMap is not used as we want predictable order in scaffold.
 #[derive(Debug, Default)]
 pub(crate) struct Outputs {
-    names: Vec<Option<String>>,
-    lids: Vec<usize>,
-    ids: Vec<String>,
+    bpmn_ids: Vec<String>,
+    local_ids: Vec<usize>,
 }
 
 impl Outputs {
     fn add(&mut self, output_id: impl Into<String>) {
-        self.ids.push(output_id.into());
-        self.names.push(None);
-        self.lids.push(0);
-    }
-
-    pub(crate) fn name_to_id(&self, search_name: impl AsRef<str>) -> Option<&usize> {
-        for index in 0..self.lids.len() {
-            if self
-                .names
-                .get(index)
-                .map_or(false, |v| v.as_deref() == Some(search_name.as_ref()))
-                || self
-                    .ids
-                    .get(index)
-                    .map_or(false, |v| v.as_str() == search_name.as_ref())
-            {
-                return self.lids.get(index);
-            }
-        }
-        None
-    }
-
-    pub(crate) fn names(&self) -> Vec<&str> {
-        self.names.iter().filter_map(Option::as_deref).collect()
+        self.bpmn_ids.push(output_id.into());
+        self.local_ids.push(0);
     }
 
     pub(crate) fn ids(&self) -> Vec<&usize> {
-        self.lids.iter().collect()
+        self.local_ids.iter().collect()
     }
 
     pub(crate) fn len(&self) -> usize {
-        self.ids.len()
+        self.local_ids.len()
     }
 
     pub(crate) fn first(&self) -> Option<&usize> {
-        self.lids.first()
+        self.local_ids.first()
     }
 
-    pub(crate) fn register(&mut self, map: &HashMap<String, (usize, Option<String>)>) {
-        for (idx, value) in self.ids.iter().enumerate() {
-            if let Some((lid, name)) = map.get(value) {
-                self.lids[idx] = *lid;
-                self.names[idx] = name.clone();
+    pub(crate) fn update_local_ids(&mut self, bpmn_index: &HashMap<String, usize>) {
+        for (idx, value) in self.bpmn_ids.iter().enumerate() {
+            if let Some(index) = bpmn_index.get(value) {
+                self.local_ids[idx] = *index;
             }
         }
     }

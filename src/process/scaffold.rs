@@ -43,7 +43,18 @@ impl Process {
                 } = bpmn
                 {
                     if outputs.len() > 1 {
-                        scaffold.add_gateway(bpmn);
+                        let names = outputs
+                            .ids()
+                            .iter()
+                            .map(|index| process.get(**index))
+                            .filter_map(|bpmn| {
+                                if let Some(Bpmn::SequenceFlow { name, .. }) = bpmn {
+                                    return name.as_ref();
+                                }
+                                None
+                            })
+                            .collect();
+                        scaffold.add_gateway(bpmn, names);
                     }
                 }
             });
@@ -56,6 +67,7 @@ impl Process {
 #[derive(Debug)]
 struct Gateway<'a> {
     bpmn: &'a Bpmn,
+    names: Vec<&'a String>,
 }
 
 #[derive(Debug)]
@@ -75,8 +87,8 @@ impl<'a> Scaffold<'a> {
         self.tasks.push(Task { bpmn, symbols });
     }
 
-    fn add_gateway(&mut self, bpmn: &'a Bpmn) {
-        self.gateways.push(Gateway { bpmn });
+    fn add_gateway(&mut self, bpmn: &'a Bpmn, names: Vec<&'a String>) {
+        self.gateways.push(Gateway { bpmn, names });
     }
 
     /// Generate code from all the task and gateways to the given file path.
@@ -120,17 +132,17 @@ impl<'a> Scaffold<'a> {
                 bpmn: Bpmn::Gateway {
                     id, name, outputs, ..
                 },
+                names,
             } = gateway
             else {
                 continue;
             };
 
             let name_or_id = name.as_ref().unwrap_or(id);
-            content.push(format!(r#"    // "{}", {:?}"#, name_or_id, outputs));
+            content.push(format!(r#"    // {:?}"#, outputs));
             content.push(format!(
                 r#"    handler.add_gateway("{}", |input| vec!{:?});"#,
-                name_or_id,
-                outputs.names()
+                name_or_id, names
             ));
             content.push("".into());
         }

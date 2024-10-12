@@ -83,52 +83,51 @@ impl DataBuilder {
         Ok(())
     }
 
-    // Fill gateway names and local id (lid)
     fn register_data(&mut self, data: &mut [Bpmn]) {
-        // Collect Bpmn id, index and name
-        let map: HashMap<String, (usize, Option<String>)> = data
+        // Collect Bpmn id to index in array
+        let bpmn_index: HashMap<String, usize> = data
             .iter()
             .enumerate()
-            .filter_map(|(idx, bpmn)| {
-                let (id, name) = match bpmn {
+            .filter_map(|(index, bpmn)| {
+                let bpmn_id = match bpmn {
                     Bpmn::Activity { id, .. }
                     | Bpmn::Event {
                         id: BpmnLocal(id, _),
                         ..
                     }
-                    | Bpmn::Gateway { id, .. } => (id.to_string(), None),
-                    Bpmn::SequenceFlow { id, name, .. } => (id.to_string(), name.clone()),
+                    | Bpmn::Gateway { id, .. }
+                    | Bpmn::SequenceFlow { id, .. } => id.to_string(),
                     _ => return None,
                 };
-                Some((id, (idx, name)))
+                Some((bpmn_id, index))
             })
             .collect();
 
-        // Register Vec index and gateway names
+        // Update information
         data.iter_mut().for_each(|bpmn| match bpmn {
-            Bpmn::Activity { outputs, .. } => outputs.register(&map),
+            Bpmn::Activity { outputs, .. } => outputs.update_local_ids(&bpmn_index),
             Bpmn::Event {
                 id,
                 outputs,
                 attached_to_ref,
                 ..
             } => {
-                outputs.register(&map);
-                fill_lid(id, &map);
+                outputs.update_local_ids(&bpmn_index);
+                update_local_id(id, &bpmn_index);
                 if let Some(attached_to_ref) = attached_to_ref {
-                    fill_lid(attached_to_ref, &map);
+                    update_local_id(attached_to_ref, &bpmn_index);
                 }
             }
             Bpmn::Gateway {
                 default, outputs, ..
             } => {
-                outputs.register(&map);
+                outputs.update_local_ids(&bpmn_index);
                 if let Some(default) = default {
-                    fill_lid(default, &map);
+                    update_local_id(default, &bpmn_index);
                 }
             }
             Bpmn::SequenceFlow { target_ref, .. } => {
-                fill_lid(target_ref, &map);
+                update_local_id(target_ref, &bpmn_index);
             }
             _ => {}
         });
@@ -142,9 +141,9 @@ impl DataBuilder {
     }
 }
 
-fn fill_lid(BpmnLocal(bid, lid): &mut BpmnLocal, map: &HashMap<String, (usize, Option<String>)>) {
-    if let Some((idx, _)) = map.get(bid) {
-        *lid = *idx;
+fn update_local_id(BpmnLocal(bid, lid): &mut BpmnLocal, map: &HashMap<String, usize>) {
+    if let Some(index) = map.get(bid) {
+        *lid = *index;
     }
 }
 

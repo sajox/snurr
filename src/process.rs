@@ -65,7 +65,7 @@ impl Process {
         data.values().for_each(|process: &Vec<Bpmn>| {
             process.iter().for_each(|bpmn| {
                 if let Bpmn::Event {
-                    id: BpmnLocal(_, lid),
+                    id,
                     event: EventType::Boundary,
                     symbol: Some(symbol),
                     attached_to_ref: Some(BpmnLocal(bref, _)),
@@ -73,11 +73,11 @@ impl Process {
                 } = bpmn
                 {
                     let entry = activity_ids.entry(bref.into()).or_default();
-                    entry.insert(symbol.clone(), *lid);
+                    entry.insert(symbol.clone(), *id.local());
                 }
 
                 if let Bpmn::Event {
-                    id: BpmnLocal(_, lid),
+                    id,
                     event: EventType::IntermediateCatch,
                     symbol: Some(symbol),
                     name: Some(name),
@@ -85,7 +85,7 @@ impl Process {
                 } = bpmn
                 {
                     let entry = catch_events_ids.entry(name.into()).or_default();
-                    entry.insert(symbol.clone(), *lid);
+                    entry.insert(symbol.clone(), *id.local());
                 }
             });
         });

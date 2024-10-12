@@ -161,7 +161,13 @@ impl Process {
                             } else {
                                 responses
                                     .first()
-                                    .and_then(|response| outputs.name_to_id(response))
+                                    .and_then(|response| {
+                                        output_by_name_or_id(
+                                            response,
+                                            &outputs.ids(),
+                                            data.process_data,
+                                        )
+                                    })
                                     .ok_or_else(|| {
                                         Error::MissingOutput(
                                             gateway.to_string(),
@@ -180,10 +186,13 @@ impl Process {
                                     )
                                 })?
                             } else {
+                                let outputs = outputs.ids();
                                 // Run all chosen paths
                                 let responses: Vec<_> = responses
                                     .iter()
-                                    .filter_map(|response| outputs.name_to_id(response))
+                                    .filter_map(|response| {
+                                        output_by_name_or_id(response, &outputs, data.process_data)
+                                    })
                                     .collect();
                                 parallelize_helper!(self, responses, data)
                             }
@@ -196,11 +205,11 @@ impl Process {
                 Bpmn::SequenceFlow {
                     id,
                     name,
-                    target_ref: BpmnLocal(_, lid),
+                    target_ref,
                     ..
                 } => {
                     info!("SequenceFlow: {}", name.as_ref().unwrap_or(id));
-                    lid
+                    target_ref.local()
                 }
                 bpmn => return Err(Error::TypeNotImplemented(format!("{bpmn:?}"))),
             };
@@ -223,6 +232,23 @@ impl Process {
                 Error::MissingIntermediateCatchEvent(symbol.to_string(), throw_event_name.into())
             })
     }
+}
+
+fn output_by_name_or_id<'a>(
+    search: impl AsRef<str>,
+    outputs: &[&'a usize],
+    process_data: &'a [Bpmn],
+) -> Option<&'a usize> {
+    outputs
+        .iter()
+        .filter(|index| {
+            if let Some(Bpmn::SequenceFlow { id, name, .. }) = process_data.get(***index) {
+                return name.as_deref() == Some(search.as_ref()) || id == search.as_ref();
+            }
+            false
+        })
+        .copied()
+        .next()
 }
 
 pub(super) type ExecuteResult<'a> = Result<Vec<&'a usize>, Error>;
