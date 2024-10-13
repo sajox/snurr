@@ -7,7 +7,7 @@ use log::info;
 
 use crate::{
     error::Error,
-    model::{ActivityType, Bpmn, BpmnLocal, EventType, GatewayType},
+    model::{ActivityType, Bpmn, BpmnLocal, EventType, GatewayType, With},
     process::{parallel::parallelize_helper, replay},
     Data, Eventhandler, Process, Symbol,
 };
@@ -75,20 +75,23 @@ impl Process {
                     let name_or_id = name.as_ref().unwrap_or(id);
                     info!("{}: {}", activity, name_or_id);
                     match activity {
-                        ActivityType::Task => {
+                        ActivityType::Task
+                        | ActivityType::ScriptTask
+                        | ActivityType::UserTask
+                        | ActivityType::ServiceTask
+                        | ActivityType::CallActivity
+                        | ActivityType::ReceiveTask
+                        | ActivityType::SendTask
+                        | ActivityType::ManualTask
+                        | ActivityType::BusinessRuleTask => {
                             data.trace(replay::TASK, name_or_id)?;
-                            match data.handler.run_task(name_or_id, data.user_data()) {
-                                Ok(_) => {
-                                    parallelize_helper!(self, outputs.ids(), data)
-                                }
-                                Err(symbol) => {
-                                    self.boundary_lookup(id, &symbol).ok_or_else(|| {
-                                        Error::MissingBoundary(
-                                            symbol.to_string(),
-                                            name_or_id.into(),
-                                        )
-                                    })?
-                                }
+                            if let Err(symbol) = data.handler.run_task(name_or_id, data.user_data())
+                            {
+                                self.boundary_lookup(id, &symbol).ok_or_else(|| {
+                                    Error::MissingBoundary(symbol.to_string(), name_or_id.into())
+                                })?
+                            } else {
+                                parallelize_helper!(self, outputs.ids(), data)
                             }
                         }
                         ActivityType::SubProcess => {
@@ -132,6 +135,12 @@ impl Process {
                             results.push(first);
                             continue;
                         }
+                        GatewayType::EventBased => {
+                            return Err(Error::BpmnRequirement(
+                                "Event gateway must have at least two outgoing sequence flows"
+                                    .into(),
+                            ))
+                        }
                     }
                 }
                 // Fork
@@ -148,8 +157,7 @@ impl Process {
                     data.trace(replay::GATEWAY, name_or_id)?;
 
                     match gateway {
-                        GatewayType::Exclusive => {
-                            // Default to first outgoing if function is not set.
+                        GatewayType::Exclusive | GatewayType::EventBased => {
                             let responses = data.handler.run_gateway(name_or_id, data.user_data());
                             if responses.is_empty() {
                                 default.as_ref().map(BpmnLocal::local).ok_or_else(|| {
@@ -162,11 +170,7 @@ impl Process {
                                 responses
                                     .first()
                                     .and_then(|response| {
-                                        output_by_name_or_id(
-                                            response,
-                                            &outputs.ids(),
-                                            data.process_data,
-                                        )
+                                        output_by(response, &outputs.ids(), data.process_data)
                                     })
                                     .ok_or_else(|| {
                                         Error::MissingOutput(
@@ -191,7 +195,7 @@ impl Process {
                                 let responses: Vec<_> = responses
                                     .iter()
                                     .filter_map(|response| {
-                                        output_by_name_or_id(response, &outputs, data.process_data)
+                                        output_by(response, &outputs, data.process_data)
                                     })
                                     .collect();
                                 parallelize_helper!(self, responses, data)
@@ -234,18 +238,53 @@ impl Process {
     }
 }
 
-fn output_by_name_or_id<'a>(
-    search: impl AsRef<str>,
+fn output_by<'a>(
+    search: &With,
     outputs: &[&'a usize],
     process_data: &'a [Bpmn],
 ) -> Option<&'a usize> {
     outputs
         .iter()
-        .filter(|index| {
-            if let Some(Bpmn::SequenceFlow { id, name, .. }) = process_data.get(***index) {
-                return name.as_deref() == Some(search.as_ref()) || id == search.as_ref();
+        .filter(|index| match search {
+            With::Name(resp) => {
+                if let Some(Bpmn::SequenceFlow { name, .. }) = process_data.get(***index) {
+                    return name.as_deref() == Some(resp);
+                }
+                false
             }
-            false
+            With::Id(resp) => {
+                if let Some(Bpmn::SequenceFlow { id, .. }) = process_data.get(***index) {
+                    return id == resp;
+                }
+                false
+            }
+            With::Symbol(search, search_symbol) => process_data
+                .get(***index)
+                .and_then(|bpmn| {
+                    if let Bpmn::SequenceFlow { target_ref, .. } = bpmn {
+                        return process_data.get(*target_ref.local());
+                    }
+                    None
+                })
+                .filter(|bpmn| match bpmn {
+                    Bpmn::Activity {
+                        id, activity, name, ..
+                    } => {
+                        activity == &ActivityType::ReceiveTask
+                            && search_symbol == &Symbol::Message
+                            && (search.filter(|&sn| sn == id).is_some()
+                                || search.to_owned() == name.as_deref())
+                    }
+                    Bpmn::Event {
+                        id, symbol, name, ..
+                    } => {
+                        symbol.as_ref() == Some(search_symbol)
+                            && (search.filter(|&sn| sn == id.bpmn()).is_some()
+                                || search.to_owned() == name.as_deref())
+                    }
+                    _ => false,
+                })
+                .is_some(),
         })
         .copied()
         .next()

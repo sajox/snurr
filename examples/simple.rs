@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             "NO"
         };
-        vec![result]
+        vec![result.into()]
     });
 
     // Run the process with handler and data

@@ -5,7 +5,7 @@ use std::{
 
 use log::warn;
 
-use crate::Symbol;
+use crate::{model::With, Symbol};
 
 // Messages
 const MISSING_FUNCTION: &str = "Missing function. Please register";
@@ -21,7 +21,7 @@ pub type TaskResult = Result<(), Symbol>;
 type TaskCallback<T> = Box<dyn Fn(Data<T>) -> TaskResult + Sync>;
 
 /// Gateway callback that use `Data` type as input and return a `Vec` with flow(s) to take
-type GatewayCallback<T> = Box<dyn Fn(Data<T>) -> Vec<&'static str> + Sync>;
+type GatewayCallback<T> = Box<dyn Fn(Data<T>) -> Vec<With> + Sync>;
 
 /// Event handler to add task or gateway closures by name or id
 pub struct Eventhandler<T> {
@@ -91,17 +91,17 @@ impl<T> Eventhandler<T> {
     ///     } else {
     ///         "NO"
     ///     };
-    ///     vec![result]
+    ///     vec![result.into()]
     /// });
     /// ```
     pub fn add_gateway<F>(&mut self, name: impl Into<String>, func: F)
     where
-        F: Fn(Data<T>) -> Vec<&'static str> + 'static + Sync,
+        F: Fn(Data<T>) -> Vec<With> + 'static + Sync,
     {
         self.gateway_func.insert(name.into(), Box::new(func));
     }
 
-    pub(crate) fn run_gateway(&self, key: &str, data: Data<T>) -> Vec<&'static str> {
+    pub(crate) fn run_gateway(&self, key: &str, data: Data<T>) -> Vec<With> {
         if let Some(func) = self.gateway_func.get(key) {
             return (*func)(data);
         }

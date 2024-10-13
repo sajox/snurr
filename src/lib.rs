@@ -49,7 +49,7 @@
 //!         } else {
 //!             "NO"
 //!         };
-//!         vec![result]
+//!         vec![result.into()]
 //!     });
 //!
 //!     // Run the process with handler and data
@@ -68,5 +68,5 @@ mod process;
 mod reader;
 
 pub use handler::{Data, Eventhandler, TaskResult};
-pub use model::Symbol;
+pub use model::{Symbol, With};
 pub use process::{Process, ProcessResult};

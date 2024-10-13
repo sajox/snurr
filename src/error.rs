@@ -45,6 +45,9 @@ pub enum Error {
     #[error("{0} not supported")]
     NotSupported(String),
 
+    #[error("{0}")]
+    BpmnRequirement(String),
+
     #[error(transparent)]
     File(#[from] quick_xml::Error),
 

@@ -141,8 +141,13 @@ impl<'a> Scaffold<'a> {
             let name_or_id = name.as_ref().unwrap_or(id);
             content.push(format!(r#"    // {:?}"#, outputs));
             content.push(format!(
-                r#"    handler.add_gateway("{}", |input| vec!{:?});"#,
-                name_or_id, names
+                r#"    handler.add_gateway("{}", |input| vec![{}]);"#,
+                name_or_id,
+                names
+                    .iter()
+                    .map(|value| format!(r#""{value}".into()"#))
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ));
             content.push("".into());
         }

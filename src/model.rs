@@ -48,6 +48,7 @@ pub(crate) const SEQUENCE_FLOW: &[u8] = b"sequenceFlow";
 pub(crate) const EXCLUSIVE_GATEWAY: &[u8] = b"exclusiveGateway";
 pub(crate) const PARALLEL_GATEWAY: &[u8] = b"parallelGateway";
 pub(crate) const INCLUSIVE_GATEWAY: &[u8] = b"inclusiveGateway";
+pub(crate) const EVENT_BASED_GATEWAY: &[u8] = b"eventBasedGateway";
 
 // Attributes
 pub(crate) const ATTRIB_ID: &[u8] = b"id";
@@ -94,10 +95,18 @@ impl Display for EventType {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum ActivityType {
     SubProcess,
     Task,
+    ScriptTask,
+    UserTask,
+    ServiceTask,
+    CallActivity,
+    ReceiveTask,
+    SendTask,
+    ManualTask,
+    BusinessRuleTask,
 }
 
 impl TryFrom<&[u8]> for ActivityType {
@@ -106,8 +115,15 @@ impl TryFrom<&[u8]> for ActivityType {
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Ok(match value {
             SUB_PROCESS | TRANSACTION => ActivityType::SubProcess,
-            TASK | SCRIPT_TASK | USER_TASK | SERVICE_TASK | CALL_ACTIVITY | RECEIVE_TASK
-            | SEND_TASK | MANUAL_TASK | BUSINESS_RULE_TASK => ActivityType::Task,
+            TASK => ActivityType::Task,
+            SCRIPT_TASK => ActivityType::ScriptTask,
+            USER_TASK => ActivityType::UserTask,
+            SERVICE_TASK => ActivityType::ServiceTask,
+            CALL_ACTIVITY => ActivityType::CallActivity,
+            RECEIVE_TASK => ActivityType::ReceiveTask,
+            SEND_TASK => ActivityType::SendTask,
+            MANUAL_TASK => ActivityType::ManualTask,
+            BUSINESS_RULE_TASK => ActivityType::BusinessRuleTask,
             _ => {
                 return Err(Error::TypeNotImplemented(
                     std::str::from_utf8(value)?.into(),
@@ -128,6 +144,7 @@ pub(crate) enum GatewayType {
     Exclusive,
     Inclusive,
     Parallel,
+    EventBased,
 }
 
 impl TryFrom<&[u8]> for GatewayType {
@@ -138,6 +155,7 @@ impl TryFrom<&[u8]> for GatewayType {
             EXCLUSIVE_GATEWAY => GatewayType::Exclusive,
             INCLUSIVE_GATEWAY => GatewayType::Inclusive,
             PARALLEL_GATEWAY => GatewayType::Parallel,
+            EVENT_BASED_GATEWAY => GatewayType::EventBased,
             _ => {
                 return Err(Error::TypeNotImplemented(
                     std::str::from_utf8(value)?.into(),
@@ -178,6 +196,28 @@ impl TryFrom<&[u8]> for DirectionType {
 impl Display for DirectionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
+    }
+}
+
+/// The return type from a gateway to tell the intention to the engine.
+pub enum With {
+    /// Engine tries to match the given bpmn name
+    Name(&'static str),
+
+    /// Engine tries to match the given bpmn id
+    Id(&'static str),
+
+    /// Engine tries to match the given bpmn name or id (if present) with a symbol.
+    /// To be used with the Event-based gateway.
+    ///
+    /// NOTE: The symbol name is matched. Not the SequenceFlow name.
+    Symbol(Option<&'static str>, Symbol),
+}
+
+/// Create a With::Name from a string slice
+impl From<&'static str> for With {
+    fn from(value: &'static str) -> Self {
+        Self::Name(value)
     }
 }
 
@@ -350,16 +390,18 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     outputs: Default::default(),
                 }
             }
-            EXCLUSIVE_GATEWAY | PARALLEL_GATEWAY | INCLUSIVE_GATEWAY => Bpmn::Gateway {
-                gateway: bpmn_type.try_into()?,
-                id: attributes
-                    .remove(ATTRIB_ID)
-                    .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
-                name: attributes.remove(ATTRIB_NAME),
-                default: attributes.remove(ATTRIB_DEFAULT).map(Into::into),
-                outputs: Default::default(),
-                inputs: Default::default(),
-            },
+            EXCLUSIVE_GATEWAY | PARALLEL_GATEWAY | INCLUSIVE_GATEWAY | EVENT_BASED_GATEWAY => {
+                Bpmn::Gateway {
+                    gateway: bpmn_type.try_into()?,
+                    id: attributes
+                        .remove(ATTRIB_ID)
+                        .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
+                    name: attributes.remove(ATTRIB_NAME),
+                    default: attributes.remove(ATTRIB_DEFAULT).map(Into::into),
+                    outputs: Default::default(),
+                    inputs: Default::default(),
+                }
+            }
             SEQUENCE_FLOW => Bpmn::SequenceFlow {
                 id: attributes
                     .remove(ATTRIB_ID)

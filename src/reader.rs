@@ -49,6 +49,7 @@ fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> ReaderResult {
                 | EXCLUSIVE_GATEWAY
                 | PARALLEL_GATEWAY
                 | INCLUSIVE_GATEWAY
+                | EVENT_BASED_GATEWAY
                 | SEQUENCE_FLOW) => {
                     builder.add(Bpmn::try_from((bpmn_type, collect_attributes(&bs)))?)
                 }
@@ -98,6 +99,7 @@ fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> ReaderResult {
                 | EXCLUSIVE_GATEWAY
                 | PARALLEL_GATEWAY
                 | INCLUSIVE_GATEWAY
+                | EVENT_BASED_GATEWAY
                 | SEQUENCE_FLOW => builder.end()?,
                 DEFINITIONS | PROCESS | SUB_PROCESS | TRANSACTION => builder.end_process()?,
                 _ => {}

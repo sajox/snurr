@@ -29,7 +29,7 @@ impl Process {
     ///         } else {
     ///             "NO"
     ///         };
-    ///         vec![result]
+    ///         vec![result.into()]
     ///     });
     ///
     ///     let pr = bpmn.run(&handler, Counter::default())?;
