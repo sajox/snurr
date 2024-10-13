@@ -2,6 +2,8 @@ mod engine;
 mod parallel;
 mod replay;
 mod scaffold;
+
+#[cfg(feature = "trace")]
 mod trace;
 
 use engine::ExecuteData;
@@ -11,6 +13,8 @@ use std::{
     str::FromStr,
     sync::{Arc, Mutex},
 };
+
+#[cfg(feature = "trace")]
 use trace::{tracer, Trace};
 
 use crate::{
@@ -120,6 +124,8 @@ impl Process {
         T: Send,
     {
         let data = Arc::new(Mutex::new(data));
+
+        #[cfg(feature = "trace")]
         let trace: Trace<(&str, String)> = tracer();
 
         // Run every process specified in the diagram
@@ -142,6 +148,7 @@ impl Process {
                         process_data,
                         handler,
                         Arc::clone(&data),
+                        #[cfg(feature = "trace")]
                         trace.sender(),
                     ),
                 )?;
@@ -153,7 +160,10 @@ impl Process {
                 .ok_or(Error::NoProcessResult)?
                 .into_inner()
                 .map_err(|_| Error::NoProcessResult)?,
+            #[cfg(feature = "trace")]
             trace: trace.finish(),
+            #[cfg(not(feature = "trace"))]
+            trace: vec![],
         })
     }
 }

@@ -1,14 +1,16 @@
-use std::{
-    collections::VecDeque,
-    sync::{mpsc::Sender, Arc},
-};
+use std::{collections::VecDeque, sync::Arc};
+
+#[cfg(feature = "trace")]
+use crate::process::replay;
+#[cfg(feature = "trace")]
+use std::sync::mpsc::Sender;
 
 use log::info;
 
 use crate::{
     error::Error,
     model::{ActivityType, Bpmn, BpmnLocal, EventType, GatewayType, With},
-    process::{parallel::parallelize_helper, replay},
+    process::parallel::parallelize_helper,
     Data, Eventhandler, Process, Symbol,
 };
 
@@ -84,6 +86,7 @@ impl Process {
                         | ActivityType::SendTask
                         | ActivityType::ManualTask
                         | ActivityType::BusinessRuleTask => {
+                            #[cfg(feature = "trace")]
                             data.trace(replay::TASK, name_or_id)?;
                             if let Err(symbol) = data.handler.run_task(name_or_id, data.user_data())
                             {
@@ -124,6 +127,7 @@ impl Process {
                 } if outputs.len() <= 1 => {
                     let name_or_id = name.as_ref().unwrap_or(id);
                     info!("{}: {}", gateway, name_or_id);
+                    #[cfg(feature = "trace")]
                     data.trace(replay::GATEWAY, name_or_id)?;
 
                     let first = outputs.first().ok_or_else(|| {
@@ -154,6 +158,7 @@ impl Process {
                 } if outputs.len() > 1 => {
                     let name_or_id = name.as_ref().unwrap_or(id);
                     info!("{}: {}", gateway, name_or_id);
+                    #[cfg(feature = "trace")]
                     data.trace(replay::GATEWAY, name_or_id)?;
 
                     match gateway {
@@ -273,14 +278,14 @@ fn output_by<'a>(
                         activity == &ActivityType::ReceiveTask
                             && search_symbol == &Symbol::Message
                             && (search.filter(|&sn| sn == id).is_some()
-                                || search.to_owned() == name.as_deref())
+                                || *search == name.as_deref())
                     }
                     Bpmn::Event {
                         id, symbol, name, ..
                     } => {
                         symbol.as_ref() == Some(search_symbol)
                             && (search.filter(|&sn| sn == id.bpmn()).is_some()
-                                || search.to_owned() == name.as_deref())
+                                || *search == name.as_deref())
                     }
                     _ => false,
                 })
@@ -298,6 +303,7 @@ pub(super) struct ExecuteData<'a, T> {
     process_data: &'a Vec<Bpmn>,
     handler: &'a Eventhandler<T>,
     user_data: Data<T>,
+    #[cfg(feature = "trace")]
     trace: Sender<(&'static str, String)>,
 }
 
@@ -307,13 +313,14 @@ impl<'a, T> ExecuteData<'a, T> {
         process_data: &'a Vec<Bpmn>,
         handler: &'a Eventhandler<T>,
         user_data: Data<T>,
-        trace: Sender<(&'static str, String)>,
+        #[cfg(feature = "trace")] trace: Sender<(&'static str, String)>,
     ) -> Self {
         Self {
             process_id,
             process_data,
             handler,
             user_data,
+            #[cfg(feature = "trace")]
             trace,
         }
     }
@@ -325,10 +332,12 @@ impl<'a, T> ExecuteData<'a, T> {
             process_data,
             handler: self.handler,
             user_data: self.user_data(),
+            #[cfg(feature = "trace")]
             trace: self.trace.clone(),
         }
     }
 
+    #[cfg(feature = "trace")]
     fn trace(&self, bpmn_type: &'static str, value: impl Into<String>) -> Result<(), Error> {
         Ok(self.trace.send((bpmn_type, value.into()))?)
     }

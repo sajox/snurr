@@ -103,6 +103,7 @@ fn subprocess_error_message_end() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(feature = "trace")]
 #[test]
 fn replay_process_trace() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();

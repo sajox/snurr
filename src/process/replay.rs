@@ -7,6 +7,8 @@ pub(super) const TASK: &str = "Task";
 
 impl Process {
     /// Replay a trace from a process run. It will be sequential. Only Tasks and gateways is traced that might mutate data.
+    ///
+    /// NOTE: Only with feature = "trace"
     /// ```
     /// use snurr::{Process, Eventhandler};
     ///
@@ -34,6 +36,8 @@ impl Process {
     ///
     ///     let pr = bpmn.run(&handler, Counter::default())?;
     ///     let trace_result = Process::replay_trace(&handler, Counter::default(), &pr.trace);
+    ///
+    ///     #[cfg(feature = "trace")]
     ///     assert_eq!(pr.result, trace_result);
     ///     Ok(())
     /// }
