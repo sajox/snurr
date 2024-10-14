@@ -6,7 +6,6 @@ const COUNT_3: &str = "Count 3";
 const COUNT_4: &str = "Count 4";
 
 const YES: With = With::Name("YES");
-const NO: With = With::Name("NO");
 const A: With = With::Name("A");
 const B: With = With::Name("B");
 const C: With = With::Name("C");
@@ -82,7 +81,7 @@ fn subprocess_message_end() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
     handler.add_task(COUNT_1, func_cnt(1));
     handler.add_task(COUNT_2, func_cnt(2));
-    handler.add_gateway("CHOOSE", |_| vec![]);
+    handler.add_gateway("CHOOSE", |_| Default::default());
 
     let bpmn = Process::new("tests/files/subprocess_message_end.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -127,7 +126,7 @@ fn exclusive_gateway_default_path() -> Result<(), Box<dyn std::error::Error>> {
     handler.add_task(COUNT_3, func_cnt(3));
 
     // Empty vec run default path
-    handler.add_gateway("CHOOSE", |_| vec![]);
+    handler.add_gateway("CHOOSE", |_| With::Default);
 
     let bpmn = Process::new("tests/files/exclusive_gateway.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -141,7 +140,7 @@ fn exclusive_gateway() -> Result<(), Box<dyn std::error::Error>> {
     handler.add_task(COUNT_1, func_cnt(1));
     handler.add_task(COUNT_2, func_cnt(2));
     handler.add_task(COUNT_3, func_cnt(3));
-    handler.add_gateway("CHOOSE", move |_| vec![YES]);
+    handler.add_gateway("CHOOSE", move |_| YES);
 
     let bpmn = Process::new("tests/files/exclusive_gateway.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -157,7 +156,7 @@ fn exclusive_gateway_with_id() -> Result<(), Box<dyn std::error::Error>> {
     handler.add_task(COUNT_3, func_cnt(3));
 
     // Navigate by Bpmn diagram Id instead of by Name.
-    handler.add_gateway("CHOOSE", move |_| vec![With::Id("Flow_15z7fe3")]);
+    handler.add_gateway("CHOOSE", move |_| With::Id("Flow_15z7fe3"));
 
     let bpmn = Process::new("tests/files/exclusive_gateway.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -172,7 +171,7 @@ fn exclusive_gateway_with_gateway_converge() -> Result<(), Box<dyn std::error::E
     handler.add_task(COUNT_2, func_cnt(2));
     handler.add_task(COUNT_3, func_cnt(3));
     handler.add_task(COUNT_4, func_cnt(4));
-    handler.add_gateway("CHOOSE", |_| vec![YES]);
+    handler.add_gateway("CHOOSE", |_| YES);
 
     let bpmn = Process::new("tests/files/exclusive_gateway_with_gateway_converge.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -187,7 +186,7 @@ fn exclusive_gateway_with_task_converge() -> Result<(), Box<dyn std::error::Erro
     handler.add_task(COUNT_2, func_cnt(2));
     handler.add_task(COUNT_3, func_cnt(3));
     handler.add_task(COUNT_4, func_cnt(4));
-    handler.add_gateway("CHOOSE", |_| vec![YES]);
+    handler.add_gateway("CHOOSE", |_| YES);
 
     let bpmn = Process::new("tests/files/exclusive_gateway_with_task_converge.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -203,7 +202,7 @@ fn inclusive_gateway_default_path() -> Result<(), Box<dyn std::error::Error>> {
     handler.add_task(COUNT_3, func_cnt(3));
 
     // Empty vec run default path
-    handler.add_gateway("CHOOSE", |_| vec![]);
+    handler.add_gateway("CHOOSE", |_| With::Default);
 
     let bpmn = Process::new("tests/files/inclusive_gateway.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -218,7 +217,7 @@ fn inclusive_gateway() -> Result<(), Box<dyn std::error::Error>> {
     handler.add_task(COUNT_2, func_cnt(2));
     handler.add_task(COUNT_3, func_cnt(3));
 
-    handler.add_gateway("CHOOSE", |_| vec![YES, NO]);
+    handler.add_gateway("CHOOSE", |_| vec!["YES", "NO"].into());
 
     let bpmn = Process::new("tests/files/inclusive_gateway.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -233,7 +232,7 @@ fn inclusive_gateway_split_end() -> Result<(), Box<dyn std::error::Error>> {
     handler.add_task(COUNT_2, func_cnt(2));
     handler.add_task(COUNT_3, func_cnt(3));
 
-    handler.add_gateway("Gateway_0jgakfl", |_| vec![YES, NO]);
+    handler.add_gateway("Gateway_0jgakfl", |_| With::Fork(vec!["YES", "NO"]));
 
     let bpmn = Process::new("tests/files/inclusive_gateway_split_end.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -246,7 +245,7 @@ fn inclusive_gateway_no_output() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
 
     // Empty vec run default path
-    handler.add_gateway("Gateway_0qmfmmo", |_| vec![]);
+    handler.add_gateway("Gateway_0qmfmmo", |_| With::Default);
 
     let bpmn = Process::new("tests/files/inclusive_gateway_no_output.bpmn")?;
     let failed = bpmn.run(&handler, Counter::default()).is_err();
@@ -349,11 +348,10 @@ fn showcase() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
     handler.add_task(COUNT_1, func_cnt(1));
     handler.add_task("Timeout 1", |_| Err(Symbol::Timer));
-    handler.add_gateway("RUN ALL", |_| vec![A, B]);
-    handler.add_gateway("RUN A", |_| vec![A]);
+    handler.add_gateway("RUN ALL", |_| With::Fork(vec!["A", "B"]));
+    handler.add_gateway("RUN A", |_| A);
 
-    // Empty vec run default path
-    handler.add_gateway("RUN DEFAULT", |_| vec![]);
+    handler.add_gateway("RUN DEFAULT", |_| With::Default);
 
     let bpmn = Process::new("tests/files/showcase.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -396,8 +394,8 @@ fn process_end_with_symbol() -> Result<(), Box<dyn std::error::Error>> {
 fn inclusive_gateway_not_all_joined() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
     handler.add_task(COUNT_1, func_cnt(1));
-    handler.add_gateway("RUN ALL", |_| vec![A, B]);
-    handler.add_gateway("RUN C", |_| vec![C]);
+    handler.add_gateway("RUN ALL", |_| With::Fork(vec!["A", "B"]));
+    handler.add_gateway("RUN C", |_| C);
 
     let bpmn = Process::new("tests/files/inclusive_gateway_not_all_joined.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -445,8 +443,8 @@ fn exclusive_gateway_merging_branching() -> Result<(), Box<dyn std::error::Error
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
     handler.add_task(COUNT_1, func_cnt(1));
     handler.add_task(COUNT_2, func_cnt(2));
-    handler.add_gateway("BRANCHING", |_| vec![A]);
-    handler.add_gateway("MERGE AND BRANCH", |_| vec![B]);
+    handler.add_gateway("BRANCHING", |_| A);
+    handler.add_gateway("MERGE AND BRANCH", |_| B);
 
     let bpmn = Process::new("tests/files/exclusive_gateway_merging_branching.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -461,11 +459,11 @@ fn event_gateway() -> Result<(), Box<dyn std::error::Error>> {
     handler.add_task(COUNT_2, func_cnt(2));
 
     handler.add_gateway("JUNIOR GATEKEEPER", |_| {
-        vec![With::Symbol(Some("Investigate"), Symbol::Message)]
+        With::Symbol(Some("Investigate"), Symbol::Message)
     });
 
     handler.add_gateway("SENIOR GATEKEEPER", |_| {
-        vec![With::Symbol(Some("Sleeping"), Symbol::Timer)]
+        With::Symbol(Some("Sleeping"), Symbol::Timer)
     });
 
     let bpmn = Process::new("tests/files/event_gateway.bpmn")?;
@@ -479,9 +477,7 @@ fn event_gateway_blank_symbol() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
     handler.add_task(COUNT_3, func_cnt(3));
 
-    handler.add_gateway("JUNIOR GATEKEEPER", |_| {
-        vec![With::Symbol(None, Symbol::Timer)]
-    });
+    handler.add_gateway("JUNIOR GATEKEEPER", |_| With::Symbol(None, Symbol::Timer));
 
     let bpmn = Process::new("tests/files/event_gateway.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;

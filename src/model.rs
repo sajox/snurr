@@ -200,24 +200,38 @@ impl Display for DirectionType {
 }
 
 /// The return type from a gateway to tell the intention to the engine.
+#[derive(Default, Debug)]
 pub enum With {
-    /// Engine tries to match the given bpmn name
+    #[default]
+    Default,
+
+    /// Engine try to match the given bpmn name
     Name(&'static str),
 
-    /// Engine tries to match the given bpmn id
+    /// Engine try to match the given bpmn id
     Id(&'static str),
 
-    /// Engine tries to match the given bpmn name or id (if present) with a symbol.
+    /// Engine try to match the given bpmn name or id (if present) with a symbol.
     /// To be used with the Event-based gateway.
     ///
-    /// NOTE: The symbol name is matched. Not the SequenceFlow name.
+    /// NOTE: The symbol name or id is matched. Not the SequenceFlow name or id.
     Symbol(Option<&'static str>, Symbol),
+
+    /// Engine try to match the given bpmn name or id in the collection
+    Fork(Vec<&'static str>),
 }
 
 /// Create a With::Name from a string slice
 impl From<&'static str> for With {
     fn from(value: &'static str) -> Self {
         Self::Name(value)
+    }
+}
+
+/// Create a With::Fork from Vec.
+impl From<Vec<&'static str>> for With {
+    fn from(value: Vec<&'static str>) -> Self {
+        Self::Fork(value)
     }
 }
 
@@ -429,6 +443,12 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
 pub(crate) struct Outputs {
     bpmn_ids: Vec<String>,
     local_ids: Vec<usize>,
+}
+
+impl Display for Outputs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.bpmn_ids.join(", "))
+    }
 }
 
 impl Outputs {

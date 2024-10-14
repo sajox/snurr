@@ -49,7 +49,7 @@
 //!         } else {
 //!             "NO"
 //!         };
-//!         vec![result.into()]
+//!         result.into()
 //!     });
 //!
 //!     // Run the process with handler and data

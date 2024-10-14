@@ -139,15 +139,18 @@ impl<'a> Scaffold<'a> {
             };
 
             let name_or_id = name.as_ref().unwrap_or(id);
-            content.push(format!(r#"    // {:?}"#, outputs));
             content.push(format!(
-                r#"    handler.add_gateway("{}", |input| vec![{}]);"#,
-                name_or_id,
+                r#"    // Names: {}"#,
                 names
                     .iter()
-                    .map(|value| format!(r#""{value}".into()"#))
+                    .map(|value| value.to_string())
                     .collect::<Vec<_>>()
                     .join(", ")
+            ));
+            content.push(format!(r#"    // Flows: {}"#, outputs));
+            content.push(format!(
+                r#"    handler.add_gateway("{}", |input| Default::default());"#,
+                name_or_id,
             ));
             content.push("".into());
         }

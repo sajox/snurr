@@ -31,7 +31,7 @@ impl Process {
     ///         } else {
     ///             "NO"
     ///         };
-    ///         vec![result.into()]
+    ///         result.into()
     ///     });
     ///
     ///     let pr = bpmn.run(&handler, Counter::default())?;

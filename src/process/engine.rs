@@ -163,47 +163,59 @@ impl Process {
 
                     match gateway {
                         GatewayType::Exclusive | GatewayType::EventBased => {
-                            let responses = data.handler.run_gateway(name_or_id, data.user_data());
-                            if responses.is_empty() {
-                                default.as_ref().map(BpmnLocal::local).ok_or_else(|| {
-                                    Error::MissingDefault(
-                                        gateway.to_string(),
-                                        name_or_id.to_string(),
-                                    )
-                                })?
-                            } else {
-                                responses
-                                    .first()
-                                    .and_then(|response| {
-                                        output_by(response, &outputs.ids(), data.process_data)
-                                    })
-                                    .ok_or_else(|| {
-                                        Error::MissingOutput(
-                                            gateway.to_string(),
-                                            name_or_id.to_string(),
-                                        )
-                                    })?
+                            let response = data.handler.run_gateway(name_or_id, data.user_data());
+                            match response {
+                                With::Name(_) | With::Id(_) | With::Symbol(_, _) => {
+                                    output_by_with(&response, &outputs.ids(), data.process_data)
+                                        .ok_or_else(|| {
+                                            Error::MissingOutput(
+                                                gateway.to_string(),
+                                                name_or_id.to_string(),
+                                            )
+                                        })?
+                                }
+                                With::Fork(_) => {
+                                    return Err(Error::BpmnRequirement(format!(
+                                        "Only one path allowed for {gateway}"
+                                    )))
+                                }
+                                With::Default => default_path(default, gateway, name_or_id)?,
                             }
                         }
                         GatewayType::Inclusive => {
-                            let responses = data.handler.run_gateway(name_or_id, data.user_data());
-                            if responses.is_empty() {
-                                default.as_ref().map(BpmnLocal::local).ok_or_else(|| {
-                                    Error::MissingDefault(
-                                        gateway.to_string(),
-                                        name_or_id.to_string(),
-                                    )
-                                })?
-                            } else {
-                                let outputs = outputs.ids();
-                                // Run all chosen paths
-                                let responses: Vec<_> = responses
-                                    .iter()
-                                    .filter_map(|response| {
-                                        output_by(response, &outputs, data.process_data)
-                                    })
-                                    .collect();
-                                parallelize_helper!(self, responses, data)
+                            let response = data.handler.run_gateway(name_or_id, data.user_data());
+                            match response {
+                                With::Name(_) | With::Id(_) | With::Symbol(_, _) => {
+                                    output_by_with(&response, &outputs.ids(), data.process_data)
+                                        .ok_or_else(|| {
+                                            Error::MissingOutput(
+                                                gateway.to_string(),
+                                                name_or_id.to_string(),
+                                            )
+                                        })?
+                                }
+                                With::Fork(responses) => {
+                                    let outputs = outputs.ids();
+                                    // Run all chosen paths
+                                    let responses: Vec<_> = responses
+                                        .iter()
+                                        .filter_map(|&response| {
+                                            output_by_name_or_id(
+                                                response,
+                                                &outputs,
+                                                data.process_data,
+                                            )
+                                        })
+                                        .collect();
+
+                                    // If the mapping did not find any hits.
+                                    if responses.is_empty() {
+                                        default_path(default, gateway, name_or_id)?
+                                    } else {
+                                        parallelize_helper!(self, responses, data)
+                                    }
+                                }
+                                With::Default => default_path(default, gateway, name_or_id)?,
                             }
                         }
                         GatewayType::Parallel => {
@@ -243,7 +255,18 @@ impl Process {
     }
 }
 
-fn output_by<'a>(
+fn default_path<'a>(
+    default: &'a Option<BpmnLocal>,
+    gateway: &GatewayType,
+    name_or_id: &String,
+) -> Result<&'a usize, Error> {
+    default
+        .as_ref()
+        .map(BpmnLocal::local)
+        .ok_or_else(|| Error::MissingDefault(gateway.to_string(), name_or_id.to_string()))
+}
+
+fn output_by_with<'a>(
     search: &With,
     outputs: &[&'a usize],
     process_data: &'a [Bpmn],
@@ -290,6 +313,24 @@ fn output_by<'a>(
                     _ => false,
                 })
                 .is_some(),
+            _ => false,
+        })
+        .copied()
+        .next()
+}
+
+fn output_by_name_or_id<'a>(
+    search: impl AsRef<str>,
+    outputs: &[&'a usize],
+    process_data: &'a [Bpmn],
+) -> Option<&'a usize> {
+    outputs
+        .iter()
+        .filter(|index| {
+            if let Some(Bpmn::SequenceFlow { id, name, .. }) = process_data.get(***index) {
+                return name.as_deref() == Some(search.as_ref()) || id == search.as_ref();
+            }
+            false
         })
         .copied()
         .next()
