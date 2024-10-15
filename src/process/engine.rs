@@ -162,60 +162,70 @@ impl Process {
                     data.trace(replay::GATEWAY, name_or_id)?;
 
                     match gateway {
-                        GatewayType::Exclusive | GatewayType::EventBased => {
+                        GatewayType::Exclusive
+                        | GatewayType::EventBased
+                        | GatewayType::Inclusive => {
                             let response = data.handler.run_gateway(name_or_id, data.user_data());
                             match response {
-                                With::Name(_) | With::Id(_) | With::Symbol(_, _) => {
-                                    output_by_with(&response, &outputs.ids(), data.process_data)
+                                With::Flow(value) => {
+                                    output_by_name_or_id(value, &outputs.ids(), data.process_data)
                                         .ok_or_else(|| {
-                                            Error::MissingOutput(
-                                                gateway.to_string(),
-                                                name_or_id.to_string(),
-                                            )
-                                        })?
+                                        Error::MissingOutput(
+                                            gateway.to_string(),
+                                            name_or_id.to_string(),
+                                        )
+                                    })?
                                 }
-                                With::Fork(_) => {
-                                    return Err(Error::BpmnRequirement(format!(
-                                        "Only one path allowed for {gateway}"
-                                    )))
-                                }
-                                With::Default => default_path(default, gateway, name_or_id)?,
-                            }
-                        }
-                        GatewayType::Inclusive => {
-                            let response = data.handler.run_gateway(name_or_id, data.user_data());
-                            match response {
-                                With::Name(_) | With::Id(_) | With::Symbol(_, _) => {
-                                    output_by_with(&response, &outputs.ids(), data.process_data)
-                                        .ok_or_else(|| {
-                                            Error::MissingOutput(
-                                                gateway.to_string(),
-                                                name_or_id.to_string(),
-                                            )
-                                        })?
-                                }
-                                With::Fork(responses) => {
-                                    let outputs = outputs.ids();
-                                    // Run all chosen paths
-                                    let responses: Vec<_> = responses
-                                        .iter()
-                                        .filter_map(|&response| {
-                                            output_by_name_or_id(
-                                                response,
-                                                &outputs,
-                                                data.process_data,
-                                            )
-                                        })
-                                        .collect();
-
-                                    // If the mapping did not find any hits.
-                                    if responses.is_empty() {
+                                With::Fork(value) if matches!(gateway, GatewayType::Inclusive) => {
+                                    // Is it an empty response
+                                    if value.is_empty() {
                                         default_path(default, gateway, name_or_id)?
                                     } else {
+                                        let outputs = outputs.ids();
+                                        // Run all chosen paths
+                                        let responses: Vec<_> = value
+                                            .iter()
+                                            .filter_map(|&response| {
+                                                output_by_name_or_id(
+                                                    response,
+                                                    &outputs,
+                                                    data.process_data,
+                                                )
+                                            })
+                                            .collect();
+
+                                        // If no id:s was found due to wrong response str.
+                                        if responses.is_empty() {
+                                            return Err(Error::MissingOutput(
+                                                gateway.to_string(),
+                                                name_or_id.to_string(),
+                                            ));
+                                        }
                                         parallelize_helper!(self, responses, data)
                                     }
                                 }
                                 With::Default => default_path(default, gateway, name_or_id)?,
+                                With::Symbol(_, _)
+                                    if matches!(gateway, GatewayType::EventBased) =>
+                                {
+                                    output_by_symbol(&response, &outputs.ids(), data.process_data)
+                                        .ok_or_else(|| {
+                                        Error::MissingOutput(
+                                            gateway.to_string(),
+                                            name_or_id.to_string(),
+                                        )
+                                    })?
+                                }
+                                With::Fork(_) => {
+                                    return Err(Error::BpmnRequirement(format!(
+                                        "{gateway} cannot fork"
+                                    )))
+                                }
+                                With::Symbol(_, _) => {
+                                    return Err(Error::BpmnRequirement(format!(
+                                        "{gateway} cannot do decision based on events"
+                                    )))
+                                }
                             }
                         }
                         GatewayType::Parallel => {
@@ -266,7 +276,7 @@ fn default_path<'a>(
         .ok_or_else(|| Error::MissingDefault(gateway.to_string(), name_or_id.to_string()))
 }
 
-fn output_by_with<'a>(
+fn output_by_symbol<'a>(
     search: &With,
     outputs: &[&'a usize],
     process_data: &'a [Bpmn],
@@ -274,18 +284,6 @@ fn output_by_with<'a>(
     outputs
         .iter()
         .filter(|index| match search {
-            With::Name(resp) => {
-                if let Some(Bpmn::SequenceFlow { name, .. }) = process_data.get(***index) {
-                    return name.as_deref() == Some(resp);
-                }
-                false
-            }
-            With::Id(resp) => {
-                if let Some(Bpmn::SequenceFlow { id, .. }) = process_data.get(***index) {
-                    return id == resp;
-                }
-                false
-            }
             With::Symbol(search, search_symbol) => process_data
                 .get(***index)
                 .and_then(|bpmn| {
@@ -295,6 +293,7 @@ fn output_by_with<'a>(
                     None
                 })
                 .filter(|bpmn| match bpmn {
+                    // We can target both some Activity or Events.
                     Bpmn::Activity {
                         id, activity, name, ..
                     } => {

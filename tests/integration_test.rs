@@ -5,10 +5,10 @@ const COUNT_2: &str = "Count 2";
 const COUNT_3: &str = "Count 3";
 const COUNT_4: &str = "Count 4";
 
-const YES: With = With::Name("YES");
-const A: With = With::Name("A");
-const B: With = With::Name("B");
-const C: With = With::Name("C");
+const YES: With = With::Flow("YES");
+const A: With = With::Flow("A");
+const B: With = With::Flow("B");
+const C: With = With::Flow("C");
 
 #[derive(Debug, Default)]
 struct Counter {
@@ -156,7 +156,7 @@ fn exclusive_gateway_with_id() -> Result<(), Box<dyn std::error::Error>> {
     handler.add_task(COUNT_3, func_cnt(3));
 
     // Navigate by Bpmn diagram Id instead of by Name.
-    handler.add_gateway("CHOOSE", move |_| With::Id("Flow_15z7fe3"));
+    handler.add_gateway("CHOOSE", move |_| With::Flow("Flow_15z7fe3"));
 
     let bpmn = Process::new("tests/files/exclusive_gateway.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;

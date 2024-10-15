@@ -139,7 +139,7 @@ impl Display for ActivityType {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum GatewayType {
     Exclusive,
     Inclusive,
@@ -204,27 +204,21 @@ impl Display for DirectionType {
 pub enum With {
     #[default]
     Default,
-
-    /// Engine try to match the given bpmn name
-    Name(&'static str),
-
-    /// Engine try to match the given bpmn id
-    Id(&'static str),
-
+    /// Outgoing sequence flow by name or id
+    Flow(&'static str),
+    /// Collection of outgoing sequence flow by name or id
+    Fork(Vec<&'static str>),
     /// Engine try to match the given bpmn name or id (if present) with a symbol.
     /// To be used with the Event-based gateway.
     ///
     /// NOTE: The symbol name or id is matched. Not the SequenceFlow name or id.
     Symbol(Option<&'static str>, Symbol),
-
-    /// Engine try to match the given bpmn name or id in the collection
-    Fork(Vec<&'static str>),
 }
 
 /// Create a With::Name from a string slice
 impl From<&'static str> for With {
     fn from(value: &'static str) -> Self {
-        Self::Name(value)
+        Self::Flow(value)
     }
 }
 

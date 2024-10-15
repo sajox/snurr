@@ -3,7 +3,7 @@ pub enum Error {
     #[error("BPMN type {0} missing id")]
     MissingId(String),
 
-    #[error("{0} with name or id '{1}' has no output")]
+    #[error("{0} with name or id '{1}' has no output. (Used correct name or id?)")]
     MissingOutput(String, String),
 
     #[error("{0} with name or id '{1}' has no default flow")]
