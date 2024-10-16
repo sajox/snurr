@@ -1,6 +1,5 @@
-use std::{collections::HashMap, fmt::Display};
-
 use crate::error::Error;
+use std::{collections::HashMap, fmt::Display};
 
 pub(crate) const DEFINITIONS: &[u8] = b"definitions";
 pub(crate) const PROCESS: &[u8] = b"process";
@@ -60,6 +59,62 @@ pub(crate) const ATTRIB_DEFAULT: &[u8] = b"default";
 pub(crate) const _ATTRIB_EXPORTER_VERSION: &[u8] = b"exporterVersion";
 pub(crate) const ATTRIB_ATTACHED_TO_REF: &[u8] = b"attachedToRef";
 pub(crate) const ATTRIB_CANCEL_ACTIVITY: &[u8] = b"cancelActivity";
+
+/// Gateway return type
+#[derive(Default, Debug)]
+pub enum With {
+    #[default]
+    Default,
+    /// Outgoing sequence flow by name or id
+    Flow(&'static str),
+    /// Collection of outgoing sequence flow by name or id
+    Fork(Vec<&'static str>),
+    /// Engine try to match the given bpmn name or id (if present) with a symbol.
+    /// To be used with the Event-based gateway.
+    ///
+    /// NOTE: The symbol name or id is matched. Not the SequenceFlow name or id.
+    Symbol(Option<&'static str>, Symbol),
+}
+
+impl From<&'static str> for With {
+    fn from(value: &'static str) -> Self {
+        Self::Flow(value)
+    }
+}
+
+impl From<Vec<&'static str>> for With {
+    fn from(value: Vec<&'static str>) -> Self {
+        Self::Fork(value)
+    }
+}
+
+impl From<Symbol> for With {
+    fn from(symbol: Symbol) -> Self {
+        Self::Symbol(None, symbol)
+    }
+}
+
+impl From<(&'static str, Symbol)> for With {
+    fn from((name, symbol): (&'static str, Symbol)) -> Self {
+        Self::Symbol(Some(name), symbol)
+    }
+}
+
+/// Boundary with an optional name and a symbol
+#[derive(Debug)]
+pub struct Boundary(pub Option<&'static str>, pub Symbol);
+
+impl From<Symbol> for Boundary {
+    fn from(value: Symbol) -> Self {
+        Self(None, value)
+    }
+}
+
+impl From<(&'static str, Symbol)> for Boundary {
+    fn from((name, symbol): (&'static str, Symbol)) -> Self {
+        Self(Some(name), symbol)
+    }
+}
 
 #[derive(Debug, Copy, Clone)]
 pub(crate) enum EventType {
@@ -196,36 +251,6 @@ impl TryFrom<&[u8]> for DirectionType {
 impl Display for DirectionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
-    }
-}
-
-/// The return type from a gateway to tell the intention to the engine.
-#[derive(Default, Debug)]
-pub enum With {
-    #[default]
-    Default,
-    /// Outgoing sequence flow by name or id
-    Flow(&'static str),
-    /// Collection of outgoing sequence flow by name or id
-    Fork(Vec<&'static str>),
-    /// Engine try to match the given bpmn name or id (if present) with a symbol.
-    /// To be used with the Event-based gateway.
-    ///
-    /// NOTE: The symbol name or id is matched. Not the SequenceFlow name or id.
-    Symbol(Option<&'static str>, Symbol),
-}
-
-/// Create a With::Name from a string slice
-impl From<&'static str> for With {
-    fn from(value: &'static str) -> Self {
-        Self::Flow(value)
-    }
-}
-
-/// Create a With::Fork from Vec.
-impl From<Vec<&'static str>> for With {
-    fn from(value: Vec<&'static str>) -> Self {
-        Self::Fork(value)
     }
 }
 

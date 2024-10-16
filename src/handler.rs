@@ -1,11 +1,9 @@
+use crate::model::{Boundary, With};
+use log::warn;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
-
-use log::warn;
-
-use crate::{model::With, Symbol};
 
 // Messages
 const MISSING_FUNCTION: &str = "Missing function. Please register";
@@ -14,7 +12,7 @@ const MISSING_FUNCTION: &str = "Missing function. Please register";
 pub type Data<T> = Arc<Mutex<T>>;
 
 /// Task result type
-pub type TaskResult = Result<(), Symbol>;
+pub type TaskResult = Option<Boundary>;
 
 /// Task callback that use `Data` type as input and return a result containing a success unit type ()
 /// or a failure that contains a `Symbol` for an alternate flow.
@@ -56,7 +54,7 @@ impl<T> Eventhandler<T> {
     /// let mut handler: Eventhandler<Counter> = Eventhandler::default();
     /// handler.add_task("Count 1", |input| {
     ///     input.lock().unwrap().count += 1;
-    ///     Ok(())
+    ///     None
     /// });
     /// ```
     pub fn add_task<F>(&mut self, name: impl Into<String>, func: F)
@@ -72,7 +70,7 @@ impl<T> Eventhandler<T> {
         } else {
             warn!("{}: {}", MISSING_FUNCTION, key);
         }
-        Ok(())
+        None
     }
 
     /// Add a gateway to the event handler by name or id with corresponding closure.

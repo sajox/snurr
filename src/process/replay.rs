@@ -22,7 +22,7 @@ impl Process {
     ///     let mut handler: Eventhandler<Counter> = Eventhandler::default();
     ///     handler.add_task("Count 1", |input| {
     ///         input.lock().unwrap().count += 1;
-    ///         Ok(())
+    ///         None
     ///     });
     ///    
     ///     handler.add_gateway("equal to 3", |input| {

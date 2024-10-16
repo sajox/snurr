@@ -88,10 +88,14 @@ impl Process {
                         | ActivityType::BusinessRuleTask => {
                             #[cfg(feature = "trace")]
                             data.trace(replay::TASK, name_or_id)?;
-                            if let Err(symbol) = data.handler.run_task(name_or_id, data.user_data())
+                            if let Some(boundary) =
+                                data.handler.run_task(name_or_id, data.user_data())
                             {
-                                self.boundary_lookup(id, &symbol).ok_or_else(|| {
-                                    Error::MissingBoundary(symbol.to_string(), name_or_id.into())
+                                self.boundary_lookup(id, &boundary.1).ok_or_else(|| {
+                                    Error::MissingBoundary(
+                                        boundary.1.to_string(),
+                                        name_or_id.into(),
+                                    )
                                 })?
                             } else {
                                 parallelize_helper!(self, outputs.ids(), data)

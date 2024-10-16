@@ -120,7 +120,7 @@ impl<'a> Scaffold<'a> {
             }
 
             content.push(format!(
-                r#"    handler.add_task("{}", |input| Ok(()));"#,
+                r#"    handler.add_task("{}", |input| None);"#,
                 name_or_id,
             ));
             content.push("".into());

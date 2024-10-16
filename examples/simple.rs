@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Register task function for handler.
     handler.add_task("Count 1", |input| {
         input.lock().unwrap().count += 1;
-        Ok(())
+        None
     });
 
     // Register gateway function for handler.

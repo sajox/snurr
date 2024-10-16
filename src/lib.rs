@@ -39,7 +39,7 @@
 //!     // Register task function for handler.
 //!     handler.add_task("Count 1", |input| {
 //!         input.lock().unwrap().count += 1;
-//!         Ok(())
+//!         None
 //!     });
 //!
 //!     // Register gateway function for handler.
@@ -68,5 +68,5 @@ mod process;
 mod reader;
 
 pub use handler::{Data, Eventhandler, TaskResult};
-pub use model::{Symbol, With};
+pub use model::{Boundary, Symbol, With};
 pub use process::{Process, ProcessResult};

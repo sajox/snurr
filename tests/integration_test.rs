@@ -18,16 +18,16 @@ struct Counter {
 fn func_cnt(value: u32) -> impl Fn(Data<Counter>) -> TaskResult {
     move |input| {
         input.lock().unwrap().count += value;
-        Ok(())
+        None
     }
 }
 
 fn func_error(_: Data<Counter>) -> TaskResult {
-    Err(Symbol::Error)
+    Some(Symbol::Error.into())
 }
 
 fn func_timer(_: Data<Counter>) -> TaskResult {
-    Err(Symbol::Timer)
+    Some(Symbol::Timer.into())
 }
 
 #[test]
@@ -347,7 +347,7 @@ fn subprocess_external_link_fail() -> Result<(), Box<dyn std::error::Error>> {
 fn showcase() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
     handler.add_task(COUNT_1, func_cnt(1));
-    handler.add_task("Timeout 1", |_| Err(Symbol::Timer));
+    handler.add_task("Timeout 1", |_| Some(Symbol::Timer.into()));
     handler.add_gateway("RUN ALL", |_| With::Fork(vec!["A", "B"]));
     handler.add_gateway("RUN A", |_| A);
 
@@ -459,12 +459,10 @@ fn event_gateway() -> Result<(), Box<dyn std::error::Error>> {
     handler.add_task(COUNT_2, func_cnt(2));
 
     handler.add_gateway("JUNIOR GATEKEEPER", |_| {
-        With::Symbol(Some("Investigate"), Symbol::Message)
+        ("Investigate", Symbol::Message).into()
     });
 
-    handler.add_gateway("SENIOR GATEKEEPER", |_| {
-        With::Symbol(Some("Sleeping"), Symbol::Timer)
-    });
+    handler.add_gateway("SENIOR GATEKEEPER", |_| ("Sleeping", Symbol::Timer).into());
 
     let bpmn = Process::new("tests/files/event_gateway.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
@@ -477,7 +475,7 @@ fn event_gateway_blank_symbol() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
     handler.add_task(COUNT_3, func_cnt(3));
 
-    handler.add_gateway("JUNIOR GATEKEEPER", |_| With::Symbol(None, Symbol::Timer));
+    handler.add_gateway("JUNIOR GATEKEEPER", |_| Symbol::Timer.into());
 
     let bpmn = Process::new("tests/files/event_gateway.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
