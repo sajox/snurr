@@ -2,7 +2,16 @@
 
 [![Build Status](https://github.com/sajox/snurr/actions/workflows/rust.yml/badge.svg)](https://github.com/sajox/snurr/actions)
 
-Create and run the process flow from a BPMN 2.0 file created by [BPMN Editor demo](https://demo.bpmn.io/new). Add your own behavior with Rust code from a small API. Read the [Snurr documentation](https://github.com/sajox/snurr/blob/main/docs/documentation.md) and explore the **tests** folder for more examples. 
+**Snurr** can run the process flow from a BPMN 2.0 file created by <https://demo.bpmn.io/new>.
+
+- Add your own behavior with Rust code from a small API.
+- You can do fast prototypes without thinking about the wiring between the boxes. 
+- Scaffold the initial BPMN diagram so you don't have to do the boilerplate code.
+- Change the BPMN diagram with new Task and Gateways without refactor your old code.
+- Contains no database.
+- Single or multithreaded (opt in)
+
+Read the [Snurr documentation](https://github.com/sajox/snurr/blob/main/docs/documentation.md) and explore the **tests** folder for more examples.
 
 **_NOTE:_** To view or edit BPMN files in your project you can use the [BPMN Editor](https://github.com/bpmn-io/vs-code-bpmn-io) plugin in VS Code.   
 

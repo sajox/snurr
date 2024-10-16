@@ -1,10 +1,57 @@
 # Documentation
 
 **Snurr** can run the process flow from a BPMN 2.0 file created by <https://demo.bpmn.io/new>.
-Model a BPMN diagram and use Snurr to run the process flow, just add your own logic in each task and gateway.
-Snurr contains no database or state over last known position.
 
-This is not a complete implementation of the BPMN 2.0 specification but intend to be light weight subset of it.
+- Add your own behavior with Rust code from a small API.
+- You can do fast prototypes without thinking about the wiring between the boxes. 
+- Scaffold the initial BPMN diagram so you don't have to do the boilerplate code.
+- Change the BPMN diagram with new Task and Gateways without refactor your old code.
+- Contains no database.
+- Single or multithreaded (opt in)
+
+This is not a complete implementation of the BPMN 2.0 specification but intend to be a light weight subset of it.
+
+**NOTE** Documentation updated for future 0.6 release. Might change.
+
+## Migration 
+
+### Version 0.5 -> 0.6 (NOT YET RELEASED)
+
+#### Gateway
+
+Default flow
+
+```rust
+vec![] => With::Default
+or
+vec![] => Default::default
+```
+
+One flow
+
+```rust
+vec!["YES"] => With::Flow("YES")
+or
+vec!["YES"] => "YES".into()
+```
+
+Many flows
+
+```rust
+vec!["YES", "NO"] => With::Fork(vec!["YES", "NO"])
+or
+vec!["YES", "NO"] => vec!["YES", "NO"].into()
+```
+
+#### Task
+
+Updated return type ```Result<(), Symbol>``` to ```Option<Boundary>```
+
+```rust
+Symbol::Timer => Boundary(None, Symbol::Timer);
+or
+Symbol::Timer => Symbol::Timer.into();
+```
 
 ## Lib
 
@@ -12,14 +59,14 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
 
 ```toml
 [dependencies]
-snurr = "0.5"
+snurr = "0.6"
 ```
 
 With parallel feature enabled, new threads are spawned with parallel, inclusive, task and event forks.
 
 ```toml
 [dependencies]
-snurr = { version = "0.5", features = ["parallel"] }
+snurr = { version = "0.6", features = ["parallel"] }
 ```
 
 
@@ -46,6 +93,8 @@ let process_result = bpmn.run(&handler, Counter::default())?;
 
 #### Run the flow from a previous process run with Process::replay_trace
 
+**NOTE** Requires feature **trace** enabled
+
 ```rust
 let trace_result = Process::replay_trace(&handler, Counter::default(), &process_result.trace);
 ```
@@ -60,12 +109,14 @@ bpmn.scaffold("scaffold.rs")?;
 Output file: **scaffold.rs**
 
 ```rust scaffold.rs
-pub fn create_handler<T>() -> snurr::Eventhandler<T> {
-    let mut handler: snurr::Eventhandler<T> = snurr::Eventhandler::default();
-    handler.add_task("Count 1", |input| Ok(()));
+// Replace the '()' in the Eventhandler<()> return type with your own type.
+pub fn create_handler() -> snurr::Eventhandler<()> {
+    let mut handler = snurr::Eventhandler::default();
+    handler.add_task("Count 1", |input| None);
 
-    // "equal to 3", Outputs { names: [Some("YES"), Some("NO")], ids: ["Flow_1h0jtl6", "Flow_0rsqhpi"] }
-    handler.add_gateway("equal to 3", |input| vec!["YES", "NO"]);
+    // Names: YES, NO
+    // Flows: Flow_1h0jtl6, Flow_0rsqhpi
+    handler.add_gateway("equal to 3", |input| Default::default());
 
     handler
 }
@@ -98,7 +149,7 @@ Register task by **name** (if it exist) or **id**. Return a result with a unit t
 
 ```rust
 handler.add_task("Name or id", |input| {
-    Ok(())
+    None
 });
 ```
 
@@ -106,7 +157,7 @@ If one or more boundarys exist on a task, then a boundary can be returned. Curre
 
 ```rust
 handler.add_task("Name or id", |input| {
-    Err(Symbol::Error)
+    Some(Symbol::Error.into())
 });
 ```
 
@@ -127,11 +178,17 @@ Register gateway by **name** (if it exist) or **id** and return the flow taken b
 
 ![Exclusive gateway](/assets/images/exclusive-gateway.png)
 
-Zero or one flow is returned. If many flows is returned only the first one is processed.
+One flow is returned or default.
 
 ```rust
 handler.add_gateway("CHOOSE", |input| {
-    vec!["YES"]
+    With::Flow("YES")
+});
+```
+
+```rust
+handler.add_gateway("CHOOSE", |input| {
+    With::Default
 });
 ```
 
@@ -139,11 +196,23 @@ handler.add_gateway("CHOOSE", |input| {
 
 ![Inclusive gateway](/assets/images/inclusive-gateway.png)
 
-Zero or more flows is returned and processed. Inclusive gateway should always have a default flow in the BPMN diagram.
+One or more flows is returned and processed. Inclusive gateway should always have a default flow in the BPMN diagram.
 
 ```rust
 handler.add_gateway("CHOOSE", |input| {
-    vec!["YES", "NO"]
+    With::Fork(vec!["YES", "NO"])
+});
+```
+
+```rust
+handler.add_gateway("CHOOSE", |input| {
+    With::Flow("YES")
+});
+```
+
+```rust
+handler.add_gateway("CHOOSE", |input| {
+    With::Default
 });
 ```
 
@@ -152,16 +221,6 @@ handler.add_gateway("CHOOSE", |input| {
 ![Parallel gateway](/assets/images/parallel-gateway.png)
 
 **Parallel gateways** run **all** available flows. No need to add gateway.
-
-#### Default flow
-
-To choose the default flow, then return an empty vector.
-
-```rust
-handler.add_gateway("Name or id", |input| {
-    vec![]
-});
-```
 
 ## Intermediate event
 
@@ -198,7 +257,7 @@ If one or more boundary's exist on a task, then a boundary can be returned.
 
 ```rust
 handler.add_task("Name or id", |input| {
-    Err(Symbol::Error)
+    Some(Symbol::Error.into())
 });
 ```
 
