@@ -188,7 +188,7 @@ handler.add_gateway("CHOOSE", |input| {
 });
 ```
 
-### Event-based gateway
+### Event-based gateway (Version 0.6)
 
 ![Event-based gateway](/assets/images/event-based-gateway.png)
 
