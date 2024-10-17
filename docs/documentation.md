@@ -117,8 +117,7 @@ pub fn create_handler() -> snurr::Eventhandler<()> {
     let mut handler = snurr::Eventhandler::default();
     handler.add_task("Count 1", |input| None);
 
-    // Names: YES, NO
-    // Flows: Flow_1h0jtl6, Flow_0rsqhpi
+    // Exclusive gateway. Names: YES, NO. Flows: Flow_1h0jtl6, Flow_0rsqhpi.
     handler.add_gateway("equal to 3", |input| Default::default());
 
     handler

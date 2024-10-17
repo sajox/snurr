@@ -129,9 +129,14 @@ impl<'a> Scaffold<'a> {
         // Second all gateways
         for gateway in self.gateways.iter() {
             let Gateway {
-                bpmn: Bpmn::Gateway {
-                    id, name, outputs, ..
-                },
+                bpmn:
+                    Bpmn::Gateway {
+                        gateway,
+                        id,
+                        name,
+                        outputs,
+                        ..
+                    },
                 names,
             } = gateway
             else {
@@ -140,14 +145,15 @@ impl<'a> Scaffold<'a> {
 
             let name_or_id = name.as_ref().unwrap_or(id);
             content.push(format!(
-                r#"    // Names: {}"#,
+                r#"    // {} gateway. Names: {}. Flows: {}."#,
+                gateway,
                 names
                     .iter()
                     .map(|value| value.to_string())
                     .collect::<Vec<_>>()
-                    .join(", ")
+                    .join(", "),
+                outputs
             ));
-            content.push(format!(r#"    // Flows: {}"#, outputs));
             content.push(format!(
                 r#"    handler.add_gateway("{}", |input| Default::default());"#,
                 name_or_id,
