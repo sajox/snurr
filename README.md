@@ -4,10 +4,9 @@
 
 **Snurr** can run the process flow from a BPMN 2.0 file created by <https://demo.bpmn.io/new>.
 
-- Add your own behavior with Rust code from a small API.
-- You can do fast prototypes without thinking about the wiring between the boxes. 
+- Add your own behavior with Rust code from a small API. The wiring is already setup from the file.
+- Change the BPMN diagram with new Task and Gateways without the need to refactor your old code.
 - Scaffold the initial BPMN diagram so you don't have to do the boilerplate code.
-- Change the BPMN diagram with new Task and Gateways without refactor your old code.
 - Contains no database.
 - Single or multithreaded (opt in)
 
