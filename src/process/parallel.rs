@@ -16,33 +16,29 @@ impl Process {
         T: Send,
     {
         let result: ExecuteResult<'_> = {
-            if start_ids.len() <= 1 {
-                return Ok(start_ids.first().map(|v| &**v));
-            } else {
-                #[cfg(feature = "parallel")]
-                {
-                    use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-                    // Fork and collect result
-                    let (oks, mut errors): (Vec<_>, Vec<_>) = start_ids
-                        .par_iter()
-                        .map(|output| self.execute(vec![output], data))
-                        .partition(Result::is_ok);
+            #[cfg(feature = "parallel")]
+            {
+                use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+                // Fork and collect result
+                let (oks, mut errors): (Vec<_>, Vec<_>) = start_ids
+                    .par_iter()
+                    .map(|output| self.execute(vec![output], data))
+                    .partition(Result::is_ok);
 
-                    if let Some(result) = errors.pop() {
-                        result
-                    } else {
-                        Ok(oks
-                            .into_iter()
-                            .filter_map(Result::ok)
-                            .flatten()
-                            .collect::<Vec<_>>())
-                    }
+                if let Some(result) = errors.pop() {
+                    result
+                } else {
+                    Ok(oks
+                        .into_iter()
+                        .filter_map(Result::ok)
+                        .flatten()
+                        .collect::<Vec<_>>())
                 }
+            }
 
-                #[cfg(not(feature = "parallel"))]
-                {
-                    self.execute(start_ids, data)
-                }
+            #[cfg(not(feature = "parallel"))]
+            {
+                self.execute(start_ids, data)
             }
         };
 
@@ -63,10 +59,16 @@ impl Process {
 }
 
 macro_rules! parallelize_helper {
-    ($self:expr, $start_ids:expr, $data:expr) => {
-        match $self.maybe_parallelize($start_ids, $data)? {
-            Some(val) => val,
-            None => continue,
+    ($self:expr, $outputs:expr, $data:expr, $ty:expr, $noi:expr) => {
+        if $outputs.len() <= 1 {
+            $outputs
+                .first()
+                .ok_or_else(|| Error::MissingOutput($ty.to_string(), $noi.to_string()))?
+        } else {
+            match $self.maybe_parallelize($outputs.ids(), $data)? {
+                Some(val) => val,
+                None => continue,
+            }
         }
     };
 }

@@ -39,10 +39,11 @@ impl Process {
                     outputs,
                     ..
                 } => {
-                    info!("{}: {}", event, name.as_ref().unwrap_or(bid));
+                    let name_or_id = name.as_ref().unwrap_or(bid);
+                    info!("{}: {}", event, name_or_id);
                     match event {
                         EventType::Start | EventType::IntermediateCatch | EventType::Boundary => {
-                            parallelize_helper!(self, outputs.ids(), data)
+                            parallelize_helper!(self, outputs, data, event, name_or_id)
                         }
                         EventType::IntermediateThrow => {
                             match (name.as_ref(), symbol.as_ref()) {
@@ -51,7 +52,7 @@ impl Process {
                                 }
                                 // Follow outputs for other throw events
                                 (Some(_), _) => {
-                                    parallelize_helper!(self, outputs.ids(), data)
+                                    parallelize_helper!(self, outputs, data, event, name_or_id)
                                 }
                                 _ => Err(Error::MissingIntermediateThrowEventName(bid.into()))?,
                             }
@@ -98,7 +99,7 @@ impl Process {
                                     )
                                 })?
                             } else {
-                                parallelize_helper!(self, outputs.ids(), data)
+                                parallelize_helper!(self, outputs, data, activity, name_or_id)
                             }
                         }
                         ActivityType::SubProcess => {
@@ -114,9 +115,7 @@ impl Process {
                                 // Boundary id returned
                                 [id, ..] => id,
                                 // Continue from subprocess
-                                _ => {
-                                    parallelize_helper!(self, outputs.ids(), data)
-                                }
+                                _ => parallelize_helper!(self, outputs, data, activity, name_or_id),
                             }
                         }
                     }
@@ -205,7 +204,19 @@ impl Process {
                                                 name_or_id.to_string(),
                                             ));
                                         }
-                                        parallelize_helper!(self, responses, data)
+                                        if responses.len() <= 1 {
+                                            responses.first().ok_or_else(|| {
+                                                Error::MissingOutput(
+                                                    gateway.to_string(),
+                                                    name_or_id.to_string(),
+                                                )
+                                            })?
+                                        } else {
+                                            match self.maybe_parallelize(responses, data)? {
+                                                Some(val) => val,
+                                                None => continue,
+                                            }
+                                        }
                                     }
                                 }
                                 With::Default => default_path(default, gateway, name_or_id)?,
@@ -233,7 +244,7 @@ impl Process {
                             }
                         }
                         GatewayType::Parallel => {
-                            parallelize_helper!(self, outputs.ids(), data)
+                            parallelize_helper!(self, outputs, data, gateway, name_or_id)
                         }
                     }
                 }
