@@ -2,16 +2,15 @@
 
 **Snurr** can run the process flow from a BPMN 2.0 file created by <https://demo.bpmn.io/new>.
 
-- Add your own behavior with Rust code from a small API.
-- You can do fast prototypes without thinking about the wiring between the boxes. 
+- Add your own behavior with Rust code from a small API. The wiring is already setup from the file.
+- Change the BPMN diagram with new Task and Gateways without the need to refactor your old code.
 - Scaffold the initial BPMN diagram so you don't have to do the boilerplate code.
-- Change the BPMN diagram with new Task and Gateways without refactor your old code.
 - Contains no database.
 - Single or multithreaded (opt in)
 
 This is not a complete implementation of the BPMN 2.0 specification but intend to be a light weight subset of it.
 
-**NOTE** Documentation updated for future 0.6 release. Might change.
+**NOTE** Documentation updated for future version 0.6 release. Documentation might change.
 
 ## Migration 
 
@@ -74,9 +73,9 @@ snurr = { version = "0.6", features = ["parallel"] }
 
 Create a process by giving a path to a bpmn file. The created process do not mutate and can be run several times. The **ProcessResult** contains the result and a trace. Use scaffold to generate code from the read BPMN file.
 
-### Usage
+### Create and run process
 
-#### Create and run process
+Use our own model to be used by the process.
 
 ```rust
 #[derive(Debug, Default)]
@@ -84,22 +83,26 @@ struct Counter {
     count: u32,
 }
 ```
+Read the bpmn file, add the handlers and run the process.
 
 ```rust
 let bpmn = Process::new("example.bpmn")?;
 let mut handler: Eventhandler<Counter> = Eventhandler::default();
+// ... Add task and gateway closures here ...
 let process_result = bpmn.run(&handler, Counter::default())?;
 ```
 
-#### Run the flow from a previous process run with Process::replay_trace
+### Replay trace
 
-**NOTE** Requires feature **trace** enabled
+Run the flow from a previous process run. **NOTE** Requires feature **trace** enabled to actually trace something.
 
 ```rust
 let trace_result = Process::replay_trace(&handler, Counter::default(), &process_result.trace);
 ```
 
-#### Generate code from all the task and gateways to the given file path with scaffold. Remove scaffold method after file is created.
+### Scaffold
+
+Generate code from all the task and gateways to the given file path with scaffold. Remove scaffold method after file is created.
 
 ```rust
 let bpmn = Process::new("example.bpmn")?;
@@ -145,7 +148,7 @@ All tasks is used in the same way regardless of which icon is used in the BPMN d
 
 ### Usage
 
-Register task by **name** (if it exist) or **id**. Return a result with a unit tuple if no boundary is used and follow regular flow.
+Register task by **name** (if it exist) or **id**. Return a **None** if no boundary is used and follow regular flow.
 
 ```rust
 handler.add_task("Name or id", |input| {
@@ -163,18 +166,11 @@ handler.add_task("Name or id", |input| {
 
 ## Gateways
 
-Only exclusive and inclusive gateways need to be registered. **Parallel gateways** run **all** available flows. If a gateway name is given then every gateway with same name will use the same closure.
-
-
-**Exclusive**, **inclusive** and **parallel** gateway
+Only exclusive, event-based and inclusive gateways need to be registered. **Parallel gateways** run **all** available flows. If a gateway name is given then every gateway with same name will use the same closure. Register a gateway by **name** (if it exist) or **id** and return the flow taken by **name** or **id**
 
 ![Exclusive, inclusive and parallel gateway](/assets/images/gateways.png)
 
-### Usage
-
-Register gateway by **name** (if it exist) or **id** and return the flow taken by **name** or **id**
-
-#### Exclusive gateway
+### Exclusive gateway
 
 ![Exclusive gateway](/assets/images/exclusive-gateway.png)
 
@@ -192,7 +188,19 @@ handler.add_gateway("CHOOSE", |input| {
 });
 ```
 
-#### Inclusive gateway
+### Event-based gateway
+
+![Event-based gateway](/assets/images/event-based-gateway.png)
+
+One flow is returned.
+
+```rust
+handler.add_gateway("CHOOSE", |input| {
+     ("Message", Symbol::Message).into()
+});
+```
+
+### Inclusive gateway
 
 ![Inclusive gateway](/assets/images/inclusive-gateway.png)
 
@@ -216,7 +224,7 @@ handler.add_gateway("CHOOSE", |input| {
 });
 ```
 
-#### Parallel gateway
+### Parallel gateway
 
 ![Parallel gateway](/assets/images/parallel-gateway.png)
 
@@ -269,7 +277,7 @@ Collapsed, expanded sub-process or transaction can be used.
 
 An end event symbol kan be used in a sub-process to use the boundary as an alternate flow.
 
-![End events](/assets/images/subprocess-message-end.png)
+![End events](/assets/images/subprocess-message.png)
 
 ## Logging
 
