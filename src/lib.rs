@@ -1,10 +1,14 @@
 //! # Snurr
 //!
 //! `Snurr` can run the process flow from a BPMN 2.0 file created by <https://demo.bpmn.io/new>.
-//! Model a BPMN diagram and use Snurr to run the process flow, just add your own logic in each task and gateway.
-//! Snurr contains no database or state over last known position.
 //!
-//! This is not a complete implementation of the BPMN 2.0 specification but intend to be light weight subset of it.
+//! - Add your own behavior with Rust code from a small API. The wiring is already setup from the file.
+//! - Change the BPMN diagram with new Task and Gateways without the need to refactor your old code.
+//! - Scaffold the initial BPMN diagram so you don't have to do the boilerplate code.
+//! - Contains no database.
+//! - Single or multithreaded (opt in)
+//!
+//! This is not a complete implementation of the BPMN 2.0 specification but intend to be a light weight subset of it.
 //!
 //! ## Example
 //!
