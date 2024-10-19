@@ -76,7 +76,7 @@ With parallel feature enabled, new threads are spawned with parallel, inclusive,
 snurr = { version = "0.6", features = ["parallel"] }
 ```
 
-Trace is disabled by default. It start a collector thread for each run.
+Trace is disabled by default. It start a collector thread and trace the visited Task or Gateways for a given run.
 
 ```toml
 [dependencies]
@@ -109,7 +109,7 @@ let process_result = bpmn.run(&handler, Counter::default())?;
 
 ### Replay trace
 
-Run the flow from a previous process run. **NOTE** Requires feature **trace** enabled to actually trace something.
+Run the flow from a previous process run. **NOTE** Requires feature **trace** enabled to actually trace something. If data is nondeterministic then do not expect same result by replay_trace.
 
 ```rust
 let trace_result = Process::replay_trace(&handler, Counter::default(), &process_result.trace);
