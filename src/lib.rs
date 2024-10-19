@@ -15,7 +15,7 @@
 //! ### Cargo.toml
 //! ```toml
 //! [dependencies]
-//! snurr = "0.5"
+//! snurr = "0.6"
 //! log = "0.4"
 //! pretty_env_logger = "0.5"
 //! ```

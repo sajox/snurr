@@ -14,32 +14,32 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
 
 ## Migration 
 
-### Version 0.5 -> 0.6 (NOT YET RELEASED)
+### Version 0.5 -> 0.6
 
 #### Gateway
 
 Default flow
 
 ```rust
-vec![] => With::Default
-or
-vec![] => Default::default
+vec![] => With::Default;
+// or
+vec![] => Default::default;
 ```
 
 One flow
 
 ```rust
-vec!["YES"] => With::Flow("YES")
-or
-vec!["YES"] => "YES".into()
+vec!["YES"] => With::Flow("YES");
+// or
+vec!["YES"] => "YES".into();
 ```
 
 Many flows
 
 ```rust
-vec!["YES", "NO"] => With::Fork(vec!["YES", "NO"])
-or
-vec!["YES", "NO"] => vec!["YES", "NO"].into()
+vec!["YES", "NO"] => With::Fork(vec!["YES", "NO"]);
+// or
+vec!["YES", "NO"] => vec!["YES", "NO"].into();
 ```
 
 #### Task
@@ -48,7 +48,7 @@ Updated return type ```Result<(), Symbol>``` to ```Option<Boundary>```
 
 ```rust
 Symbol::Timer => Boundary(None, Symbol::Timer);
-or
+// or
 Symbol::Timer => Symbol::Timer.into();
 ```
 
@@ -56,7 +56,7 @@ Match both name and symbol (new)
 
 ```rust
 Boundary(Some("timeout"), Symbol::Timer);
-or
+// or
 ("timeout", Symbol::Timer).into();
 ```
 
@@ -211,7 +211,7 @@ handler.add_gateway("CHOOSE", |input| {
 });
 ```
 
-### Event-based gateway (Version 0.6)
+### Event-based gateway
 
 ![Event-based gateway](/assets/images/event-based-gateway.png)
 
