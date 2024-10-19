@@ -155,11 +155,20 @@ handler.add_task("Name or id", |input| {
 });
 ```
 
-If one or more boundarys exist on a task, then a boundary can be returned. Currently only **one** boundary of **same** type can be returned. Might be updated in the future if need arise.
+If one or more boundaries exist on a task, then a boundary can be returned. If a name exist it must match.
+
+Boundary with no name
 
 ```rust
 handler.add_task("Name or id", |input| {
     Some(Symbol::Error.into())
+});
+```
+Boundary with name
+
+```rust
+handler.add_task("Name or id", |input| {
+    Some(("Not good", Symbol::Error).into())
 });
 ```
 

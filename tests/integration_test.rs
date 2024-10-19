@@ -22,14 +22,6 @@ fn func_cnt(value: u32) -> impl Fn(Data<Counter>) -> TaskResult {
     }
 }
 
-fn func_error(_: Data<Counter>) -> TaskResult {
-    Some(Symbol::Error.into())
-}
-
-fn func_timer(_: Data<Counter>) -> TaskResult {
-    Some(Symbol::Timer.into())
-}
-
 #[test]
 fn one_task() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
@@ -92,7 +84,7 @@ fn subprocess_message_end() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn subprocess_error_message_end() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task(COUNT_1, func_error);
+    handler.add_task(COUNT_1, |_| Some(("Overflow", Symbol::Error).into()));
     handler.add_task(COUNT_2, func_cnt(2));
     handler.add_task(COUNT_3, func_cnt(3));
 
@@ -106,7 +98,7 @@ fn subprocess_error_message_end() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn replay_process_trace() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task(COUNT_1, func_error);
+    handler.add_task(COUNT_1, |_| Some(("Overflow", Symbol::Error).into()));
     handler.add_task(COUNT_2, func_cnt(2));
     handler.add_task(COUNT_3, func_cnt(3));
 
@@ -272,8 +264,8 @@ fn parallell_gateway() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn error_handling() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task(COUNT_1, func_error);
-    handler.add_task(COUNT_2, func_error);
+    handler.add_task(COUNT_1, |_| Some(Symbol::Error.into()));
+    handler.add_task(COUNT_2, |_| Some(Symbol::Error.into()));
     handler.add_task(COUNT_3, func_cnt(3));
 
     let bpmn = Process::new("tests/files/error_handling.bpmn")?;
@@ -285,7 +277,7 @@ fn error_handling() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn two_boundary_timer_thrown() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task(COUNT_1, func_timer);
+    handler.add_task(COUNT_1, |_| Some(("Timeout", Symbol::Timer).into()));
     handler.add_task(COUNT_2, func_cnt(2));
     handler.add_task(COUNT_3, func_cnt(3));
 
@@ -298,13 +290,26 @@ fn two_boundary_timer_thrown() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn two_boundary_error_thrown() -> Result<(), Box<dyn std::error::Error>> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-    handler.add_task(COUNT_1, func_error);
+    handler.add_task(COUNT_1, |_| Some(("Error", Symbol::Error).into()));
     handler.add_task(COUNT_2, func_cnt(2));
     handler.add_task(COUNT_3, func_cnt(3));
 
     let bpmn = Process::new("tests/files/two_boundary.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
     assert_eq!(pr.result.count, 2);
+    Ok(())
+}
+
+#[test]
+fn multiple_boundaries_same_symbol() -> Result<(), Box<dyn std::error::Error>> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, |_| Some(("M2", Symbol::Message).into()));
+    handler.add_task(COUNT_2, func_cnt(2));
+    handler.add_task(COUNT_3, func_cnt(3));
+
+    let bpmn = Process::new("tests/files/multiple_boundaries_same_symbol.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 3);
     Ok(())
 }
 

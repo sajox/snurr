@@ -19,8 +19,8 @@ use trace::{tracer, Trace};
 
 use crate::{
     error::Error,
-    model::{Bpmn, BpmnLocal, EventType},
-    reader::{read_bpmn_file, read_bpmn_str},
+    model::{Bpmn, EventType},
+    reader::{read_bpmn_file, read_bpmn_str, ReaderResult},
     Eventhandler, Symbol,
 };
 
@@ -39,7 +39,7 @@ pub struct ProcessResult<T> {
 pub struct Process {
     data: HashMap<String, Vec<Bpmn>>,
     definitions_id: String,
-    activity_ids: HashMap<String, HashMap<Symbol, usize>>,
+    boundaries: HashMap<String, Vec<usize>>,
     catch_events_ids: HashMap<String, HashMap<Symbol, usize>>,
 }
 
@@ -57,29 +57,12 @@ impl Process {
         Self::assemble_data(read_bpmn_file(path)?)
     }
 
-    fn assemble_data(
-        (definitions_id, data): (String, HashMap<String, Vec<Bpmn>>),
-    ) -> Result<Self, Error> {
-        // Collect all boundary symbols attached to an activity id
-        let mut activity_ids: HashMap<String, HashMap<Symbol, usize>> = HashMap::new();
-
+    fn assemble_data(result: ReaderResult) -> Result<Self, Error> {
         // Collect all IntermediateCatchEvents
         let mut catch_events_ids: HashMap<String, HashMap<Symbol, usize>> = HashMap::new();
 
-        data.values().for_each(|process: &Vec<Bpmn>| {
+        result.data.values().for_each(|process: &Vec<Bpmn>| {
             process.iter().for_each(|bpmn| {
-                if let Bpmn::Event {
-                    id,
-                    event: EventType::Boundary,
-                    symbol: Some(symbol),
-                    attached_to_ref: Some(BpmnLocal(bref, _)),
-                    ..
-                } = bpmn
-                {
-                    let entry = activity_ids.entry(bref.into()).or_default();
-                    entry.insert(symbol.clone(), *id.local());
-                }
-
                 if let Bpmn::Event {
                     id,
                     event: EventType::IntermediateCatch,
@@ -95,9 +78,9 @@ impl Process {
         });
 
         Ok(Self {
-            data,
-            definitions_id,
-            activity_ids,
+            data: result.data,
+            definitions_id: result.definitions_id,
+            boundaries: result.boundaries,
             catch_events_ids,
         })
     }
@@ -136,15 +119,14 @@ impl Process {
             .iter()
         {
             if let Bpmn::Process { id, .. } = bpmn {
-                let (process_id, process_data) = self
+                let process_data = self
                     .data
-                    .get_key_value(id)
+                    .get(id)
                     .ok_or_else(|| Error::MissingProcessData(id.into()))?;
 
                 self.execute(
                     vec![&0],
                     &ExecuteData::new(
-                        process_id,
                         process_data,
                         handler,
                         Arc::clone(&data),

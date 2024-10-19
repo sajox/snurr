@@ -6,6 +6,7 @@ use super::ReaderResult;
 #[derive(Default)]
 pub(super) struct DataBuilder {
     data: HashMap<String, Vec<Bpmn>>,
+    boundaries: HashMap<String, Vec<usize>>,
     process_stack: Vec<Vec<Bpmn>>,
     stack: Vec<Bpmn>,
     definitions_id: Option<String>,
@@ -116,6 +117,12 @@ impl DataBuilder {
                 update_local_id(id, &bpmn_index);
                 if let Some(attached_to_ref) = attached_to_ref {
                     update_local_id(attached_to_ref, &bpmn_index);
+
+                    // Collect boundary to activity id
+                    self.boundaries
+                        .entry(attached_to_ref.bpmn().to_owned())
+                        .or_default()
+                        .push(*id.local());
                 }
             }
             Bpmn::Gateway {
@@ -133,11 +140,12 @@ impl DataBuilder {
         });
     }
 
-    pub(super) fn finish(self) -> ReaderResult {
-        Ok((
-            self.definitions_id.ok_or(Error::MissingDefinitionsId)?,
-            self.data,
-        ))
+    pub(super) fn finish(self) -> Result<ReaderResult, Error> {
+        Ok(ReaderResult {
+            data: self.data,
+            boundaries: self.boundaries,
+            definitions_id: self.definitions_id.ok_or(Error::MissingDefinitionsId)?,
+        })
     }
 }
 

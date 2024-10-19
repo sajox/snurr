@@ -26,7 +26,7 @@
       </bpmn:boundaryEvent>
       <bpmn:sequenceFlow id="Flow_1eec6ff" name="Error occured" sourceRef="Event_0fdj80m" targetRef="Activity_015s7ai" />
       <bpmn:sequenceFlow id="Flow_10lf18k" sourceRef="Activity_015s7ai" targetRef="Event_1pwwg7u" />
-      <bpmn:endEvent id="Event_1pwwg7u" name="End with message">
+      <bpmn:endEvent id="Event_1pwwg7u" name="B7">
         <bpmn:incoming>Flow_10lf18k</bpmn:incoming>
         <bpmn:messageEventDefinition id="MessageEventDefinition_1u79cq9" />
       </bpmn:endEvent>
@@ -35,7 +35,7 @@
       </bpmn:endEvent>
     </bpmn:subProcess>
     <bpmn:sequenceFlow id="Flow_1jpp2ze" sourceRef="StartEvent_0fqyv2p" targetRef="Activity_0zd8r93" />
-    <bpmn:boundaryEvent id="Event_0r55d8a" name="Subprocess message" attachedToRef="Activity_0zd8r93">
+    <bpmn:boundaryEvent id="Event_0r55d8a" name="B7" attachedToRef="Activity_0zd8r93">
       <bpmn:outgoing>Flow_1kxqmic</bpmn:outgoing>
       <bpmn:messageEventDefinition id="MessageEventDefinition_1m0prw7" />
     </bpmn:boundaryEvent>
@@ -81,7 +81,7 @@
       <bpmndi:BPMNShape id="Event_16ehlm1_di" bpmnElement="Event_1pwwg7u">
         <dc:Bounds x="622" y="302" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="618" y="345" width="45" height="27" />
+          <dc:Bounds x="634" y="345" width="14" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Event_1wz9tbq_di" bpmnElement="Event_16gsgu3">
@@ -131,7 +131,7 @@
       <bpmndi:BPMNShape id="Event_0r55d8a_di" bpmnElement="Event_0r55d8a">
         <dc:Bounds x="462" y="392" width="36" height="36" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="410" y="426" width="59" height="27" />
+          <dc:Bounds x="433" y="426" width="14" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_1jpp2ze_di" bpmnElement="Flow_1jpp2ze">

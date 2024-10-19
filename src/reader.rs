@@ -11,18 +11,23 @@ use quick_xml::reader::Reader;
 use crate::error::Error;
 use crate::model::*;
 
-type ReaderResult = Result<(String, HashMap<String, Vec<Bpmn>>), Error>;
+#[derive(Debug)]
+pub(crate) struct ReaderResult {
+    pub data: HashMap<String, Vec<Bpmn>>,
+    pub boundaries: HashMap<String, Vec<usize>>,
+    pub definitions_id: String,
+}
 
-pub(crate) fn read_bpmn_str(s: &str) -> ReaderResult {
+pub(crate) fn read_bpmn_str(s: &str) -> Result<ReaderResult, Error> {
     read_bpmn(Reader::from_str(s))
 }
 
-pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> ReaderResult {
+pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> Result<ReaderResult, Error> {
     read_bpmn(Reader::from_file(path)?)
 }
 
 // Read BPMN content and return the ReaderResult containing a tuple with definitions ID and BPMN data.
-fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> ReaderResult {
+fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<ReaderResult, Error> {
     let mut builder = DataBuilder::default();
     let mut buf = Vec::new();
     loop {

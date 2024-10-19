@@ -34,7 +34,7 @@ impl Process {
                 Bpmn::Event {
                     event,
                     symbol,
-                    id: BpmnLocal(bid, _),
+                    id: BpmnLocal(bid, lid),
                     name,
                     outputs,
                     ..
@@ -58,11 +58,9 @@ impl Process {
                             }
                         }
                         EventType::End => {
-                            if let Some(boundary_id) = symbol
-                                .as_ref()
-                                .and_then(|symbol| self.boundary_lookup(data.process_id, symbol))
-                            {
-                                results.push(boundary_id);
+                            if symbol.is_some() {
+                                // return the End Id so parent can check info.
+                                results.push(lid);
                             }
                             continue;
                         }
@@ -92,28 +90,48 @@ impl Process {
                             if let Some(boundary) =
                                 data.handler.run_task(name_or_id, data.user_data())
                             {
-                                self.boundary_lookup(id, &boundary.1).ok_or_else(|| {
-                                    Error::MissingBoundary(
-                                        boundary.1.to_string(),
-                                        name_or_id.into(),
-                                    )
-                                })?
+                                self.boundary_lookup(id, boundary.0, &boundary.1, data.process_data)
+                                    .ok_or_else(|| {
+                                        Error::MissingBoundary(
+                                            format!("{}", boundary),
+                                            name_or_id.into(),
+                                        )
+                                    })?
                             } else {
                                 parallelize_helper!(self, outputs, data, activity, name_or_id)
                             }
                         }
                         ActivityType::SubProcess => {
-                            let (process_id, process_data) = self
+                            let sp_data = self
                                 .data
-                                .get_key_value(id)
+                                .get(id)
                                 .ok_or_else(|| Error::MissingProcessData(id.into()))?;
 
-                            match self
-                                .execute(vec![&0], &data.update(process_id, process_data))?
-                                .as_slice()
-                            {
-                                // Boundary id returned
-                                [id, ..] => id,
+                            match self.execute(vec![&0], &data.update(sp_data))?.as_slice() {
+                                // Boundary id returned. Fetch info from subprocess data as it don't exist in data.process_data
+                                [end_id, ..] => {
+                                    let Some(Bpmn::Event {
+                                        symbol: Some(symbol),
+                                        name,
+                                        ..
+                                    }) = sp_data.get(**end_id)
+                                    else {
+                                        return Err(Error::MissingId(end_id.to_string()));
+                                    };
+
+                                    self.boundary_lookup(
+                                        id,
+                                        name.as_deref(),
+                                        symbol,
+                                        data.process_data,
+                                    )
+                                    .ok_or_else(|| {
+                                        Error::MissingBoundary(
+                                            format!("{}", symbol),
+                                            name_or_id.into(),
+                                        )
+                                    })?
+                                }
                                 // Continue from subprocess
                                 _ => parallelize_helper!(self, outputs, data, activity, name_or_id),
                             }
@@ -264,10 +282,29 @@ impl Process {
         Ok(results)
     }
 
-    fn boundary_lookup(&self, activity_id: &str, symbol: &Symbol) -> Option<&usize> {
-        self.activity_ids
-            .get(activity_id)
-            .and_then(|map| map.get(symbol))
+    fn boundary_lookup<'a>(
+        &'a self,
+        activity_id: &str,
+        search_name: Option<&str>,
+        search_symbol: &Symbol,
+        process_data: &'a [Bpmn],
+    ) -> Option<&usize> {
+        for bpmn in self
+            .boundaries
+            .get(activity_id)?
+            .iter()
+            .filter_map(|index| process_data.get(*index))
+        {
+            if let Bpmn::Event {
+                symbol, id, name, ..
+            } = bpmn
+            {
+                if symbol.as_ref() == Some(search_symbol) && search_name == name.as_deref() {
+                    return Some(id.local());
+                }
+            }
+        }
+        None
     }
 
     fn catch_event_lookup(&self, throw_event_name: &str, symbol: &Symbol) -> Result<&usize, Error> {
@@ -354,7 +391,6 @@ pub(super) type ExecuteResult<'a> = Result<Vec<&'a usize>, Error>;
 
 // Data for the execution engine.
 pub(super) struct ExecuteData<'a, T> {
-    process_id: &'a str,
     process_data: &'a Vec<Bpmn>,
     handler: &'a Eventhandler<T>,
     user_data: Data<T>,
@@ -364,14 +400,12 @@ pub(super) struct ExecuteData<'a, T> {
 
 impl<'a, T> ExecuteData<'a, T> {
     pub(super) fn new(
-        process_id: &'a str,
         process_data: &'a Vec<Bpmn>,
         handler: &'a Eventhandler<T>,
         user_data: Data<T>,
         #[cfg(feature = "trace")] trace: Sender<(&'static str, String)>,
     ) -> Self {
         Self {
-            process_id,
             process_data,
             handler,
             user_data,
@@ -381,9 +415,8 @@ impl<'a, T> ExecuteData<'a, T> {
     }
 
     // When we change to a sub process we must change process id and data.
-    fn update(&self, process_id: &'a str, process_data: &'a Vec<Bpmn>) -> Self {
+    fn update(&self, process_data: &'a Vec<Bpmn>) -> Self {
         Self {
-            process_id,
             process_data,
             handler: self.handler,
             user_data: self.user_data(),

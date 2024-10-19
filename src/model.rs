@@ -117,6 +117,12 @@ impl From<(&'static str, Symbol)> for Boundary {
     }
 }
 
+impl Display for Boundary {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {:?})", self.0.unwrap_or_default(), self.1)
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub(crate) enum EventType {
     Boundary,

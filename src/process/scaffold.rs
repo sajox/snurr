@@ -1,4 +1,4 @@
-use std::{io::Write, path::Path};
+use std::{collections::HashSet, io::Write, path::Path};
 
 use crate::{
     error::Error,
@@ -28,8 +28,23 @@ impl Process {
                     ..
                 } = bpmn
                 {
-                    let symbols = if let Some(map) = self.activity_ids.get(id) {
-                        map.keys().collect::<Vec<&Symbol>>()
+                    let symbols = if let Some(boundaries) = self.boundaries.get(id) {
+                        boundaries
+                            .iter()
+                            .filter_map(|index| process.get(*index))
+                            .filter_map(|bpmn| {
+                                if let Bpmn::Event {
+                                    symbol: Some(symbol),
+                                    name,
+                                    ..
+                                } = bpmn
+                                {
+                                    Some((name, symbol))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect()
                     } else {
                         Vec::new()
                     };
@@ -73,7 +88,7 @@ struct Gateway<'a> {
 #[derive(Debug)]
 struct Task<'a> {
     bpmn: &'a Bpmn,
-    symbols: Vec<&'a Symbol>,
+    symbols: Vec<(&'a Option<String>, &'a Symbol)>,
 }
 
 #[derive(Debug, Default)]
@@ -83,7 +98,7 @@ struct Scaffold<'a> {
 }
 
 impl<'a> Scaffold<'a> {
-    fn add_task(&mut self, bpmn: &'a Bpmn, symbols: Vec<&'a Symbol>) {
+    fn add_task(&mut self, bpmn: &'a Bpmn, symbols: Vec<(&'a Option<String>, &'a Symbol)>) {
         self.tasks.push(Task { bpmn, symbols });
     }
 
@@ -93,13 +108,17 @@ impl<'a> Scaffold<'a> {
 
     /// Generate code from all the task and gateways to the given file path.
     /// No file is allowed to exist at the target location.
-    fn create(&self, path: impl AsRef<Path>) -> Result<(), Error> {
+    fn create(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
         let mut content = vec![];
         content.push(
             "// Replace the '()' in the Eventhandler<()> return type with your own type.".into(),
         );
         content.push("pub fn create_handler() -> snurr::Eventhandler<()> {".into());
         content.push("    let mut handler = snurr::Eventhandler::default();".into());
+
+        // Do not generate duplicates
+        let mut seen_tasks: HashSet<&String> = HashSet::new();
+        let mut seen_gateways: HashSet<&String> = HashSet::new();
 
         // First all tasks
         for task in self.tasks.iter() {
@@ -112,18 +131,20 @@ impl<'a> Scaffold<'a> {
             };
 
             let name_or_id = name.as_ref().unwrap_or(id);
-            if !symbols.is_empty() {
-                content.push(format!(
-                    r#"    // "{}" boundary symbols: {:?}"#,
-                    name_or_id, symbols
-                ));
-            }
+            if seen_tasks.insert(name_or_id) {
+                if !symbols.is_empty() {
+                    content.push(format!(
+                        r#"    // "{}" boundary symbols: {:?}"#,
+                        name_or_id, symbols
+                    ));
+                }
 
-            content.push(format!(
-                r#"    handler.add_task("{}", |input| None);"#,
-                name_or_id,
-            ));
-            content.push("".into());
+                content.push(format!(
+                    r#"    handler.add_task("{}", |input| None);"#,
+                    name_or_id,
+                ));
+                content.push("".into());
+            }
         }
 
         // Second all gateways
@@ -144,21 +165,23 @@ impl<'a> Scaffold<'a> {
             };
 
             let name_or_id = name.as_ref().unwrap_or(id);
-            content.push(format!(
-                r#"    // {} gateway. Names: {}. Flows: {}."#,
-                gateway,
-                names
-                    .iter()
-                    .map(|value| value.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                outputs
-            ));
-            content.push(format!(
-                r#"    handler.add_gateway("{}", |input| Default::default());"#,
-                name_or_id,
-            ));
-            content.push("".into());
+            if seen_gateways.insert(name_or_id) {
+                content.push(format!(
+                    r#"    // {} gateway. Names: {}. Flows: {}."#,
+                    gateway,
+                    names
+                        .iter()
+                        .map(|value| value.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    outputs
+                ));
+                content.push(format!(
+                    r#"    handler.add_gateway("{}", |input| Default::default());"#,
+                    name_or_id,
+                ));
+                content.push("".into());
+            }
         }
 
         content.push("    handler\n}".into());
