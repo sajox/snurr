@@ -90,7 +90,7 @@ Create a process by giving a path to a bpmn file. The created process do not mut
 
 ### Create and run process
 
-Use our own model to be used by the process.
+Use your own model to be used by the process.
 
 ```rust
 #[derive(Debug, Default)]
