@@ -52,6 +52,14 @@ or
 Symbol::Timer => Symbol::Timer.into();
 ```
 
+Match both name and symbol (new)
+
+```rust
+Boundary(Some("timeout"), Symbol::Timer);
+or
+("timeout", Symbol::Timer).into();
+```
+
 ## Lib
 
 **parallel feature** is disabled by default and might be sufficient. Spawning threads can add additional overhead.
@@ -66,6 +74,13 @@ With parallel feature enabled, new threads are spawned with parallel, inclusive,
 ```toml
 [dependencies]
 snurr = { version = "0.6", features = ["parallel"] }
+```
+
+Trace is disabled by default. It start a collector thread for each run.
+
+```toml
+[dependencies]
+snurr = { version = "0.6", features = ["trace"] }
 ```
 
 

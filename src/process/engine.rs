@@ -127,7 +127,7 @@ impl Process {
                                     )
                                     .ok_or_else(|| {
                                         Error::MissingBoundary(
-                                            format!("{}", symbol),
+                                            symbol.to_string(),
                                             name_or_id.into(),
                                         )
                                     })?
@@ -198,12 +198,10 @@ impl Process {
                                     })?
                                 }
                                 With::Fork(value) if matches!(gateway, GatewayType::Inclusive) => {
-                                    // Is it an empty response
                                     if value.is_empty() {
                                         default_path(default, gateway, name_or_id)?
                                     } else {
                                         let outputs = outputs.ids();
-                                        // Run all chosen paths
                                         let responses: Vec<_> = value
                                             .iter()
                                             .filter_map(|&response| {
@@ -215,24 +213,19 @@ impl Process {
                                             })
                                             .collect();
 
-                                        // If no id:s was found due to wrong response str.
-                                        if responses.is_empty() {
-                                            return Err(Error::MissingOutput(
-                                                gateway.to_string(),
-                                                name_or_id.to_string(),
-                                            ));
-                                        }
-                                        if responses.len() <= 1 {
-                                            responses.first().ok_or_else(|| {
-                                                Error::MissingOutput(
+                                        match responses.as_slice() {
+                                            [] => {
+                                                return Err(Error::MissingOutput(
                                                     gateway.to_string(),
                                                     name_or_id.to_string(),
-                                                )
-                                            })?
-                                        } else {
-                                            match self.maybe_parallelize(responses, data)? {
-                                                Some(val) => val,
-                                                None => continue,
+                                                ))
+                                            }
+                                            [first] => first,
+                                            [..] => {
+                                                match self.maybe_parallelize(responses, data)? {
+                                                    Some(val) => val,
+                                                    None => continue,
+                                                }
                                             }
                                         }
                                     }
@@ -345,7 +338,7 @@ fn output_by_symbol<'a>(
                     None
                 })
                 .filter(|bpmn| match bpmn {
-                    // We can target both some Activity or Events.
+                    // We can target both ReceiveTask or Events.
                     Bpmn::Activity {
                         id, activity, name, ..
                     } => {
