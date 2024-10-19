@@ -50,7 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     handler.add_task("Count 1", |input| {
         input.lock().unwrap().count += 1;
-        Ok(())
+        None
     });
 
     handler.add_gateway("equal to 3", |input| {
@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             "NO"
         };
-        vec![result]
+        result.into()
     });
 
     let pr = bpmn.run(&handler, Counter::default())?;
