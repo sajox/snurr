@@ -107,7 +107,6 @@ impl From<(&'static str, Symbol)> for With {
 }
 
 /// Boundary with an optional name and a symbol
-/// NOTE Name is not yet used to match. Prepared for future changes.
 #[derive(Debug)]
 pub struct Boundary(pub Option<&'static str>, pub Symbol);
 

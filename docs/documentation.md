@@ -10,8 +10,6 @@
 
 This is not a complete implementation of the BPMN 2.0 specification but intend to be a light weight subset of it.
 
-**NOTE** Documentation updated for future version 0.6 release. Documentation might change.
-
 ## Migration 
 
 ### Version 0.5 -> 0.6
