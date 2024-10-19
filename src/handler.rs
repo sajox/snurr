@@ -1,9 +1,6 @@
-use crate::model::{Boundary, With};
+use crate::model::{Boundary, HashMap, With};
 use log::warn;
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 // Messages
 const MISSING_FUNCTION: &str = "Missing function. Please register";

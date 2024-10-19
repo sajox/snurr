@@ -1,7 +1,7 @@
 mod builder;
 
 use std::io::BufRead;
-use std::{collections::HashMap, path::Path};
+use std::path::Path;
 
 use builder::DataBuilder;
 use log::error;

@@ -8,7 +8,6 @@ mod trace;
 
 use engine::ExecuteData;
 use std::{
-    collections::HashMap,
     path::Path,
     str::FromStr,
     sync::{Arc, Mutex},
@@ -19,7 +18,7 @@ use trace::{tracer, Trace};
 
 use crate::{
     error::Error,
-    model::{Bpmn, EventType},
+    model::{Bpmn, EventType, HashMap},
     reader::{read_bpmn_file, read_bpmn_str, ReaderResult},
     Eventhandler, Symbol,
 };

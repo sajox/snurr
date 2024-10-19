@@ -1,7 +1,5 @@
-use crate::{error::Error, model::*};
-use std::collections::HashMap;
-
 use super::ReaderResult;
+use crate::{error::Error, model::*};
 
 #[derive(Default)]
 pub(super) struct DataBuilder {

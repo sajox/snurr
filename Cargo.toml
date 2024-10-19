@@ -24,11 +24,13 @@ name = "simple"
 quick-xml = "0.36"
 log = "0.4"
 thiserror = "1.0"
+hashbrown = { version = "0.15", optional = true }
 rayon = { version = "1.10", optional = true }
 
 [features]
-default = []
+default = ["hashbrown"]
 trace = []
+hashbrown = ["dep:hashbrown"]
 parallel = ["dep:rayon"]
 
 
