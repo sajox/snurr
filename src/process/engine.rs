@@ -300,7 +300,7 @@ impl Process {
         None
     }
 
-    // The Link name should be globally unique but the returned local id can be in another process.
+    // The returned local id can be in another process. Must revisit this and collect only for this process.
     fn catch_link_lookup(
         &self,
         throw_event_name: &str,
