@@ -48,7 +48,7 @@ impl Process {
                         EventType::IntermediateThrow => {
                             match (name.as_ref(), symbol.as_ref()) {
                                 (Some(name), Some(symbol @ Symbol::Link)) => {
-                                    self.catch_link_lookup(name, symbol, data.process_data)?
+                                    self.catch_link_lookup(name, symbol, data.process_id)?
                                 }
                                 // Follow outputs for other throw events
                                 (Some(_), _) => {
@@ -107,7 +107,10 @@ impl Process {
                                 .get(id)
                                 .ok_or_else(|| Error::MissingProcessData(id.into()))?;
 
-                            match self.execute(vec![&0], &data.update(sp_data))?.as_slice() {
+                            match self
+                                .execute(vec![&0], &data.update(id, sp_data))?
+                                .as_slice()
+                            {
                                 // Boundary id returned. Fetch info from subprocess data as it don't exist in data.process_data
                                 [end_id, ..] => {
                                     let Some(Bpmn::Event {
@@ -300,46 +303,19 @@ impl Process {
         None
     }
 
-    // The returned local id can be in another process. Must revisit this and collect only for this process.
+    // Links in specified process.
     fn catch_link_lookup(
         &self,
         throw_event_name: &str,
         symbol: &Symbol,
-        _process_data: &[Bpmn],
+        process_id: &str,
     ) -> Result<&usize, Error> {
-        let link_id = self
-            .catch_event_links
-            .get(throw_event_name)
+        self.catch_event_links
+            .get(process_id)
+            .and_then(|links| links.get(throw_event_name))
             .ok_or_else(|| {
                 Error::MissingIntermediateCatchEvent(symbol.to_string(), throw_event_name.into())
-            })?;
-
-        // Additional checking in debug mode.
-        #[cfg(debug_assertions)]
-        {
-            // We must check if the link_id is in the current process space and expected type.
-            let Some(Bpmn::Event {
-                event: EventType::IntermediateCatch,
-                symbol: Some(Symbol::Link),
-                id,
-                ..
-            }) = _process_data.get(*link_id)
-            else {
-                return Err(Error::MissingIntermediateCatchEvent(
-                    symbol.to_string(),
-                    throw_event_name.into(),
-                ));
-            };
-
-            // Was the returned Id the same
-            if id.local() != link_id {
-                return Err(Error::MissingIntermediateCatchEvent(
-                    symbol.to_string(),
-                    throw_event_name.into(),
-                ));
-            }
-        }
-        Ok(link_id)
+            })
     }
 }
 
@@ -418,6 +394,7 @@ pub(super) type ExecuteResult<'a> = Result<Vec<&'a usize>, Error>;
 // Data for the execution engine.
 pub(super) struct ExecuteData<'a, T> {
     process_data: &'a Vec<Bpmn>,
+    process_id: &'a str,
     handler: &'a Eventhandler<T>,
     user_data: Data<T>,
     #[cfg(feature = "trace")]
@@ -427,12 +404,14 @@ pub(super) struct ExecuteData<'a, T> {
 impl<'a, T> ExecuteData<'a, T> {
     pub(super) fn new(
         process_data: &'a Vec<Bpmn>,
+        process_id: &'a str,
         handler: &'a Eventhandler<T>,
         user_data: Data<T>,
         #[cfg(feature = "trace")] trace: Sender<(&'static str, String)>,
     ) -> Self {
         Self {
             process_data,
+            process_id,
             handler,
             user_data,
             #[cfg(feature = "trace")]
@@ -441,9 +420,10 @@ impl<'a, T> ExecuteData<'a, T> {
     }
 
     // When we change to a sub process we must change process id and data.
-    fn update(&self, process_data: &'a Vec<Bpmn>) -> Self {
+    fn update(&self, process_id: &'a str, process_data: &'a Vec<Bpmn>) -> Self {
         Self {
             process_data,
+            process_id,
             handler: self.handler,
             user_data: self.user_data(),
             #[cfg(feature = "trace")]

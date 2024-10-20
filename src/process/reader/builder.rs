@@ -4,7 +4,7 @@ use crate::{error::Error, model::*, Process};
 pub(super) struct DataBuilder {
     data: HashMap<String, Vec<Bpmn>>,
     boundaries: HashMap<String, Vec<usize>>,
-    catch_event_links: HashMap<String, usize>,
+    catch_event_links: HashMap<String, HashMap<String, usize>>,
     process_stack: Vec<Vec<Bpmn>>,
     stack: Vec<Bpmn>,
     definitions_id: Option<String>,
@@ -64,7 +64,8 @@ impl DataBuilder {
     pub(super) fn end_process(&mut self) -> Result<(), Error> {
         if let Some(bpmn) = self.stack.pop() {
             if let Some(mut current) = self.process_stack.pop() {
-                self.register_data(&mut current);
+                let id = bpmn.id()?.to_string();
+                self.register_data(&id, &mut current);
                 let id = bpmn.id()?.to_string();
                 // Put the Bpmn model in parent scope and in 'data' it's related process data.
                 // Definitions collect all Processes
@@ -82,7 +83,7 @@ impl DataBuilder {
         Ok(())
     }
 
-    fn register_data(&mut self, data: &mut [Bpmn]) {
+    fn register_data(&mut self, process_id: &str, data: &mut [Bpmn]) {
         // Collect Bpmn id to index in array
         let bpmn_index: HashMap<String, usize> = data
             .iter()
@@ -131,6 +132,8 @@ impl DataBuilder {
                     && name.is_some()
                 {
                     self.catch_event_links
+                        .entry(process_id.to_string())
+                        .or_default()
                         .insert(name.clone().unwrap(), *id.local());
                 }
             }

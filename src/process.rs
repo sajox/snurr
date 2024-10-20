@@ -40,7 +40,7 @@ pub struct Process {
     data: HashMap<String, Vec<Bpmn>>,
     definitions_id: String,
     boundaries: HashMap<String, Vec<usize>>,
-    catch_event_links: HashMap<String, usize>,
+    catch_event_links: HashMap<String, HashMap<String, usize>>,
 }
 
 impl Process {
@@ -100,6 +100,7 @@ impl Process {
                     vec![&0],
                     &ExecuteData::new(
                         process_data,
+                        id,
                         handler,
                         Arc::clone(&data),
                         #[cfg(feature = "trace")]
