@@ -48,7 +48,7 @@ impl Process {
                         EventType::IntermediateThrow => {
                             match (name.as_ref(), symbol.as_ref()) {
                                 (Some(name), Some(symbol @ Symbol::Link)) => {
-                                    self.catch_link_lookup(name, symbol)?
+                                    self.catch_link_lookup(name, symbol, data.process_data)?
                                 }
                                 // Follow outputs for other throw events
                                 (Some(_), _) => {
@@ -300,10 +300,46 @@ impl Process {
         None
     }
 
-    fn catch_link_lookup(&self, throw_event_name: &str, symbol: &Symbol) -> Result<&usize, Error> {
-        self.catch_event_links.get(throw_event_name).ok_or_else(|| {
-            Error::MissingIntermediateCatchEvent(symbol.to_string(), throw_event_name.into())
-        })
+    // The Link name should be globally unique but the returned local id can be in another process.
+    fn catch_link_lookup(
+        &self,
+        throw_event_name: &str,
+        symbol: &Symbol,
+        _process_data: &[Bpmn],
+    ) -> Result<&usize, Error> {
+        let link_id = self
+            .catch_event_links
+            .get(throw_event_name)
+            .ok_or_else(|| {
+                Error::MissingIntermediateCatchEvent(symbol.to_string(), throw_event_name.into())
+            })?;
+
+        // Additional checking in debug mode.
+        #[cfg(debug_assertions)]
+        {
+            // We must check if the link_id is in the current process space and expected type.
+            let Some(Bpmn::Event {
+                event: EventType::IntermediateCatch,
+                symbol: Some(Symbol::Link),
+                id,
+                ..
+            }) = _process_data.get(*link_id)
+            else {
+                return Err(Error::MissingIntermediateCatchEvent(
+                    symbol.to_string(),
+                    throw_event_name.into(),
+                ));
+            };
+
+            // Was the returned Id the same
+            if id.local() != link_id {
+                return Err(Error::MissingIntermediateCatchEvent(
+                    symbol.to_string(),
+                    throw_event_name.into(),
+                ));
+            }
+        }
+        Ok(link_id)
     }
 }
 
