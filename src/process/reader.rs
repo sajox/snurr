@@ -9,25 +9,18 @@ use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 
 use crate::error::Error;
-use crate::model::*;
+use crate::{model::*, Process};
 
-#[derive(Debug)]
-pub(crate) struct ReaderResult {
-    pub data: HashMap<String, Vec<Bpmn>>,
-    pub boundaries: HashMap<String, Vec<usize>>,
-    pub definitions_id: String,
-}
-
-pub(crate) fn read_bpmn_str(s: &str) -> Result<ReaderResult, Error> {
+pub(super) fn read_bpmn_str(s: &str) -> Result<Process, Error> {
     read_bpmn(Reader::from_str(s))
 }
 
-pub(crate) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> Result<ReaderResult, Error> {
+pub(super) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> Result<Process, Error> {
     read_bpmn(Reader::from_file(path)?)
 }
 
 // Read BPMN content and return the ReaderResult containing a tuple with definitions ID and BPMN data.
-fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<ReaderResult, Error> {
+fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Process, Error> {
     let mut builder = DataBuilder::default();
     let mut buf = Vec::new();
     loop {
@@ -118,7 +111,7 @@ fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<ReaderResult, Error> {
         }
         buf.clear();
     }
-    builder.finish()
+    builder.try_into()
 }
 
 fn collect_attributes<'a>(bs: &'a quick_xml::events::BytesStart<'_>) -> HashMap<&'a [u8], String> {

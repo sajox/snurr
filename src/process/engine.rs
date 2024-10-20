@@ -48,7 +48,7 @@ impl Process {
                         EventType::IntermediateThrow => {
                             match (name.as_ref(), symbol.as_ref()) {
                                 (Some(name), Some(symbol @ Symbol::Link)) => {
-                                    self.catch_event_lookup(name, symbol)?
+                                    self.catch_link_lookup(name, symbol)?
                                 }
                                 // Follow outputs for other throw events
                                 (Some(_), _) => {
@@ -300,13 +300,10 @@ impl Process {
         None
     }
 
-    fn catch_event_lookup(&self, throw_event_name: &str, symbol: &Symbol) -> Result<&usize, Error> {
-        self.catch_events_ids
-            .get(throw_event_name)
-            .and_then(|map| map.get(symbol))
-            .ok_or_else(|| {
-                Error::MissingIntermediateCatchEvent(symbol.to_string(), throw_event_name.into())
-            })
+    fn catch_link_lookup(&self, throw_event_name: &str, symbol: &Symbol) -> Result<&usize, Error> {
+        self.catch_event_links.get(throw_event_name).ok_or_else(|| {
+            Error::MissingIntermediateCatchEvent(symbol.to_string(), throw_event_name.into())
+        })
     }
 }
 

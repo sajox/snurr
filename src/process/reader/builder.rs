@@ -1,10 +1,10 @@
-use super::ReaderResult;
-use crate::{error::Error, model::*};
+use crate::{error::Error, model::*, Process};
 
 #[derive(Default)]
 pub(super) struct DataBuilder {
     data: HashMap<String, Vec<Bpmn>>,
     boundaries: HashMap<String, Vec<usize>>,
+    catch_event_links: HashMap<String, usize>,
     process_stack: Vec<Vec<Bpmn>>,
     stack: Vec<Bpmn>,
     definitions_id: Option<String>,
@@ -106,9 +106,12 @@ impl DataBuilder {
         data.iter_mut().for_each(|bpmn| match bpmn {
             Bpmn::Activity { outputs, .. } => outputs.update_local_ids(&bpmn_index),
             Bpmn::Event {
+                event,
                 id,
                 outputs,
                 attached_to_ref,
+                symbol,
+                name,
                 ..
             } => {
                 outputs.update_local_ids(&bpmn_index);
@@ -121,6 +124,14 @@ impl DataBuilder {
                         .entry(attached_to_ref.bpmn().to_owned())
                         .or_default()
                         .push(*id.local());
+                }
+
+                if *event == EventType::IntermediateCatch
+                    && *symbol == Some(Symbol::Link)
+                    && name.is_some()
+                {
+                    self.catch_event_links
+                        .insert(name.clone().unwrap(), *id.local());
                 }
             }
             Bpmn::Gateway {
@@ -137,12 +148,17 @@ impl DataBuilder {
             _ => {}
         });
     }
+}
 
-    pub(super) fn finish(self) -> Result<ReaderResult, Error> {
-        Ok(ReaderResult {
-            data: self.data,
-            boundaries: self.boundaries,
-            definitions_id: self.definitions_id.ok_or(Error::MissingDefinitionsId)?,
+impl TryFrom<DataBuilder> for Process {
+    type Error = Error;
+
+    fn try_from(builder: DataBuilder) -> Result<Self, Self::Error> {
+        Ok(Self {
+            data: builder.data,
+            definitions_id: builder.definitions_id.ok_or(Error::MissingDefinitionsId)?,
+            boundaries: builder.boundaries,
+            catch_event_links: builder.catch_event_links,
         })
     }
 }

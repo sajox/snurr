@@ -128,7 +128,7 @@ impl Display for Boundary {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum EventType {
     Boundary,
     End,

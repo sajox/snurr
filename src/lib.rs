@@ -69,7 +69,6 @@ mod error;
 mod handler;
 mod model;
 mod process;
-mod reader;
 
 pub use handler::{Data, Eventhandler, TaskResult};
 pub use model::{Boundary, Symbol, With};

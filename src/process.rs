@@ -1,5 +1,6 @@
 mod engine;
 mod parallel;
+mod reader;
 mod replay;
 mod scaffold;
 
@@ -7,6 +8,7 @@ mod scaffold;
 mod trace;
 
 use engine::ExecuteData;
+use reader::{read_bpmn_file, read_bpmn_str};
 use std::{
     path::Path,
     str::FromStr,
@@ -18,9 +20,8 @@ use trace::{tracer, Trace};
 
 use crate::{
     error::Error,
-    model::{Bpmn, EventType, HashMap},
-    reader::{read_bpmn_file, read_bpmn_str, ReaderResult},
-    Eventhandler, Symbol,
+    model::{Bpmn, HashMap},
+    Eventhandler,
 };
 
 /// Process result from a process run.
@@ -39,7 +40,7 @@ pub struct Process {
     data: HashMap<String, Vec<Bpmn>>,
     definitions_id: String,
     boundaries: HashMap<String, Vec<usize>>,
-    catch_events_ids: HashMap<String, HashMap<Symbol, usize>>,
+    catch_event_links: HashMap<String, usize>,
 }
 
 impl Process {
@@ -53,35 +54,7 @@ impl Process {
     /// }
     /// ```
     pub fn new(path: impl AsRef<Path>) -> Result<Self, Error> {
-        Self::assemble_data(read_bpmn_file(path)?)
-    }
-
-    fn assemble_data(result: ReaderResult) -> Result<Self, Error> {
-        // Collect all IntermediateCatchEvents
-        let mut catch_events_ids: HashMap<String, HashMap<Symbol, usize>> = HashMap::new();
-
-        result.data.values().for_each(|process: &Vec<Bpmn>| {
-            process.iter().for_each(|bpmn| {
-                if let Bpmn::Event {
-                    id,
-                    event: EventType::IntermediateCatch,
-                    symbol: Some(symbol),
-                    name: Some(name),
-                    ..
-                } = bpmn
-                {
-                    let entry = catch_events_ids.entry(name.into()).or_default();
-                    entry.insert(symbol.clone(), *id.local());
-                }
-            });
-        });
-
-        Ok(Self {
-            data: result.data,
-            definitions_id: result.definitions_id,
-            boundaries: result.boundaries,
-            catch_events_ids,
-        })
+        read_bpmn_file(path)
     }
 
     /// Run the process and return the `ProcessResult` or an `Error`.
@@ -164,7 +137,7 @@ impl FromStr for Process {
     /// }
     /// ```
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::assemble_data(read_bpmn_str(s)?)
+        read_bpmn_str(s)
     }
 }
 
