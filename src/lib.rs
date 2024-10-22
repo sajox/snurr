@@ -70,6 +70,7 @@ mod handler;
 mod model;
 mod process;
 
+pub use error::{Error, Result};
 pub use handler::{Data, Eventhandler, TaskResult};
 pub use model::{Boundary, Symbol, With};
 pub use process::{Process, ProcessResult};

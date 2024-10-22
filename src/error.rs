@@ -1,3 +1,5 @@
+pub type Result<T> = std::result::Result<T, Error>;
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("BPMN type {0} missing id")]
