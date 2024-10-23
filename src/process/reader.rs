@@ -19,7 +19,7 @@ pub(super) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> Result<Process, Error> 
     read_bpmn(Reader::from_file(path)?)
 }
 
-// Read BPMN content and return the ReaderResult containing a tuple with definitions ID and BPMN data.
+// Read BPMN content and return the Process
 fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Process, Error> {
     let mut builder = DataBuilder::default();
     let mut buf = Vec::new();

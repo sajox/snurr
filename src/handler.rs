@@ -11,11 +11,11 @@ pub type Data<T> = Arc<Mutex<T>>;
 /// Task result type
 pub type TaskResult = Option<Boundary>;
 
-/// Task callback that use `Data` type as input and return a result containing a success unit type ()
-/// or a failure that contains a `Symbol` for an alternate flow.
+/// Task callback that use `Data` type as input and return a None for regular flow
+/// or Some(Boundary) for an alternate flow.
 type TaskCallback<T> = Box<dyn Fn(Data<T>) -> TaskResult + Sync>;
 
-/// Gateway callback that use `Data` type as input and return a `Vec` with flow(s) to take
+/// Gateway callback that use `Data` type as input and return a `With` enum.
 type GatewayCallback<T> = Box<dyn Fn(Data<T>) -> With + Sync>;
 
 /// Event handler to add task or gateway closures by name or id

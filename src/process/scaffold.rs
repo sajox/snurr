@@ -106,8 +106,8 @@ impl<'a> Scaffold<'a> {
         self.gateways.push(Gateway { bpmn, names });
     }
 
-    /// Generate code from all the task and gateways to the given file path.
-    /// No file is allowed to exist at the target location.
+    // Generate code from all the task and gateways to the given file path.
+    // No file is allowed to exist at the target location.
     fn create(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
         let mut content = vec![];
         content.push(
