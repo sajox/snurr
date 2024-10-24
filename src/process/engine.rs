@@ -191,7 +191,12 @@ impl Process {
                         | GatewayType::Inclusive => {
                             let response = data.handler.run_gateway(name_or_id, data.user_data());
                             match response {
-                                With::Flow(value) => {
+                                With::Flow(value)
+                                    if matches!(
+                                        gateway,
+                                        GatewayType::Exclusive | GatewayType::Inclusive
+                                    ) =>
+                                {
                                     output_by_name_or_id(value, &outputs.ids(), data.process_data)
                                         .ok_or_else(|| {
                                         Error::MissingOutput(
@@ -245,6 +250,11 @@ impl Process {
                                         )
                                     })?
                                 }
+                                With::Flow(_) => {
+                                    return Err(Error::BpmnRequirement(format!(
+                                        "{gateway} cannot use conditional expression"
+                                    )))
+                                }
                                 With::Fork(_) => {
                                     return Err(Error::BpmnRequirement(format!(
                                         "{gateway} cannot fork"
@@ -285,22 +295,23 @@ impl Process {
         search_symbol: &Symbol,
         process_data: &'a [Bpmn],
     ) -> Option<&usize> {
-        for bpmn in self
-            .boundaries
+        self.boundaries
             .get(activity_id)?
             .iter()
             .filter_map(|index| process_data.get(*index))
-        {
-            if let Bpmn::Event {
-                symbol, id, name, ..
-            } = bpmn
-            {
+            .filter_map(|bpmn| {
+                let Bpmn::Event {
+                    symbol, id, name, ..
+                } = bpmn
+                else {
+                    return None;
+                };
                 if symbol.as_ref() == Some(search_symbol) && search_name == name.as_deref() {
                     return Some(id.local());
                 }
-            }
-        }
-        None
+                None
+            })
+            .next()
     }
 
     // Links in specified process.
@@ -357,9 +368,18 @@ fn output_by_symbol<'a>(
                                 || *search == name.as_deref())
                     }
                     Bpmn::Event {
-                        id, symbol, name, ..
+                        id,
+                        symbol:
+                            Some(
+                                symbol @ (Symbol::Message
+                                | Symbol::Signal
+                                | Symbol::Timer
+                                | Symbol::Conditional),
+                            ),
+                        name,
+                        ..
                     } => {
-                        symbol.as_ref() == Some(search_symbol)
+                        symbol == search_symbol
                             && (search.filter(|&sn| sn == id.bpmn()).is_some()
                                 || *search == name.as_deref())
                     }
@@ -381,7 +401,11 @@ fn output_by_name_or_id<'a>(
         .iter()
         .filter(|index| {
             if let Some(Bpmn::SequenceFlow { id, name, .. }) = process_data.get(***index) {
-                return name.as_deref() == Some(search.as_ref()) || id == search.as_ref();
+                return name
+                    .as_deref()
+                    .filter(|&name| name == search.as_ref())
+                    .is_some()
+                    || id == search.as_ref();
             }
             false
         })

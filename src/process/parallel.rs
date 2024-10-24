@@ -5,8 +5,8 @@ use super::{
 use crate::error::Error;
 
 impl Process {
-    // If more than 1 start id exist then all id:s run in parallel with rayon. When all threads terminates then the
-    // next id is returned to continue on. Thread terminates on a Parallel or Inclusive Join and End events.
+    // When all threads terminates then the next id is returned to continue on.
+    // Thread terminates on a Parallel or Inclusive Join and End events.
     pub(super) fn maybe_parallelize<'a, T>(
         &'a self,
         start_ids: Vec<&'a usize>,

@@ -1,5 +1,7 @@
 use crate::{error::Error, model::*, Process};
 
+const BUILD_PROCESS_ERROR_MSG: &str = "couldn't build process";
+
 #[derive(Default)]
 pub(super) struct DataBuilder {
     data: HashMap<String, Vec<Bpmn>>,
@@ -62,28 +64,23 @@ impl DataBuilder {
     }
 
     pub(super) fn end_process(&mut self) -> Result<(), Error> {
-        if let Some(bpmn) = self.stack.pop() {
-            if let Some(mut current) = self.process_stack.pop() {
-                let id = bpmn.id()?.to_string();
-                self.register_data(&id, &mut current);
-                let id = bpmn.id()?.to_string();
-                // Put the Bpmn model in parent scope and in 'data' it's related process data.
-                // Definitions collect all Processes
-                // Process collect all related sub processes
-                if let Some(parent) = self.process_stack.last_mut() {
-                    parent.push(bpmn);
-                } else {
-                    // No parent, must be Definitions.
-                    self.definitions_id = Some(id.clone());
-                }
-                self.data.insert(id, current);
-            }
-        }
+        let Some((bpmn, mut data)) = self.stack.pop().zip(self.process_stack.pop()) else {
+            return Err(Error::Builder(BUILD_PROCESS_ERROR_MSG.into()));
+        };
 
+        let id = bpmn.id()?.to_string();
+        self.update_data(&id, &mut data);
+        // Definitions collect all Processes
+        // Processes collect all related sub processes
+        match self.process_stack.last_mut() {
+            Some(parent_data) => parent_data.push(bpmn),
+            None => self.definitions_id = Some(id.clone()),
+        }
+        self.data.insert(id, data);
         Ok(())
     }
 
-    fn register_data(&mut self, process_id: &str, data: &mut [Bpmn]) {
+    fn update_data(&mut self, process_id: &str, data: &mut [Bpmn]) {
         // Collect Bpmn id to index in array
         let bpmn_index: HashMap<String, usize> = data
             .iter()

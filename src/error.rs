@@ -50,6 +50,9 @@ pub enum Error {
     #[error("{0}")]
     BpmnRequirement(String),
 
+    #[error("{0}")]
+    Builder(String),
+
     #[error(transparent)]
     File(#[from] quick_xml::Error),
 
