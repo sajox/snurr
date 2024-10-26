@@ -188,7 +188,9 @@ handler.add_task("Name or id", |input| {
 
 ## Gateways
 
-Only exclusive, event-based and inclusive gateways need to be registered. **Parallel gateways** run **all** available flows. If a gateway name is given then every gateway with same name will use the same closure. Register a gateway by **name** (if it exist) or **id** and return the flow taken by **name** or **id**
+Only branching/forking exclusive, event-based and inclusive gateways need to be added. If a gateway name is given then every gateway with same name will use the same closure. Register a gateway by **name** (if it exist) or **id** and return the flow taken by **name** or **id**. 
+
+**NOTE** No merging/joining gateway need to be added from the BPMN diagram.
 
 ![Exclusive, inclusive and parallel gateway](/assets/images/gateways.png)
 
