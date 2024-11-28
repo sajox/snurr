@@ -19,7 +19,7 @@ impl Process {
         &'a self,
         start_ids: Vec<&usize>,
         data: &ExecuteData<'a, T>,
-    ) -> ExecuteResult<'_>
+    ) -> ExecuteResult<'a>
     where
         T: Send,
     {
@@ -294,7 +294,7 @@ impl Process {
         search_name: Option<&str>,
         search_symbol: &Symbol,
         process_data: &'a [Bpmn],
-    ) -> Option<&usize> {
+    ) -> Option<&'a usize> {
         self.boundaries
             .get(activity_id)?
             .iter()

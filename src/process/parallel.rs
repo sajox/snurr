@@ -11,7 +11,7 @@ impl Process {
         &'a self,
         start_ids: Vec<&'a usize>,
         data: &ExecuteData<'a, T>,
-    ) -> Result<Option<&usize>, Error>
+    ) -> Result<Option<&'a usize>, Error>
     where
         T: Send,
     {
