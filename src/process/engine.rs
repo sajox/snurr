@@ -8,10 +8,10 @@ use std::sync::mpsc::Sender;
 use log::info;
 
 use crate::{
+    Data, Eventhandler, Process, Symbol,
     error::Error,
     model::{ActivityType, Bpmn, BpmnLocal, EventType, GatewayType, With},
     process::parallel::parallelize_helper,
-    Data, Eventhandler, Process, Symbol,
 };
 
 impl Process {
@@ -167,7 +167,7 @@ impl Process {
                             return Err(Error::BpmnRequirement(
                                 "Event gateway must have at least two outgoing sequence flows"
                                     .into(),
-                            ))
+                            ));
                         }
                     }
                 }
@@ -226,7 +226,7 @@ impl Process {
                                                 return Err(Error::MissingOutput(
                                                     gateway.to_string(),
                                                     name_or_id.to_string(),
-                                                ))
+                                                ));
                                             }
                                             [first] => first,
                                             [..] => {
@@ -253,17 +253,17 @@ impl Process {
                                 With::Flow(_) => {
                                     return Err(Error::BpmnRequirement(format!(
                                         "{gateway} cannot use conditional expression"
-                                    )))
+                                    )));
                                 }
                                 With::Fork(_) => {
                                     return Err(Error::BpmnRequirement(format!(
                                         "{gateway} cannot fork"
-                                    )))
+                                    )));
                                 }
                                 With::Symbol(_, _) => {
                                     return Err(Error::BpmnRequirement(format!(
                                         "{gateway} cannot do decision based on events"
-                                    )))
+                                    )));
                                 }
                             }
                         }

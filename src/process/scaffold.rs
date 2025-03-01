@@ -1,9 +1,9 @@
 use std::{collections::HashSet, io::Write, path::Path};
 
 use crate::{
+    Process,
     error::Error,
     model::{ActivityType, Bpmn, GatewayType, Symbol},
-    Process,
 };
 
 impl Process {

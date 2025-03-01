@@ -1,7 +1,7 @@
 [package]
 name = "snurr"
-version = "0.7.0"
-edition = "2021"
+version = "0.8.0-wip"
+edition = "2024"
 authors = ["sajox"]
 description = "Read BPMN 2.0 files and run the process flow"
 repository = "https://github.com/sajox/snurr"
