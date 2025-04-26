@@ -64,9 +64,8 @@ impl<T> Eventhandler<T> {
     pub(crate) fn run_task(&self, key: &str, data: Data<T>) -> TaskResult {
         if let Some(func) = self.task_func.get(key) {
             return (*func)(data);
-        } else {
-            warn!("{}: {}", MISSING_FUNCTION, key);
         }
+        warn!("{}: {}", MISSING_FUNCTION, key);
         None
     }
 

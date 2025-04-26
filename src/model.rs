@@ -150,7 +150,7 @@ impl TryFrom<&[u8]> for EventType {
             _ => {
                 return Err(Error::TypeNotImplemented(
                     std::str::from_utf8(value)?.into(),
-                ))
+                ));
             }
         })
     }
@@ -194,7 +194,7 @@ impl TryFrom<&[u8]> for ActivityType {
             _ => {
                 return Err(Error::TypeNotImplemented(
                     std::str::from_utf8(value)?.into(),
-                ))
+                ));
             }
         })
     }
@@ -226,7 +226,7 @@ impl TryFrom<&[u8]> for GatewayType {
             _ => {
                 return Err(Error::TypeNotImplemented(
                     std::str::from_utf8(value)?.into(),
-                ))
+                ));
             }
         })
     }
@@ -254,7 +254,7 @@ impl TryFrom<&[u8]> for DirectionType {
             _ => {
                 return Err(Error::TypeNotImplemented(
                     std::str::from_utf8(value)?.into(),
-                ))
+                ));
             }
         })
     }
@@ -305,7 +305,7 @@ impl TryFrom<&[u8]> for Symbol {
             _ => {
                 return Err(Error::TypeNotImplemented(
                     std::str::from_utf8(value)?.into(),
-                ))
+                ));
             }
         };
         Ok(ty)

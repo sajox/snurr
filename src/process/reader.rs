@@ -1,7 +1,6 @@
 mod builder;
 
 use std::io::BufRead;
-use std::path::Path;
 
 use builder::DataBuilder;
 use log::error;
@@ -9,18 +8,10 @@ use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 
 use crate::error::Error;
-use crate::{model::*, Process};
-
-pub(super) fn read_bpmn_str(s: &str) -> Result<Process, Error> {
-    read_bpmn(Reader::from_str(s))
-}
-
-pub(super) fn read_bpmn_file<P: AsRef<Path>>(path: P) -> Result<Process, Error> {
-    read_bpmn(Reader::from_file(path)?)
-}
+use crate::{Process, model::*};
 
 // Read BPMN content and return the Process
-fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Process, Error> {
+pub(super) fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Process, Error> {
     let mut builder = DataBuilder::default();
     let mut buf = Vec::new();
     loop {
@@ -133,7 +124,10 @@ mod tests {
 
     #[test]
     fn load_file() -> Result<(), Box<dyn std::error::Error>> {
-        println!("{:#?}", read_bpmn_file("examples/example.bpmn")?);
+        println!(
+            "{:#?}",
+            read_bpmn(quick_xml::Reader::from_file("examples/example.bpmn")?)
+        );
         Ok(())
     }
 }

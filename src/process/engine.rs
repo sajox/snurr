@@ -300,14 +300,14 @@ impl Process {
             .iter()
             .filter_map(|index| process_data.get(*index))
             .filter_map(|bpmn| {
-                let Bpmn::Event {
+                // TODO rewrite with let chains when stable
+                if let Bpmn::Event {
                     symbol, id, name, ..
                 } = bpmn
-                else {
-                    return None;
-                };
-                if symbol.as_ref() == Some(search_symbol) && search_name == name.as_deref() {
-                    return Some(id.local());
+                {
+                    if symbol.as_ref() == Some(search_symbol) && search_name == name.as_deref() {
+                        return Some(id.local());
+                    }
                 }
                 None
             })

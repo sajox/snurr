@@ -8,7 +8,6 @@ mod scaffold;
 mod trace;
 
 use engine::ExecuteData;
-use reader::{read_bpmn_file, read_bpmn_str};
 use std::{
     path::Path,
     str::FromStr,
@@ -16,12 +15,12 @@ use std::{
 };
 
 #[cfg(feature = "trace")]
-use trace::{tracer, Trace};
+use trace::{Trace, tracer};
 
 use crate::{
+    Eventhandler,
     error::Error,
     model::{Bpmn, HashMap},
-    Eventhandler,
 };
 
 /// Process result from a process run.
@@ -54,7 +53,7 @@ impl Process {
     /// }
     /// ```
     pub fn new(path: impl AsRef<Path>) -> Result<Self, Error> {
-        read_bpmn_file(path)
+        reader::read_bpmn(quick_xml::Reader::from_file(path)?)
     }
 
     /// Run the process and return the `ProcessResult` or an `Error`.
@@ -138,7 +137,7 @@ impl FromStr for Process {
     /// }
     /// ```
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        read_bpmn_str(s)
+        reader::read_bpmn(quick_xml::Reader::from_str(s))
     }
 }
 

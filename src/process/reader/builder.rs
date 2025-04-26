@@ -1,4 +1,4 @@
-use crate::{error::Error, model::*, Process};
+use crate::{Process, error::Error, model::*};
 
 const BUILD_PROCESS_ERROR_MSG: &str = "couldn't build process";
 
@@ -85,22 +85,9 @@ impl DataBuilder {
         let bpmn_index: HashMap<String, usize> = data
             .iter()
             .enumerate()
-            .filter_map(|(index, bpmn)| {
-                let bpmn_id = match bpmn {
-                    Bpmn::Activity { id, .. }
-                    | Bpmn::Event {
-                        id: BpmnLocal(id, _),
-                        ..
-                    }
-                    | Bpmn::Gateway { id, .. }
-                    | Bpmn::SequenceFlow { id, .. } => id.to_string(),
-                    _ => return None,
-                };
-                Some((bpmn_id, index))
-            })
+            .filter_map(|(index, bpmn)| bpmn.id().ok().map(|id| (id.to_string(), index)))
             .collect();
 
-        // Update information
         data.iter_mut().for_each(|bpmn| match bpmn {
             Bpmn::Activity { outputs, .. } => outputs.update_local_ids(&bpmn_index),
             Bpmn::Event {
@@ -142,9 +129,7 @@ impl DataBuilder {
                     update_local_id(default, &bpmn_index);
                 }
             }
-            Bpmn::SequenceFlow { target_ref, .. } => {
-                update_local_id(target_ref, &bpmn_index);
-            }
+            Bpmn::SequenceFlow { target_ref, .. } => update_local_id(target_ref, &bpmn_index),
             _ => {}
         });
     }
