@@ -1,4 +1,6 @@
-use std::{collections::VecDeque, sync::Arc};
+mod token_stack;
+
+use std::sync::Arc;
 
 #[cfg(feature = "trace")]
 use crate::process::replay;
@@ -6,13 +8,32 @@ use crate::process::replay;
 use std::sync::mpsc::Sender;
 
 use log::info;
+use token_stack::TokenStack;
 
 use crate::{
     Data, Eventhandler, Process, Symbol,
     error::Error,
     model::{ActivityType, Bpmn, BpmnLocal, EventType, GatewayType, With},
-    process::parallel::parallelize_helper,
 };
+
+#[derive(Debug)]
+enum Return<'a> {
+    Fork(Vec<&'a usize>),
+    Join(&'a usize),
+    End(Option<&'a usize>),
+}
+
+macro_rules! maybe_fork {
+    ($self:expr, $outputs:expr, $data:expr, $ty:expr, $noi:expr) => {
+        if $outputs.len() <= 1 {
+            $outputs
+                .first()
+                .ok_or_else(|| Error::MissingOutput($ty.to_string(), $noi.to_string()))?
+        } else {
+            return Ok(Return::Fork($outputs.ids()));
+        }
+    };
+}
 
 impl Process {
     pub(super) fn execute<'a, T>(
@@ -23,10 +44,86 @@ impl Process {
     where
         T: Send,
     {
-        let mut results: Vec<&usize> = vec![];
-        let mut queue = VecDeque::from(start_ids);
-        while let Some(current_id) = queue.pop_front() {
-            let next_id = match data
+        let mut token_stack = TokenStack::default();
+        let mut bpmn_queue = vec![start_ids];
+        while let Some(start_ids) = bpmn_queue.pop() {
+            let tokens = start_ids.len();
+
+            // Run flow single or multi threaded
+            let (other, forks): (Vec<_>, Vec<_>) = {
+                let (oks, mut errors): (Vec<_>, Vec<_>) = {
+                    #[cfg(feature = "parallel")]
+                    {
+                        use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+                        start_ids
+                            .par_iter()
+                            .map(|output| self.flow(output, data))
+                            .partition(Result::is_ok)
+                    }
+
+                    #[cfg(not(feature = "parallel"))]
+                    start_ids
+                        .iter()
+                        .map(|output| self.flow(output, data))
+                        .partition(Result::is_ok)
+                };
+
+                if let Some(result) = errors.pop() {
+                    result?;
+                }
+
+                oks.into_iter()
+                    .filter_map(Result::ok)
+                    .partition(|a| matches!(a, Return::End(_) | Return::Join(_)))
+            };
+
+            // Handle join and end
+            for result in other {
+                match result {
+                    // When all tokens has arrived, then put output_id on the bpmn_queue to be processed.
+                    Return::Join(output_id) => {
+                        if token_stack.remove_token() {
+                            bpmn_queue.push(vec![output_id]);
+                        }
+                    }
+                    // A flow has finished, reduce token queue.
+                    Return::End(output) => {
+                        token_stack.remove_token();
+
+                        // Currently only a subprocess use the end symbol and should not end with multiple tokens.
+                        if let Some(symbol_id) = output {
+                            if bpmn_queue.is_empty() && tokens == 1 {
+                                return Ok(vec![symbol_id]);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            // Add fork flows after every Join or End. Oterwise we might add a Fork, and a Join reduce wrong token in the queue.
+            for fork in forks {
+                if let Return::Fork(vec) = fork {
+                    token_stack.push(vec.len());
+                    bpmn_queue.push(vec);
+                }
+            }
+        }
+        Ok(vec![])
+    }
+
+    // Each flow process one "token" and returns on a Fork, Join or End.
+    fn flow<'a, T>(
+        &'a self,
+        start_id: &usize,
+        data: &ExecuteData<'a, T>,
+    ) -> Result<Return<'a>, Error>
+    where
+        T: Send,
+    {
+        let mut current_id = start_id;
+        loop {
+            current_id = match data
                 .process_data
                 .get(*current_id)
                 .ok_or_else(|| Error::MisssingBpmnData(current_id.to_string()))?
@@ -43,7 +140,7 @@ impl Process {
                     info!("{}: {}", event, name_or_id);
                     match event {
                         EventType::Start | EventType::IntermediateCatch | EventType::Boundary => {
-                            parallelize_helper!(self, outputs, data, event, name_or_id)
+                            maybe_fork!(self, outputs, data, event, name_or_id)
                         }
                         EventType::IntermediateThrow => {
                             match (name.as_ref(), symbol.as_ref()) {
@@ -52,7 +149,7 @@ impl Process {
                                 }
                                 // Follow outputs for other throw events
                                 (Some(_), _) => {
-                                    parallelize_helper!(self, outputs, data, event, name_or_id)
+                                    maybe_fork!(self, outputs, data, event, name_or_id)
                                 }
                                 _ => Err(Error::MissingIntermediateThrowEventName(bid.into()))?,
                             }
@@ -60,9 +157,9 @@ impl Process {
                         EventType::End => {
                             if symbol.is_some() {
                                 // return the End Id so parent can check info.
-                                results.push(lid);
+                                return Ok(Return::End(Some(lid)));
                             }
-                            continue;
+                            break;
                         }
                     }
                 }
@@ -98,7 +195,7 @@ impl Process {
                                         )
                                     })?
                             } else {
-                                parallelize_helper!(self, outputs, data, activity, name_or_id)
+                                maybe_fork!(self, outputs, data, activity, name_or_id)
                             }
                         }
                         ActivityType::SubProcess => {
@@ -136,7 +233,7 @@ impl Process {
                                     })?
                                 }
                                 // Continue from subprocess
-                                _ => parallelize_helper!(self, outputs, data, activity, name_or_id),
+                                _ => maybe_fork!(self, outputs, data, activity, name_or_id),
                             }
                         }
                     }
@@ -160,8 +257,7 @@ impl Process {
                     match gateway {
                         GatewayType::Exclusive => first,
                         GatewayType::Inclusive | GatewayType::Parallel => {
-                            results.push(first);
-                            continue;
+                            return Ok(Return::Join(first));
                         }
                         GatewayType::EventBased => {
                             return Err(Error::BpmnRequirement(
@@ -221,20 +317,15 @@ impl Process {
                                             })
                                             .collect();
 
-                                        match responses.as_slice() {
-                                            [] => {
-                                                return Err(Error::MissingOutput(
+                                        if responses.len() <= 1 {
+                                            responses.first().ok_or_else(|| {
+                                                Error::MissingOutput(
                                                     gateway.to_string(),
                                                     name_or_id.to_string(),
-                                                ));
-                                            }
-                                            [first] => first,
-                                            [..] => {
-                                                match self.maybe_parallelize(responses, data)? {
-                                                    Some(val) => val,
-                                                    None => continue,
-                                                }
-                                            }
+                                                )
+                                            })?
+                                        } else {
+                                            return Ok(Return::Fork(responses));
                                         }
                                     }
                                 }
@@ -268,7 +359,7 @@ impl Process {
                             }
                         }
                         GatewayType::Parallel => {
-                            parallelize_helper!(self, outputs, data, gateway, name_or_id)
+                            maybe_fork!(self, outputs, data, gateway, name_or_id)
                         }
                     }
                 }
@@ -283,9 +374,8 @@ impl Process {
                 }
                 bpmn => return Err(Error::TypeNotImplemented(format!("{bpmn:?}"))),
             };
-            queue.push_back(next_id);
         }
-        Ok(results)
+        Ok(Return::End(None))
     }
 
     fn boundary_lookup<'a>(

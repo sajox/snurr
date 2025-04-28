@@ -1,5 +1,4 @@
 mod engine;
-mod parallel;
 mod reader;
 mod replay;
 mod scaffold;

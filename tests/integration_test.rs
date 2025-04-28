@@ -429,6 +429,16 @@ fn parallel_gateway_not_all_joined() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn parallel_multi() -> Result<()> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+    let bpmn = Process::new("tests/files/parallel_multi.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 5);
+    Ok(())
+}
+
 #[ignore]
 #[test]
 fn parallel_unbalanced() -> Result<()> {
@@ -496,5 +506,21 @@ fn event_gateway_blank_symbol() -> Result<()> {
     let bpmn = Process::new("tests/files/event_gateway.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
     assert_eq!(pr.result.count, 3);
+    Ok(())
+}
+
+#[test]
+fn single_flow() -> Result<()> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+
+    handler.add_gateway("GW A", |_| A);
+    handler.add_gateway("GW B", |_| A);
+    handler.add_gateway("GW C", |_| A);
+    handler.add_gateway("GW D", |_| A);
+
+    let bpmn = Process::new("tests/files/single_flow.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 18);
     Ok(())
 }

@@ -42,10 +42,11 @@
       <bpmn:incoming>Flow_0ejspuh</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_0ejspuh" sourceRef="Activity_1sqf3en" targetRef="Event_1nz8r38" />
+    <bpmn:sequenceFlow id="Flow_1x7bjx4" sourceRef="Activity_1tat6uw" targetRef="Event_0c1hzg9" />
     <bpmn:endEvent id="Event_0c1hzg9">
       <bpmn:incoming>Flow_1x7bjx4</bpmn:incoming>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_1rsb3oi" />
     </bpmn:endEvent>
-    <bpmn:sequenceFlow id="Flow_1x7bjx4" sourceRef="Activity_1tat6uw" targetRef="Event_0c1hzg9" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_1">
@@ -77,7 +78,7 @@
       <bpmndi:BPMNShape id="Event_1nz8r38_di" bpmnElement="Event_1nz8r38">
         <dc:Bounds x="902" y="312" width="36" height="36" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_0c1hzg9_di" bpmnElement="Event_0c1hzg9">
+      <bpmndi:BPMNShape id="Event_0pzs1y8_di" bpmnElement="Event_0c1hzg9">
         <dc:Bounds x="592" y="202" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_19vikyb_di" bpmnElement="Flow_19vikyb">
