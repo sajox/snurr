@@ -50,7 +50,7 @@ impl Process {
             let tokens = start_ids.len();
 
             // Run flow single or multi threaded
-            let (other, forks): (Vec<_>, Vec<_>) = {
+            let (join_and_ends, forks): (Vec<_>, Vec<_>) = {
                 let (oks, mut errors): (Vec<_>, Vec<_>) = {
                     #[cfg(feature = "parallel")]
                     {
@@ -77,25 +77,38 @@ impl Process {
                     .partition(|a| matches!(a, Return::End(_) | Return::Join(_)))
             };
 
-            // Handle join and end
-            for result in other {
-                match result {
-                    // When all tokens has arrived, then put output_id on the bpmn_queue to be processed.
-                    Return::Join(output_id) => {
-                        if token_stack.remove_token() {
-                            bpmn_queue.push(vec![output_id]);
-                        }
-                    }
-                    // A flow has finished, reduce token queue.
-                    Return::End(output) => {
-                        token_stack.remove_token();
+            let tokens_to_reduce = join_and_ends.len();
+            let mut join_ids = None;
 
+            for result in join_and_ends {
+                match result {
+                    Return::Join(output_id) => {
+                        join_ids.get_or_insert(vec![]).push(output_id);
+                    }
+                    Return::End(output) => {
                         // Currently only a subprocess use the end symbol and should not end with multiple tokens.
                         if let Some(symbol_id) = output {
                             if bpmn_queue.is_empty() && tokens == 1 {
                                 return Ok(vec![symbol_id]);
                             }
                         }
+                    }
+                    _ => {}
+                }
+            }
+
+            if let Some(output_ids) = join_ids.take_if(|_| token_stack.remove(tokens_to_reduce)) {
+                match output_ids.as_slice() {
+                    // Test if diagram is balanced in debug mode.
+                    // Check if all result ids is the same. If not. Match on row below.
+                    #[cfg(debug_assertions)]
+                    arr @ [id, ..] if arr.iter().all(|item| item == id) => {
+                        bpmn_queue.push(vec![id])
+                    }
+                    _arr @ [id, ..] => {
+                        #[cfg(debug_assertions)]
+                        log::error!("unbalanced BPMN diagram detected! {:?}", _arr);
+                        bpmn_queue.push(vec![id]);
                     }
                     _ => {}
                 }

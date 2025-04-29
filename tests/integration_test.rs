@@ -430,6 +430,16 @@ fn parallel_gateway_not_all_joined() -> Result<()> {
 }
 
 #[test]
+fn parallel_gateway_not_all_joined_inverse() -> Result<()> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+    let bpmn = Process::new("tests/files/parallel_gateway_not_all_joined_inverse.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 4);
+    Ok(())
+}
+
+#[test]
 fn parallel_multi() -> Result<()> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
     handler.add_task(COUNT_1, func_cnt(1));
