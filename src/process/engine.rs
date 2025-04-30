@@ -12,7 +12,10 @@ use token_stack::TokenStack;
 
 use crate::{
     Data, Eventhandler, Process, Symbol,
-    error::Error,
+    error::{
+        AT_LEAST_TWO_OUTGOING, Error, cannot_do_events, cannot_fork, cannot_use_cond_expr,
+        cannot_use_default,
+    },
     model::{ActivityType, Bpmn, BpmnLocal, EventType, GatewayType, With},
 };
 
@@ -85,13 +88,9 @@ impl Process {
                     Return::Join(output_id) => {
                         join_ids.get_or_insert(vec![]).push(output_id);
                     }
-                    Return::End(output) => {
-                        // Currently only a subprocess use the end symbol and should not end with multiple tokens.
-                        if let Some(symbol_id) = output {
-                            if bpmn_queue.is_empty() && tokens == 1 {
-                                return Ok(vec![symbol_id]);
-                            }
-                        }
+                    // Currently only a subprocess use the end symbol and should not end with multiple tokens.
+                    Return::End(Some(symbol_id)) if bpmn_queue.is_empty() && tokens == 1 => {
+                        return Ok(vec![symbol_id]);
                     }
                     _ => {}
                 }
@@ -251,36 +250,7 @@ impl Process {
                         }
                     }
                 }
-                // Join
-                Bpmn::Gateway {
-                    gateway,
-                    id,
-                    name,
-                    outputs,
-                    ..
-                } if outputs.len() <= 1 => {
-                    let name_or_id = name.as_ref().unwrap_or(id);
-                    info!("{}: {}", gateway, name_or_id);
-                    #[cfg(feature = "trace")]
-                    data.trace(replay::GATEWAY, name_or_id)?;
 
-                    let first = outputs.first().ok_or_else(|| {
-                        Error::MissingOutput(gateway.to_string(), name_or_id.to_string())
-                    })?;
-                    match gateway {
-                        GatewayType::Exclusive => first,
-                        GatewayType::Inclusive | GatewayType::Parallel => {
-                            return Ok(Return::Join(first));
-                        }
-                        GatewayType::EventBased => {
-                            return Err(Error::BpmnRequirement(
-                                "Event gateway must have at least two outgoing sequence flows"
-                                    .into(),
-                            ));
-                        }
-                    }
-                }
-                // Fork
                 Bpmn::Gateway {
                     gateway,
                     id,
@@ -288,24 +258,30 @@ impl Process {
                     default,
                     outputs,
                     ..
-                } if outputs.len() > 1 => {
+                } => {
                     let name_or_id = name.as_ref().unwrap_or(id);
                     info!("{}: {}", gateway, name_or_id);
                     #[cfg(feature = "trace")]
                     data.trace(replay::GATEWAY, name_or_id)?;
 
-                    match gateway {
-                        GatewayType::Exclusive
-                        | GatewayType::EventBased
-                        | GatewayType::Inclusive => {
+                    match (gateway, outputs.len()) {
+                        (_, 0) => {
+                            return Err(Error::MissingOutput(
+                                gateway.to_string(),
+                                name_or_id.to_string(),
+                            ));
+                        }
+                        (GatewayType::Exclusive, 1) => outputs.first().unwrap(),
+                        (GatewayType::Inclusive | GatewayType::Parallel, 1) => {
+                            return Ok(Return::Join(outputs.first().unwrap()));
+                        }
+                        (GatewayType::EventBased, 1) => {
+                            return Err(Error::BpmnRequirement(AT_LEAST_TWO_OUTGOING.into()));
+                        }
+                        (GatewayType::Exclusive, _) => {
                             let response = data.handler.run_gateway(name_or_id, data.user_data());
                             match response {
-                                With::Flow(value)
-                                    if matches!(
-                                        gateway,
-                                        GatewayType::Exclusive | GatewayType::Inclusive
-                                    ) =>
-                                {
+                                With::Flow(value) => {
                                     output_by_name_or_id(value, &outputs.ids(), data.process_data)
                                         .ok_or_else(|| {
                                         Error::MissingOutput(
@@ -314,7 +290,24 @@ impl Process {
                                         )
                                     })?
                                 }
-                                With::Fork(value) if matches!(gateway, GatewayType::Inclusive) => {
+                                With::Default => default_path(default, gateway, name_or_id)?,
+                                With::Fork(_) => return Err(cannot_fork(gateway)),
+                                With::Symbol(_, _) => return Err(cannot_do_events(gateway)),
+                            }
+                        }
+                        (GatewayType::Inclusive, _) => {
+                            let response = data.handler.run_gateway(name_or_id, data.user_data());
+                            match response {
+                                With::Flow(value) => {
+                                    output_by_name_or_id(value, &outputs.ids(), data.process_data)
+                                        .ok_or_else(|| {
+                                        Error::MissingOutput(
+                                            gateway.to_string(),
+                                            name_or_id.to_string(),
+                                        )
+                                    })?
+                                }
+                                With::Fork(value) => {
                                     if value.is_empty() {
                                         default_path(default, gateway, name_or_id)?
                                     } else {
@@ -343,9 +336,13 @@ impl Process {
                                     }
                                 }
                                 With::Default => default_path(default, gateway, name_or_id)?,
-                                With::Symbol(_, _)
-                                    if matches!(gateway, GatewayType::EventBased) =>
-                                {
+                                With::Symbol(_, _) => return Err(cannot_do_events(gateway)),
+                            }
+                        }
+                        (GatewayType::EventBased, _) => {
+                            let response = data.handler.run_gateway(name_or_id, data.user_data());
+                            match response {
+                                With::Symbol(_, _) => {
                                     output_by_symbol(&response, &outputs.ids(), data.process_data)
                                         .ok_or_else(|| {
                                         Error::MissingOutput(
@@ -354,24 +351,12 @@ impl Process {
                                         )
                                     })?
                                 }
-                                With::Flow(_) => {
-                                    return Err(Error::BpmnRequirement(format!(
-                                        "{gateway} cannot use conditional expression"
-                                    )));
-                                }
-                                With::Fork(_) => {
-                                    return Err(Error::BpmnRequirement(format!(
-                                        "{gateway} cannot fork"
-                                    )));
-                                }
-                                With::Symbol(_, _) => {
-                                    return Err(Error::BpmnRequirement(format!(
-                                        "{gateway} cannot do decision based on events"
-                                    )));
-                                }
+                                With::Default => return Err(cannot_use_default(gateway)),
+                                With::Flow(_) => return Err(cannot_use_cond_expr(gateway)),
+                                With::Fork(_) => return Err(cannot_fork(gateway)),
                             }
                         }
-                        GatewayType::Parallel => {
+                        (GatewayType::Parallel, _) => {
                             maybe_fork!(self, outputs, data, gateway, name_or_id)
                         }
                     }

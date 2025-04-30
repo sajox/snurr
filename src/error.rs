@@ -65,3 +65,23 @@ pub enum Error {
     #[error(transparent)]
     Send(#[from] std::sync::mpsc::SendError<(&'static str, String)>),
 }
+
+// BpmnRequirement
+pub const AT_LEAST_TWO_OUTGOING: &str =
+    "Event gateway must have at least two outgoing sequence flows";
+
+pub fn cannot_do_events(gateway: &crate::model::GatewayType) -> Error {
+    Error::BpmnRequirement(format!("{gateway} cannot do decision based on events"))
+}
+
+pub fn cannot_fork(gateway: &crate::model::GatewayType) -> Error {
+    Error::BpmnRequirement(format!("{gateway} cannot fork"))
+}
+
+pub fn cannot_use_default(gateway: &crate::model::GatewayType) -> Error {
+    Error::BpmnRequirement(format!("{gateway} cannot use default"))
+}
+
+pub fn cannot_use_cond_expr(gateway: &crate::model::GatewayType) -> Error {
+    Error::BpmnRequirement(format!("{gateway} cannot use conditional expression"))
+}
