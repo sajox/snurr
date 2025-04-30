@@ -253,6 +253,18 @@ fn inclusive_gateway_no_output() -> Result<()> {
 }
 
 #[test]
+fn inclusive_join_fork() -> Result<()> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_gateway("GW A", |_| vec!["A", "B"].into());
+    handler.add_gateway("GW B", |_| vec!["A", "B", "C"].into());
+    let bpmn = Process::new("tests/files/inclusive_join_fork.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 6);
+    Ok(())
+}
+
+#[test]
 fn parallell_gateway() -> Result<()> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
     handler.add_task(COUNT_1, func_cnt(1));
@@ -449,6 +461,16 @@ fn parallel_multi() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn parallel_join_fork() -> Result<()> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+    let bpmn = Process::new("tests/files/parallel_join_fork.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 6);
+    Ok(())
+}
+
 #[ignore]
 #[test]
 fn parallel_unbalanced() -> Result<()> {
@@ -457,13 +479,6 @@ fn parallel_unbalanced() -> Result<()> {
     let bpmn = Process::new("tests/files/parallel_unbalanced.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
     assert_eq!(pr.result.count, 5);
-    Ok(())
-}
-
-#[test]
-fn join_and_fork() -> Result<()> {
-    let failed = Process::new("tests/files/join_and_fork.bpmn").is_err();
-    assert!(failed, "Expected an error");
     Ok(())
 }
 

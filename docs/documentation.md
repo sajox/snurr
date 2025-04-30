@@ -333,7 +333,7 @@ RUST_LOG=warn cargo run
 
 ![Conditional Sequence Flows](/tests/not_supported/conditional_sequence_flows.png)
 
-### Both join and fork (Inclusive and Parallel gateway)
+### Both join and fork (Inclusive and Parallel gateway) (Supported with version 0.8)
 
 ![Join and fork](/tests/not_supported/join_and_fork.png)
 

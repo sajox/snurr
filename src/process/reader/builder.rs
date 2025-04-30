@@ -156,18 +156,6 @@ fn update_local_id(BpmnLocal(bid, lid): &mut BpmnLocal, map: &HashMap<String, us
 
 fn check_unsupported(bpmn: &Bpmn) -> Result<(), Error> {
     Err(match bpmn {
-        Bpmn::Gateway {
-            gateway: GatewayType::Parallel | GatewayType::Inclusive,
-            id,
-            name,
-            outputs,
-            inputs,
-            ..
-        } if outputs.len() > 1 && inputs.len() > 1 => Error::NotSupported(format!(
-            "{}: {}",
-            name.as_ref().unwrap_or(id),
-            "both join and fork",
-        )),
         // SequenceFlow with Start and End tag is Conditional Sequence Flow
         Bpmn::SequenceFlow { id, name, .. } => Error::NotSupported(format!(
             "{}: {}",
