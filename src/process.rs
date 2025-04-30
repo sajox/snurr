@@ -94,17 +94,14 @@ impl Process {
                     .get(id)
                     .ok_or_else(|| Error::MissingProcessData(id.into()))?;
 
-                self.execute(
-                    vec![&0],
-                    &ExecuteData::new(
-                        process_data,
-                        id,
-                        handler,
-                        Arc::clone(&data),
-                        #[cfg(feature = "trace")]
-                        trace.sender(),
-                    ),
-                )?;
+                self.execute(&ExecuteData::new(
+                    process_data,
+                    id,
+                    handler,
+                    Arc::clone(&data),
+                    #[cfg(feature = "trace")]
+                    trace.sender(),
+                ))?;
             }
         }
 

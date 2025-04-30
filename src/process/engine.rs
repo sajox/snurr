@@ -24,7 +24,7 @@ enum Return<'a> {
     Fork(Vec<&'a usize>),
     Join(Vec<&'a usize>),
     JoinFork(Vec<&'a usize>),
-    End(Option<&'a usize>),
+    End(Option<&'a Bpmn>),
 }
 
 macro_rules! maybe_fork {
@@ -40,16 +40,16 @@ macro_rules! maybe_fork {
 }
 
 impl Process {
-    pub(super) fn execute<'a, T>(
-        &'a self,
-        start_ids: Vec<&usize>,
-        data: &ExecuteData<'a, T>,
-    ) -> ExecuteResult<'a>
+    pub(super) fn execute<'a, T>(&'a self, data: &ExecuteData<'a, T>) -> ExecuteResult<'a>
     where
         T: Send,
     {
         let mut token_stack = TokenStack::default();
-        let mut bpmn_queue = vec![start_ids];
+        // Start event always begin on zero in every (sub) process.
+        let mut bpmn_queue = vec![vec![&0]];
+        // Add one token as we just added zero
+        token_stack.push(1);
+
         while let Some(start_ids) = bpmn_queue.pop() {
             let tokens = start_ids.len();
 
@@ -92,8 +92,8 @@ impl Process {
                         join_ids.get_or_insert(vec![]).push(output_id);
                     }
                     // Currently only a subprocess use the end symbol and should not end with multiple tokens.
-                    Return::End(Some(symbol_id)) if bpmn_queue.is_empty() && tokens == 1 => {
-                        return Ok(vec![symbol_id]);
+                    Return::End(symbol @ Some(_)) if bpmn_queue.is_empty() && tokens == 1 => {
+                        return Ok(symbol);
                     }
                     _ => {}
                 }
@@ -107,6 +107,8 @@ impl Process {
                     token_stack.push(tokens.len());
                 }
                 bpmn_queue.push(tokens);
+            } else {
+                token_stack.remove(tokens_to_reduce);
             }
 
             // Add fork flows after every Join or End. Oterwise we might add a Fork, and a Join reduce wrong token in the queue.
@@ -117,7 +119,7 @@ impl Process {
                 }
             }
         }
-        Ok(vec![])
+        Ok(None)
     }
 
     // Each flow process one "token" and returns on a Fork, Join or End.
@@ -136,10 +138,10 @@ impl Process {
                 .get(*current_id)
                 .ok_or_else(|| Error::MisssingBpmnData(current_id.to_string()))?
             {
-                Bpmn::Event {
+                bpmn @ Bpmn::Event {
                     event,
                     symbol,
-                    id: BpmnLocal(bid, lid),
+                    id: BpmnLocal(bid, _),
                     name,
                     outputs,
                     ..
@@ -164,8 +166,7 @@ impl Process {
                         }
                         EventType::End => {
                             if symbol.is_some() {
-                                // return the End Id so parent can check info.
-                                return Ok(Return::End(Some(lid)));
+                                return Ok(Return::End(Some(bpmn)));
                             }
                             break;
                         }
@@ -212,36 +213,23 @@ impl Process {
                                 .get(id)
                                 .ok_or_else(|| Error::MissingProcessData(id.into()))?;
 
-                            match self
-                                .execute(vec![&0], &data.update(id, sp_data))?
-                                .as_slice()
+                            if let Some(Bpmn::Event {
+                                event: EventType::End,
+                                symbol: Some(symbol),
+                                name,
+                                ..
+                            }) = self.execute(&data.update(id, sp_data))?
                             {
-                                // Boundary id returned. Fetch info from subprocess data as it don't exist in data.process_data
-                                [end_id, ..] => {
-                                    let Some(Bpmn::Event {
-                                        symbol: Some(symbol),
-                                        name,
-                                        ..
-                                    }) = sp_data.get(**end_id)
-                                    else {
-                                        return Err(Error::MissingId(end_id.to_string()));
-                                    };
-
-                                    self.boundary_lookup(
-                                        id,
-                                        name.as_deref(),
-                                        symbol,
-                                        data.process_data,
-                                    )
+                                self.boundary_lookup(id, name.as_deref(), symbol, data.process_data)
                                     .ok_or_else(|| {
                                         Error::MissingBoundary(
                                             symbol.to_string(),
                                             name_or_id.into(),
                                         )
                                     })?
-                                }
+                            } else {
                                 // Continue from subprocess
-                                _ => maybe_fork!(self, outputs, data, activity, name_or_id),
+                                maybe_fork!(self, outputs, data, activity, name_or_id)
                             }
                         }
                     }
@@ -503,7 +491,7 @@ fn output_by_name_or_id<'a>(
         .next()
 }
 
-pub(super) type ExecuteResult<'a> = Result<Vec<&'a usize>, Error>;
+pub(super) type ExecuteResult<'a> = Result<Option<&'a Bpmn>, Error>;
 
 // Data for the execution engine.
 pub(super) struct ExecuteData<'a, T> {
