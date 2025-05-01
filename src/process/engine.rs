@@ -99,16 +99,14 @@ impl Process {
                 }
             }
 
-            if let Some(mut output_ids) = join_ids.take_if(|_| token_stack.remove(tokens_to_reduce))
-            {
+            let all_tokens_consumed = token_stack.remove(tokens_to_reduce);
+            if let Some(mut output_ids) = join_ids.take_if(|_| all_tokens_consumed) {
                 let tokens = output_ids.pop().unwrap();
                 // If it is a join fork, add tokens as we just consumed all.
                 if is_join_fork {
                     token_stack.push(tokens.len());
                 }
                 bpmn_queue.push(tokens);
-            } else {
-                token_stack.remove(tokens_to_reduce);
             }
 
             // Add fork flows after every Join or End. Oterwise we might add a Fork, and a Join reduce wrong token in the queue.
