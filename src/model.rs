@@ -488,8 +488,8 @@ impl Outputs {
         self.local_ids.push(0);
     }
 
-    pub(crate) fn ids(&self) -> Vec<&usize> {
-        self.local_ids.iter().collect()
+    pub(crate) fn ids(&self) -> &[usize] {
+        &self.local_ids
     }
 
     pub(crate) fn len(&self) -> usize {

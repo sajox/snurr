@@ -61,7 +61,7 @@ impl Process {
                         let names = outputs
                             .ids()
                             .iter()
-                            .map(|index| process.get(**index))
+                            .map(|index| process.get(*index))
                             .filter_map(|bpmn| {
                                 if let Some(Bpmn::SequenceFlow { name, .. }) = bpmn {
                                     return name.as_ref();

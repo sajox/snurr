@@ -1,6 +1,6 @@
 mod token_stack;
 
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 #[cfg(feature = "trace")]
 use crate::process::replay;
@@ -21,9 +21,9 @@ use crate::{
 
 #[derive(Debug)]
 enum Return<'a> {
-    Fork(Vec<&'a usize>),
-    Join(Vec<&'a usize>),
-    JoinFork(Vec<&'a usize>),
+    Fork(Cow<'a, [usize]>),
+    Join(Cow<'a, [usize]>),
+    JoinFork(Cow<'a, [usize]>),
     End(Option<&'a Bpmn>),
 }
 
@@ -34,7 +34,7 @@ macro_rules! maybe_fork {
                 .first()
                 .ok_or_else(|| Error::MissingOutput($ty.to_string(), $noi.to_string()))?
         } else {
-            return Ok(Return::Fork($outputs.ids()));
+            return Ok(Return::Fork(Cow::Borrowed($outputs.ids())));
         }
     };
 }
@@ -46,7 +46,7 @@ impl Process {
     {
         let mut token_stack = TokenStack::default();
         // Start event always begin on zero in every (sub) process.
-        let mut bpmn_queue = vec![vec![&0]];
+        let mut bpmn_queue = vec![Cow::from(&[0])];
         // Add one token as we just added zero
         token_stack.push(1);
 
@@ -255,7 +255,7 @@ impl Process {
                         }
                         (GatewayType::Exclusive, 1) => outputs.first().unwrap(),
                         (GatewayType::Inclusive | GatewayType::Parallel, 1) => {
-                            return Ok(Return::Join(outputs.ids()));
+                            return Ok(Return::Join(Cow::Borrowed(outputs.ids())));
                         }
                         (GatewayType::EventBased, 1) => {
                             return Err(Error::BpmnRequirement(AT_LEAST_TWO_OUTGOING.into()));
@@ -264,13 +264,13 @@ impl Process {
                             let response = data.handler.run_gateway(name_or_id, data.user_data());
                             match response {
                                 With::Flow(value) => {
-                                    output_by_name_or_id(value, &outputs.ids(), data.process_data)
+                                    output_by_name_or_id(value, outputs.ids(), data.process_data)
                                         .ok_or_else(|| {
-                                        Error::MissingOutput(
-                                            gateway.to_string(),
-                                            name_or_id.to_string(),
-                                        )
-                                    })?
+                                            Error::MissingOutput(
+                                                gateway.to_string(),
+                                                name_or_id.to_string(),
+                                            )
+                                        })?
                                 }
                                 With::Default => default_path(default, gateway, name_or_id)?,
                                 With::Fork(_) => return Err(cannot_fork(gateway)),
@@ -281,13 +281,13 @@ impl Process {
                             let response = data.handler.run_gateway(name_or_id, data.user_data());
                             match response {
                                 With::Flow(value) => {
-                                    output_by_name_or_id(value, &outputs.ids(), data.process_data)
+                                    output_by_name_or_id(value, outputs.ids(), data.process_data)
                                         .ok_or_else(|| {
-                                        Error::MissingOutput(
-                                            gateway.to_string(),
-                                            name_or_id.to_string(),
-                                        )
-                                    })?
+                                            Error::MissingOutput(
+                                                gateway.to_string(),
+                                                name_or_id.to_string(),
+                                            )
+                                        })?
                                 }
                                 With::Fork(value) => {
                                     if value.is_empty() {
@@ -299,7 +299,7 @@ impl Process {
                                             .filter_map(|&response| {
                                                 output_by_name_or_id(
                                                     response,
-                                                    &outputs,
+                                                    outputs,
                                                     data.process_data,
                                                 )
                                             })
@@ -313,9 +313,11 @@ impl Process {
                                                 )
                                             })?
                                         } else {
+                                            let owned_values =
+                                                responses.into_iter().cloned().collect();
                                             return match inputs.len() {
-                                                1 => Ok(Return::Fork(responses)),
-                                                _ => Ok(Return::JoinFork(responses)),
+                                                1 => Ok(Return::Fork(Cow::Owned(owned_values))),
+                                                _ => Ok(Return::JoinFork(Cow::Owned(owned_values))),
                                             };
                                         }
                                     }
@@ -328,13 +330,13 @@ impl Process {
                             let response = data.handler.run_gateway(name_or_id, data.user_data());
                             match response {
                                 With::Symbol(_, _) => {
-                                    output_by_symbol(&response, &outputs.ids(), data.process_data)
+                                    output_by_symbol(&response, outputs.ids(), data.process_data)
                                         .ok_or_else(|| {
-                                        Error::MissingOutput(
-                                            gateway.to_string(),
-                                            name_or_id.to_string(),
-                                        )
-                                    })?
+                                            Error::MissingOutput(
+                                                gateway.to_string(),
+                                                name_or_id.to_string(),
+                                            )
+                                        })?
                                 }
                                 With::Default => return Err(cannot_use_default(gateway)),
                                 With::Flow(_) => return Err(cannot_use_cond_expr(gateway)),
@@ -343,8 +345,8 @@ impl Process {
                         }
                         (GatewayType::Parallel, _) => {
                             return match inputs.len() {
-                                1 => Ok(Return::Fork(outputs.ids())),
-                                _ => Ok(Return::JoinFork(outputs.ids())),
+                                1 => Ok(Return::Fork(Cow::Borrowed(outputs.ids()))),
+                                _ => Ok(Return::JoinFork(Cow::Borrowed(outputs.ids()))),
                             };
                         }
                     }
@@ -419,74 +421,65 @@ fn default_path<'a>(
 
 fn output_by_symbol<'a>(
     search: &With,
-    outputs: &[&'a usize],
+    outputs: &'a [usize],
     process_data: &'a [Bpmn],
 ) -> Option<&'a usize> {
-    outputs
-        .iter()
-        .filter(|index| match search {
-            With::Symbol(search, search_symbol) => process_data
-                .get(***index)
-                .and_then(|bpmn| {
-                    if let Bpmn::SequenceFlow { target_ref, .. } = bpmn {
-                        return process_data.get(*target_ref.local());
-                    }
-                    None
-                })
-                .filter(|bpmn| match bpmn {
-                    // We can target both ReceiveTask or Events.
-                    Bpmn::Activity {
-                        id, activity, name, ..
-                    } => {
-                        activity == &ActivityType::ReceiveTask
-                            && search_symbol == &Symbol::Message
-                            && (search.filter(|&sn| sn == id).is_some()
-                                || *search == name.as_deref())
-                    }
-                    Bpmn::Event {
-                        id,
-                        symbol:
-                            Some(
-                                symbol @ (Symbol::Message
-                                | Symbol::Signal
-                                | Symbol::Timer
-                                | Symbol::Conditional),
-                            ),
-                        name,
-                        ..
-                    } => {
-                        symbol == search_symbol
-                            && (search.filter(|&sn| sn == id.bpmn()).is_some()
-                                || *search == name.as_deref())
-                    }
-                    _ => false,
-                })
-                .is_some(),
-            _ => false,
-        })
-        .copied()
-        .next()
+    outputs.iter().find(|index| match search {
+        With::Symbol(search, search_symbol) => process_data
+            .get(**index)
+            .and_then(|bpmn| {
+                if let Bpmn::SequenceFlow { target_ref, .. } = bpmn {
+                    return process_data.get(*target_ref.local());
+                }
+                None
+            })
+            .filter(|bpmn| match bpmn {
+                // We can target both ReceiveTask or Events.
+                Bpmn::Activity {
+                    id, activity, name, ..
+                } => {
+                    activity == &ActivityType::ReceiveTask
+                        && search_symbol == &Symbol::Message
+                        && (search.filter(|&sn| sn == id).is_some() || *search == name.as_deref())
+                }
+                Bpmn::Event {
+                    id,
+                    symbol:
+                        Some(
+                            symbol @ (Symbol::Message
+                            | Symbol::Signal
+                            | Symbol::Timer
+                            | Symbol::Conditional),
+                        ),
+                    name,
+                    ..
+                } => {
+                    symbol == search_symbol
+                        && (search.filter(|&sn| sn == id.bpmn()).is_some()
+                            || *search == name.as_deref())
+                }
+                _ => false,
+            })
+            .is_some(),
+        _ => false,
+    })
 }
 
 fn output_by_name_or_id<'a>(
     search: impl AsRef<str>,
-    outputs: &[&'a usize],
+    outputs: &'a [usize],
     process_data: &'a [Bpmn],
 ) -> Option<&'a usize> {
-    outputs
-        .iter()
-        .filter(|index| {
-            if let Some(Bpmn::SequenceFlow { id, name, .. }) = process_data.get(***index) {
-                return name
-                    .as_deref()
-                    .filter(|&name| name == search.as_ref())
-                    .is_some()
-                    || id == search.as_ref();
-            }
-            false
-        })
-        .copied()
-        .next()
+    outputs.iter().find(|index| {
+        if let Some(Bpmn::SequenceFlow { id, name, .. }) = process_data.get(**index) {
+            return name
+                .as_deref()
+                .filter(|&name| name == search.as_ref())
+                .is_some()
+                || id == search.as_ref();
+        }
+        false
+    })
 }
 
 pub(super) type ExecuteResult<'a> = Result<Option<&'a Bpmn>, Error>;
