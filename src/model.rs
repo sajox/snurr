@@ -313,6 +313,16 @@ impl TryFrom<&[u8]> for Symbol {
 }
 
 #[derive(Debug)]
+pub(crate) struct Gateway {
+    pub(crate) gateway: GatewayType,
+    pub(crate) id: String,
+    pub(crate) name: Option<String>,
+    pub(crate) default: Option<BpmnLocal>,
+    pub(crate) outputs: Outputs,
+    pub(crate) inputs: Vec<String>,
+}
+
+#[derive(Debug)]
 pub(crate) enum Bpmn {
     Activity {
         activity: ActivityType,
@@ -336,14 +346,7 @@ pub(crate) enum Bpmn {
         _cancel_activity: Option<String>,
         outputs: Outputs,
     },
-    Gateway {
-        gateway: GatewayType,
-        id: String,
-        name: Option<String>,
-        default: Option<BpmnLocal>,
-        outputs: Outputs,
-        inputs: Vec<String>,
-    },
+    Gateway(Gateway),
     Process {
         id: String,
         _is_executable: bool,
@@ -361,8 +364,8 @@ impl Bpmn {
         match self {
             Bpmn::Definitions { id, .. }
             | Bpmn::Process { id, .. }
+            | Bpmn::Gateway(Gateway { id, .. })
             | Bpmn::Activity { id, .. }
-            | Bpmn::Gateway { id, .. }
             | Bpmn::SequenceFlow { id, .. } => Ok(id),
             Bpmn::Event { id, .. } => Ok(id.bpmn()),
             Bpmn::Direction { direction, .. } => Err(Error::MissingId(direction.to_string())),
@@ -372,7 +375,7 @@ impl Bpmn {
     pub(crate) fn add_output(&mut self, text: String) {
         match self {
             Bpmn::Event { outputs, .. }
-            | Bpmn::Gateway { outputs, .. }
+            | Bpmn::Gateway(Gateway { outputs, .. })
             | Bpmn::Activity { outputs, .. } => outputs.add(text),
             _ => {}
         }
@@ -380,7 +383,7 @@ impl Bpmn {
 
     // Only use input to check unsupported join and fork
     pub(crate) fn add_input(&mut self, text: String) {
-        if let Bpmn::Gateway { inputs, .. } = self {
+        if let Bpmn::Gateway(Gateway { inputs, .. }) = self {
             inputs.push(text)
         }
     }
@@ -436,7 +439,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                 }
             }
             EXCLUSIVE_GATEWAY | PARALLEL_GATEWAY | INCLUSIVE_GATEWAY | EVENT_BASED_GATEWAY => {
-                Bpmn::Gateway {
+                Bpmn::Gateway(Gateway {
                     gateway: bpmn_type.try_into()?,
                     id: attributes
                         .remove(ATTRIB_ID)
@@ -445,7 +448,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     default: attributes.remove(ATTRIB_DEFAULT).map(Into::into),
                     outputs: Default::default(),
                     inputs: Default::default(),
-                }
+                })
             }
             SEQUENCE_FLOW => Bpmn::SequenceFlow {
                 id: attributes

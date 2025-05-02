@@ -265,6 +265,22 @@ fn inclusive_join_fork() -> Result<()> {
 }
 
 #[test]
+fn inclusive_join_fork_gateway_verify_sync() -> Result<()> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_gateway("GW A", |_| vec!["A", "B"].into());
+    handler.add_gateway("GW B", |input| {
+        // Make sure that the gateway is only executed once. Do not recommend to mutate data in gateway.
+        input.lock().unwrap().count += 1;
+        vec!["A", "B", "C"].into()
+    });
+    let bpmn = Process::new("tests/files/inclusive_join_fork.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 7);
+    Ok(())
+}
+
+#[test]
 fn parallell_gateway() -> Result<()> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
     handler.add_task(COUNT_1, func_cnt(1));

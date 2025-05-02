@@ -1,4 +1,8 @@
-use crate::{Process, error::Error, model::*};
+use crate::{
+    Process,
+    error::Error,
+    model::{Gateway, *},
+};
 
 const BUILD_PROCESS_ERROR_MSG: &str = "couldn't build process";
 
@@ -121,9 +125,9 @@ impl DataBuilder {
                         .insert(name.clone().unwrap(), *id.local());
                 }
             }
-            Bpmn::Gateway {
+            Bpmn::Gateway(Gateway {
                 default, outputs, ..
-            } => {
+            }) => {
                 outputs.update_local_ids(&bpmn_index);
                 if let Some(default) = default {
                     update_local_id(default, &bpmn_index);
