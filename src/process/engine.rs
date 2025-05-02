@@ -122,7 +122,7 @@ impl Process {
                             GatewayType::Inclusive if outputs.len() > 1 => {
                                 match self.handle_inclusive_gateway(data, gw)? {
                                     ControlFlow::Continue(value) => {
-                                        token_stack.push(outputs.len());
+                                        token_stack.push(1);
                                         bpmn_queue.push(Cow::Owned(vec![*value]));
                                     }
                                     ControlFlow::Break(Return::Fork(value)) => {

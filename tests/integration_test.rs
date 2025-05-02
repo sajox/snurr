@@ -265,6 +265,18 @@ fn inclusive_join_fork() -> Result<()> {
 }
 
 #[test]
+fn inclusive_join_fork_gwb_one_flow() -> Result<()> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_gateway("GW A", |_| vec!["A", "B"].into());
+    handler.add_gateway("GW B", |_| vec!["A"].into());
+    let bpmn = Process::new("tests/files/inclusive_join_fork.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 4);
+    Ok(())
+}
+
+#[test]
 fn inclusive_join_fork_gateway_verify_sync() -> Result<()> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
     handler.add_task(COUNT_1, func_cnt(1));
