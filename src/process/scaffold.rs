@@ -3,7 +3,7 @@ use std::{collections::HashSet, io::Write, path::Path};
 use crate::{
     Process,
     error::Error,
-    model::{ActivityType, Bpmn, GatewayType, Symbol},
+    model::{ActivityType, Bpmn, Gateway, GatewayType, Symbol},
 };
 
 impl Process {
@@ -51,11 +51,11 @@ impl Process {
                     scaffold.add_task(bpmn, symbols);
                 }
 
-                if let Bpmn::Gateway {
+                if let Bpmn::Gateway(Gateway {
                     gateway: GatewayType::Exclusive | GatewayType::Inclusive,
                     outputs,
                     ..
-                } = bpmn
+                }) = bpmn
                 {
                     if outputs.len() > 1 {
                         let names = outputs
@@ -80,7 +80,7 @@ impl Process {
 }
 
 #[derive(Debug)]
-struct Gateway<'a> {
+struct GatewayInner<'a> {
     bpmn: &'a Bpmn,
     names: Vec<&'a String>,
 }
@@ -94,7 +94,7 @@ struct Task<'a> {
 #[derive(Debug, Default)]
 struct Scaffold<'a> {
     tasks: Vec<Task<'a>>,
-    gateways: Vec<Gateway<'a>>,
+    gateways: Vec<GatewayInner<'a>>,
 }
 
 impl<'a> Scaffold<'a> {
@@ -103,7 +103,7 @@ impl<'a> Scaffold<'a> {
     }
 
     fn add_gateway(&mut self, bpmn: &'a Bpmn, names: Vec<&'a String>) {
-        self.gateways.push(Gateway { bpmn, names });
+        self.gateways.push(GatewayInner { bpmn, names });
     }
 
     // Generate code from all the task and gateways to the given file path.
@@ -149,15 +149,15 @@ impl<'a> Scaffold<'a> {
 
         // Second all gateways
         for gateway in self.gateways.iter() {
-            let Gateway {
+            let GatewayInner {
                 bpmn:
-                    Bpmn::Gateway {
+                    Bpmn::Gateway(Gateway {
                         gateway,
                         id,
                         name,
                         outputs,
                         ..
-                    },
+                    }),
                 names,
             } = gateway
             else {

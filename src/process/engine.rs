@@ -1,6 +1,6 @@
-mod token_stack;
+mod token_handler;
 
-use std::{borrow::Cow, sync::Arc};
+use std::{borrow::Cow, ops::ControlFlow, sync::Arc};
 
 #[cfg(feature = "trace")]
 use crate::process::replay;
@@ -8,7 +8,7 @@ use crate::process::replay;
 use std::sync::mpsc::Sender;
 
 use log::info;
-use token_stack::TokenStack;
+use token_handler::TokenHandler;
 
 use crate::{
     Data, Eventhandler, Process, Symbol,
@@ -16,14 +16,13 @@ use crate::{
         AT_LEAST_TWO_OUTGOING, Error, cannot_do_events, cannot_fork, cannot_use_cond_expr,
         cannot_use_default,
     },
-    model::{ActivityType, Bpmn, BpmnLocal, EventType, GatewayType, With},
+    model::{ActivityType, Bpmn, BpmnLocal, EventType, Gateway, GatewayType, With},
 };
 
 #[derive(Debug)]
 enum Return<'a> {
     Fork(Cow<'a, [usize]>),
-    Join(Cow<'a, [usize]>),
-    JoinFork(Cow<'a, [usize]>),
+    Join(&'a Gateway),
     End(Option<&'a Bpmn>),
 }
 
@@ -44,7 +43,7 @@ impl Process {
     where
         T: Send,
     {
-        let mut token_stack = TokenStack::default();
+        let mut token_stack = TokenHandler::default();
         // Start event always begin on zero in every (sub) process.
         let mut bpmn_queue = vec![Cow::from(&[0])];
         // Add one token as we just added zero
@@ -76,37 +75,71 @@ impl Process {
                     result?;
                 }
 
-                oks.into_iter().filter_map(Result::ok).partition(|a| {
-                    matches!(a, Return::End(_) | Return::Join(_) | Return::JoinFork(_))
-                })
+                oks.into_iter()
+                    .filter_map(Result::ok)
+                    .partition(|a| matches!(a, Return::End(_) | Return::Join(_)))
             };
 
-            let tokens_to_reduce = join_and_ends.len();
-            let mut join_ids = None;
-            let mut is_join_fork = false;
             for result in join_and_ends {
-                match result {
-                    Return::Join(output_id) => join_ids.get_or_insert(vec![]).push(output_id),
-                    Return::JoinFork(output_id) => {
-                        is_join_fork = true;
-                        join_ids.get_or_insert(vec![]).push(output_id);
-                    }
+                let all_joined = match result {
+                    Return::Join(gateway_id) => token_stack.join(gateway_id),
                     // Currently only a subprocess use the end symbol and should not end with multiple tokens.
                     Return::End(symbol @ Some(_)) if bpmn_queue.is_empty() && tokens == 1 => {
                         return Ok(symbol);
                     }
-                    _ => {}
-                }
-            }
+                    Return::End(_) => token_stack.end(),
+                    _ => None,
+                };
 
-            let all_tokens_consumed = token_stack.remove(tokens_to_reduce);
-            if let Some(mut output_ids) = join_ids.take_if(|_| all_tokens_consumed) {
-                let tokens = output_ids.pop().unwrap();
-                // If it is a join fork, add tokens as we just consumed all.
-                if is_join_fork {
-                    token_stack.push(tokens.len());
+                // Once all inputs have been merged for a gateway, then proceed with its outputs.
+                // The gateway vector contains all the gateways involved. Right now we are using balanced diagram
+                // and do not need to investigate further. Just pop it.
+                if let Some(mut gateways) = all_joined {
+                    if let Some(
+                        gw @ Gateway {
+                            gateway,
+                            id,
+                            name,
+                            outputs,
+                            ..
+                        },
+                    ) = gateways.pop()
+                    {
+                        let name_or_id = name.as_ref().unwrap_or(id);
+                        match gateway {
+                            // A regular join, no user code involved.
+                            GatewayType::Inclusive if outputs.len() <= 1 => {
+                                let value = *outputs.first().ok_or_else(|| {
+                                    Error::MissingOutput(
+                                        gateway.to_string(),
+                                        name_or_id.to_string(),
+                                    )
+                                })?;
+                                token_stack.push(1);
+                                bpmn_queue.push(Cow::Owned(vec![value]));
+                            }
+                            // Handle fork with user code
+                            GatewayType::Inclusive if outputs.len() > 1 => {
+                                match self.handle_inclusive_gateway(data, gw)? {
+                                    ControlFlow::Continue(value) => {
+                                        token_stack.push(outputs.len());
+                                        bpmn_queue.push(Cow::Owned(vec![*value]));
+                                    }
+                                    ControlFlow::Break(Return::Fork(value)) => {
+                                        token_stack.push(value.len());
+                                        bpmn_queue.push(value);
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            GatewayType::Parallel => {
+                                token_stack.push(outputs.len());
+                                bpmn_queue.push(Cow::Borrowed(outputs.ids()));
+                            }
+                            _ => {}
+                        }
+                    }
                 }
-                bpmn_queue.push(tokens);
             }
 
             // Add fork flows after every Join or End. Oterwise we might add a Fork, and a Join reduce wrong token in the queue.
@@ -233,14 +266,16 @@ impl Process {
                     }
                 }
 
-                Bpmn::Gateway {
-                    gateway,
-                    id,
-                    name,
-                    default,
-                    outputs,
-                    inputs,
-                } => {
+                Bpmn::Gateway(
+                    gw @ Gateway {
+                        gateway,
+                        id,
+                        name,
+                        default,
+                        outputs,
+                        inputs,
+                    },
+                ) => {
                     let name_or_id = name.as_ref().unwrap_or(id);
                     info!("{}: {}", gateway, name_or_id);
                     #[cfg(feature = "trace")]
@@ -255,7 +290,7 @@ impl Process {
                         }
                         (GatewayType::Exclusive, 1) => outputs.first().unwrap(),
                         (GatewayType::Inclusive | GatewayType::Parallel, 1) => {
-                            return Ok(Return::Join(Cow::Borrowed(outputs.ids())));
+                            return Ok(Return::Join(gw));
                         }
                         (GatewayType::EventBased, 1) => {
                             return Err(Error::BpmnRequirement(AT_LEAST_TWO_OUTGOING.into()));
@@ -277,53 +312,15 @@ impl Process {
                                 With::Symbol(_, _) => return Err(cannot_do_events(gateway)),
                             }
                         }
+                        // Many inputs and outputs (Join and Fork)
+                        (GatewayType::Inclusive, _) if inputs.len() > 1 => {
+                            return Ok(Return::Join(gw));
+                        }
+                        // Handle fork with user code
                         (GatewayType::Inclusive, _) => {
-                            let response = data.handler.run_gateway(name_or_id, data.user_data());
-                            match response {
-                                With::Flow(value) => {
-                                    output_by_name_or_id(value, outputs.ids(), data.process_data)
-                                        .ok_or_else(|| {
-                                            Error::MissingOutput(
-                                                gateway.to_string(),
-                                                name_or_id.to_string(),
-                                            )
-                                        })?
-                                }
-                                With::Fork(value) => {
-                                    if value.is_empty() {
-                                        default_path(default, gateway, name_or_id)?
-                                    } else {
-                                        let outputs = outputs.ids();
-                                        let responses: Vec<_> = value
-                                            .iter()
-                                            .filter_map(|&response| {
-                                                output_by_name_or_id(
-                                                    response,
-                                                    outputs,
-                                                    data.process_data,
-                                                )
-                                            })
-                                            .collect();
-
-                                        if responses.len() <= 1 {
-                                            responses.first().ok_or_else(|| {
-                                                Error::MissingOutput(
-                                                    gateway.to_string(),
-                                                    name_or_id.to_string(),
-                                                )
-                                            })?
-                                        } else {
-                                            let owned_values =
-                                                responses.into_iter().cloned().collect();
-                                            return match inputs.len() {
-                                                1 => Ok(Return::Fork(Cow::Owned(owned_values))),
-                                                _ => Ok(Return::JoinFork(Cow::Owned(owned_values))),
-                                            };
-                                        }
-                                    }
-                                }
-                                With::Default => default_path(default, gateway, name_or_id)?,
-                                With::Symbol(_, _) => return Err(cannot_do_events(gateway)),
+                            match self.handle_inclusive_gateway(data, gw)? {
+                                ControlFlow::Continue(value) => value,
+                                ControlFlow::Break(value) => return Ok(value),
                             }
                         }
                         (GatewayType::EventBased, _) => {
@@ -346,7 +343,7 @@ impl Process {
                         (GatewayType::Parallel, _) => {
                             return match inputs.len() {
                                 1 => Ok(Return::Fork(Cow::Borrowed(outputs.ids()))),
-                                _ => Ok(Return::JoinFork(Cow::Borrowed(outputs.ids()))),
+                                _ => Ok(Return::Join(gw)),
                             };
                         }
                     }
@@ -364,6 +361,52 @@ impl Process {
             };
         }
         Ok(Return::End(None))
+    }
+
+    fn handle_inclusive_gateway<'a, T>(
+        &'a self,
+        data: &ExecuteData<'a, T>,
+        Gateway {
+            gateway,
+            id,
+            name,
+            default,
+            outputs,
+            ..
+        }: &'a Gateway,
+    ) -> Result<ControlFlow<Return<'a>, &'a usize>, Error> {
+        let name_or_id = name.as_ref().unwrap_or(id);
+        let response = data.handler.run_gateway(name_or_id, data.user_data());
+        let value = match response {
+            With::Flow(value) => output_by_name_or_id(value, outputs.ids(), data.process_data)
+                .ok_or_else(|| Error::MissingOutput(gateway.to_string(), name_or_id.to_string()))?,
+            With::Fork(value) => {
+                if value.is_empty() {
+                    default_path(default, gateway, name_or_id)?
+                } else {
+                    let outputs = outputs.ids();
+                    let responses: Vec<_> = value
+                        .iter()
+                        .filter_map(|&response| {
+                            output_by_name_or_id(response, outputs, data.process_data)
+                        })
+                        .collect();
+
+                    if responses.len() <= 1 {
+                        *responses.first().ok_or_else(|| {
+                            Error::MissingOutput(gateway.to_string(), name_or_id.to_string())
+                        })?
+                    } else {
+                        return Ok(ControlFlow::Break(Return::Fork(Cow::Owned(
+                            responses.into_iter().cloned().collect(),
+                        ))));
+                    }
+                }
+            }
+            With::Default => default_path(default, gateway, name_or_id)?,
+            With::Symbol(_, _) => return Err(cannot_do_events(gateway)),
+        };
+        Ok(ControlFlow::Continue(value))
     }
 
     fn boundary_lookup<'a>(
