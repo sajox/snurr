@@ -511,6 +511,16 @@ fn parallel_unbalanced() -> Result<()> {
 }
 
 #[test]
+fn parallel_one_in_and_out() -> Result<()> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+    let bpmn = Process::new("tests/files/parallel_one_in_and_out.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 1);
+    Ok(())
+}
+
+#[test]
 fn conditional_sequence_flows() -> Result<()> {
     let failed = Process::new("tests/files/conditional_sequence_flows.bpmn").is_err();
     assert!(failed, "Expected an error");

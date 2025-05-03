@@ -97,11 +97,13 @@ impl Process {
                 ) = gateways.pop()
                 {
                     match gateway {
-                        // A regular join, no user code involved.
-                        GatewayType::Inclusive if outputs.len() <= 1 => {
+                        GatewayType::Parallel => {
                             queue.push(Cow::Borrowed(outputs.ids()));
                         }
-                        // Handle fork with user code
+                        GatewayType::Inclusive if outputs.len() == 1 => {
+                            queue.push(Cow::Borrowed(outputs.ids()));
+                        }
+                        // Handle Fork, the user code determine next token(s) to run.
                         GatewayType::Inclusive if outputs.len() > 1 => {
                             match self.handle_inclusive_gateway(data, gw)? {
                                 ControlFlow::Continue(value) => {
@@ -112,9 +114,6 @@ impl Process {
                                 }
                                 _ => {}
                             }
-                        }
-                        GatewayType::Parallel => {
-                            queue.push(Cow::Borrowed(outputs.ids()));
                         }
                         _ => {}
                     }
@@ -258,21 +257,17 @@ impl Process {
                     #[cfg(feature = "trace")]
                     data.trace(replay::GATEWAY, name_or_id)?;
 
-                    match (gateway, outputs.len()) {
-                        (_, 0) => {
+                    match gateway {
+                        _ if outputs.len() == 0 => {
                             return Err(Error::MissingOutput(
                                 gateway.to_string(),
                                 name_or_id.to_string(),
                             ));
                         }
-                        (GatewayType::Exclusive, 1) => outputs.first().unwrap(),
-                        (GatewayType::Inclusive | GatewayType::Parallel, 1) => {
-                            return Ok(Return::Join(gw));
-                        }
-                        (GatewayType::EventBased, 1) => {
-                            return Err(Error::BpmnRequirement(AT_LEAST_TWO_OUTGOING.into()));
-                        }
-                        (GatewayType::Exclusive, _) => {
+                        // Handle 1 to 1, probably a temporary design or mistake
+                        _ if outputs.len() == 1 && inputs.len() == 1 => outputs.first().unwrap(),
+                        GatewayType::Exclusive if outputs.len() == 1 => outputs.first().unwrap(),
+                        GatewayType::Exclusive => {
                             let response = data.handler.run_gateway(name_or_id, data.user_data());
                             match response {
                                 With::Flow(value) => {
@@ -289,18 +284,21 @@ impl Process {
                                 With::Symbol(_, _) => return Err(cannot_do_events(gateway)),
                             }
                         }
-                        // Many inputs and outputs (Join and Fork)
-                        (GatewayType::Inclusive, _) if inputs.len() > 1 => {
+                        // Handle a regular Join or a JoinFork. In both cases, we need to wait for all tokens.
+                        GatewayType::Parallel | GatewayType::Inclusive if inputs.len() > 1 => {
                             return Ok(Return::Join(gw));
                         }
-                        // Handle fork with user code
-                        (GatewayType::Inclusive, _) => {
-                            match self.handle_inclusive_gateway(data, gw)? {
-                                ControlFlow::Continue(value) => value,
-                                ControlFlow::Break(value) => return Ok(value),
-                            }
+                        GatewayType::Parallel => {
+                            return Ok(Return::Fork(Cow::Borrowed(outputs.ids())));
                         }
-                        (GatewayType::EventBased, _) => {
+                        GatewayType::Inclusive => match self.handle_inclusive_gateway(data, gw)? {
+                            ControlFlow::Continue(value) => value,
+                            ControlFlow::Break(value) => return Ok(value),
+                        },
+                        GatewayType::EventBased if outputs.len() == 1 => {
+                            return Err(Error::BpmnRequirement(AT_LEAST_TWO_OUTGOING.into()));
+                        }
+                        GatewayType::EventBased => {
                             let response = data.handler.run_gateway(name_or_id, data.user_data());
                             match response {
                                 With::Symbol(_, _) => {
@@ -316,12 +314,6 @@ impl Process {
                                 With::Flow(_) => return Err(cannot_use_cond_expr(gateway)),
                                 With::Fork(_) => return Err(cannot_fork(gateway)),
                             }
-                        }
-                        (GatewayType::Parallel, _) => {
-                            return match inputs.len() {
-                                1 => Ok(Return::Fork(Cow::Borrowed(outputs.ids()))),
-                                _ => Ok(Return::Join(gw)),
-                            };
                         }
                     }
                 }
