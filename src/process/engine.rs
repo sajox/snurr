@@ -1,14 +1,13 @@
-mod token_handler;
+mod bpmn_queue;
 
+use bpmn_queue::BpmnQueue;
+use log::info;
 use std::{borrow::Cow, ops::ControlFlow, sync::Arc};
 
 #[cfg(feature = "trace")]
 use crate::process::replay;
 #[cfg(feature = "trace")]
 use std::sync::mpsc::Sender;
-
-use log::info;
-use token_handler::TokenHandler;
 
 use crate::{
     Data, Eventhandler, Process, Symbol,
@@ -43,14 +42,11 @@ impl Process {
     where
         T: Send,
     {
-        let mut token_stack = TokenHandler::default();
-        // Start event always begin on zero in every (sub) process.
-        let mut bpmn_queue = vec![Cow::from(&[0])];
-        // Add one token as we just added zero
-        token_stack.push(1);
+        let mut queue = BpmnQueue::default();
+        queue.push(Cow::from(&[0]));
 
-        while let Some(start_ids) = bpmn_queue.pop() {
-            let tokens = start_ids.len();
+        while let Some(tokens) = queue.pop() {
+            let num_tokens = tokens.len();
 
             // Run flow single or multi threaded
             let (join_and_ends, forks): (Vec<_>, Vec<_>) = {
@@ -58,14 +54,14 @@ impl Process {
                     #[cfg(feature = "parallel")]
                     {
                         use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-                        start_ids
+                        tokens
                             .par_iter()
                             .map(|output| self.flow(output, data))
                             .partition(Result::is_ok)
                     }
 
                     #[cfg(not(feature = "parallel"))]
-                    start_ids
+                    tokens
                         .iter()
                         .map(|output| self.flow(output, data))
                         .partition(Result::is_ok)
@@ -81,52 +77,48 @@ impl Process {
             };
 
             for result in join_and_ends {
-                let all_joined = match result {
-                    Return::Join(gateway_id) => token_stack.join(gateway_id),
+                match result {
+                    Return::Join(gateway_id) => queue.join_token(gateway_id),
                     // Currently only a subprocess use the end symbol and should not end with multiple tokens.
-                    Return::End(symbol @ Some(_)) if bpmn_queue.is_empty() && tokens == 1 => {
+                    Return::End(symbol @ Some(_)) if queue.is_empty() && num_tokens == 1 => {
                         return Ok(symbol);
                     }
-                    Return::End(_) => token_stack.end(),
-                    _ => None,
-                };
+                    Return::End(_) => queue.end_token(),
+                    _ => {}
+                }
+            }
 
-                // Once all inputs have been merged for a gateway, then proceed with its outputs.
-                // The gateway vector contains all the gateways involved. Right now we are using balanced diagram
-                // and do not need to investigate further. Just pop it.
-                if let Some(mut gateways) = all_joined {
-                    if let Some(
-                        gw @ Gateway {
-                            gateway, outputs, ..
-                        },
-                    ) = gateways.pop()
-                    {
-                        match gateway {
-                            // A regular join, no user code involved.
-                            GatewayType::Inclusive if outputs.len() <= 1 => {
-                                token_stack.push(outputs.len());
-                                bpmn_queue.push(Cow::Borrowed(outputs.ids()));
-                            }
-                            // Handle fork with user code
-                            GatewayType::Inclusive if outputs.len() > 1 => {
-                                match self.handle_inclusive_gateway(data, gw)? {
-                                    ControlFlow::Continue(value) => {
-                                        token_stack.push(1);
-                                        bpmn_queue.push(Cow::Owned(vec![*value]));
-                                    }
-                                    ControlFlow::Break(Return::Fork(value)) => {
-                                        token_stack.push(value.len());
-                                        bpmn_queue.push(value);
-                                    }
-                                    _ => {}
-                                }
-                            }
-                            GatewayType::Parallel => {
-                                token_stack.push(outputs.len());
-                                bpmn_queue.push(Cow::Borrowed(outputs.ids()));
-                            }
-                            _ => {}
+            // Once all inputs have been merged for a gateway, then proceed with its outputs.
+            // The gateway vector contains all the gateways involved. Right now we are using balanced diagram
+            // and do not need to investigate further.
+            if let Some(mut gateways) = queue.tokens_consumed() {
+                if let Some(
+                    gw @ Gateway {
+                        gateway, outputs, ..
+                    },
+                ) = gateways.pop()
+                {
+                    match gateway {
+                        // A regular join, no user code involved.
+                        GatewayType::Inclusive if outputs.len() <= 1 => {
+                            queue.push(Cow::Borrowed(outputs.ids()));
                         }
+                        // Handle fork with user code
+                        GatewayType::Inclusive if outputs.len() > 1 => {
+                            match self.handle_inclusive_gateway(data, gw)? {
+                                ControlFlow::Continue(value) => {
+                                    queue.push(Cow::Owned(vec![*value]));
+                                }
+                                ControlFlow::Break(Return::Fork(value)) => {
+                                    queue.push(value);
+                                }
+                                _ => {}
+                            }
+                        }
+                        GatewayType::Parallel => {
+                            queue.push(Cow::Borrowed(outputs.ids()));
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -134,8 +126,7 @@ impl Process {
             // Add fork flows after every Join or End. Oterwise we might add a Fork, and a Join reduce wrong token in the queue.
             for fork in forks {
                 if let Return::Fork(vec) = fork {
-                    token_stack.push(vec.len());
-                    bpmn_queue.push(vec);
+                    queue.push(vec);
                 }
             }
         }
