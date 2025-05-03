@@ -47,42 +47,31 @@ impl Process {
             let num_tokens = tokens.len();
 
             // Run flow single or multi threaded
-            let (join_and_ends, forks): (Vec<_>, Vec<_>) = {
-                let (oks, mut errors): (Vec<_>, Vec<_>) = {
-                    #[cfg(feature = "parallel")]
-                    {
-                        use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-                        tokens
-                            .par_iter()
-                            .map(|token| self.flow(token, data))
-                            .partition(Result::is_ok)
-                    }
-
-                    #[cfg(not(feature = "parallel"))]
-                    tokens
-                        .iter()
+            let results = {
+                #[cfg(feature = "parallel")]
+                {
+                    use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+                    // Need to collect the parallel iterator first.
+                    let results: Vec<_> = tokens
+                        .par_iter()
                         .map(|token| self.flow(token, data))
-                        .partition(Result::is_ok)
-                };
-
-                if let Some(result) = errors.pop() {
-                    result?;
+                        .collect::<Vec<_>>();
+                    results.into_iter()
                 }
-
-                oks.into_iter()
-                    .filter_map(Result::ok)
-                    .partition(|a| matches!(a, Return::End(_) | Return::Join(_)))
+                #[cfg(not(feature = "parallel"))]
+                tokens.into_iter().map(|token| self.flow(token, data))
             };
 
-            for result in join_and_ends {
+            for result in results {
                 match result {
-                    Return::Join(gateway) => queue.join_token(gateway),
+                    Ok(Return::Join(gateway)) => queue.join_token(gateway),
                     // Currently only a subprocess use the end symbol and should not end with multiple tokens.
-                    Return::End(symbol @ Some(_)) if queue.is_empty() && num_tokens == 1 => {
+                    Ok(Return::End(symbol @ Some(_))) if queue.is_empty() && num_tokens == 1 => {
                         return Ok(symbol);
                     }
-                    Return::End(_) => queue.end_token(),
-                    _ => {}
+                    Ok(Return::End(_)) => queue.end_token(),
+                    Ok(Return::Fork(item)) => queue.add_pending_fork(item),
+                    Err(value) => return Err(value),
                 }
             }
 
@@ -120,12 +109,8 @@ impl Process {
                 }
             }
 
-            // Add fork flows after every Join or End. Oterwise we might add a Fork, and a Join reduce wrong token in the queue.
-            for fork in forks {
-                if let Return::Fork(vec) = fork {
-                    queue.push(vec);
-                }
-            }
+            // Commit pending forks
+            queue.commit_forks();
         }
         Ok(None)
     }

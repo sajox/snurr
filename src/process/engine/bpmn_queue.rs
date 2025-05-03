@@ -5,6 +5,7 @@ use std::borrow::Cow;
 pub struct BpmnQueue<'a> {
     queue: Vec<Cow<'a, [usize]>>,
     token_handler: TokenHandler<'a>,
+    uncommitted: Vec<Cow<'a, [usize]>>,
 }
 
 impl<'a> BpmnQueue<'a> {
@@ -12,6 +13,7 @@ impl<'a> BpmnQueue<'a> {
         Self {
             queue: vec![item],
             token_handler: Default::default(),
+            uncommitted: Default::default(),
         }
     }
 
@@ -22,6 +24,16 @@ impl<'a> BpmnQueue<'a> {
     pub fn push(&mut self, item: Cow<'a, [usize]>) {
         self.token_handler.push(item.len());
         self.queue.push(item);
+    }
+
+    pub fn add_pending_fork(&mut self, item: Cow<'a, [usize]>) {
+        self.uncommitted.push(item);
+    }
+
+    pub fn commit_forks(&mut self) {
+        for item in std::mem::replace(&mut self.uncommitted, vec![]) {
+            self.push(item);
+        }
     }
 
     pub fn is_empty(&mut self) -> bool {
