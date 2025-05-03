@@ -1,6 +1,6 @@
 [package]
 name = "snurr"
-version = "0.8.0-wip"
+version = "0.8.0"
 edition = "2024"
 authors = ["sajox"]
 description = "Read BPMN 2.0 files and run the process flow"

@@ -13,6 +13,10 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
 
 ## Migration 
 
+### Version 0.7 -> 0.8
+
+Rust edition 2024
+
 ### Version 0.6 -> 0.7
 
 Snurr Error and Result type is now public
@@ -69,21 +73,21 @@ Boundary(Some("timeout"), Symbol::Timer);
 
 ```toml
 [dependencies]
-snurr = "0.7"
+snurr = "0.8"
 ```
 
 With parallel feature enabled, new threads are spawned with parallel, inclusive, task and event forks.
 
 ```toml
 [dependencies]
-snurr = { version = "0.7", features = ["parallel"] }
+snurr = { version = "0.8", features = ["parallel"] }
 ```
 
 Trace is disabled by default. It start a collector thread and trace the visited Task or Gateways for a given run.
 
 ```toml
 [dependencies]
-snurr = { version = "0.7", features = ["trace"] }
+snurr = { version = "0.8", features = ["trace"] }
 ```
 
 
