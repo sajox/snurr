@@ -59,7 +59,7 @@ impl Process {
                     results.into_iter()
                 }
                 #[cfg(not(feature = "parallel"))]
-                tokens.into_iter().map(|token| self.flow(token, data))
+                tokens.iter().map(|token| self.flow(token, data))
             };
 
             for result in results {

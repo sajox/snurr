@@ -31,7 +31,7 @@ impl<'a> BpmnQueue<'a> {
     }
 
     pub fn commit_forks(&mut self) {
-        for item in std::mem::replace(&mut self.uncommitted, vec![]) {
+        for item in std::mem::take(&mut self.uncommitted) {
             self.push(item);
         }
     }
