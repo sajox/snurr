@@ -8,6 +8,13 @@ pub struct BpmnQueue<'a> {
 }
 
 impl<'a> BpmnQueue<'a> {
+    pub fn new(item: Cow<'a, [usize]>) -> Self {
+        Self {
+            queue: vec![item],
+            token_handler: Default::default(),
+        }
+    }
+
     pub fn pop(&mut self) -> Option<Cow<'a, [usize]>> {
         self.queue.pop()
     }

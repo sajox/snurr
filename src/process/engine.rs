@@ -42,9 +42,7 @@ impl Process {
     where
         T: Send,
     {
-        let mut queue = BpmnQueue::default();
-        queue.push(Cow::from(&[0]));
-
+        let mut queue = BpmnQueue::new(Cow::from(&[0]));
         while let Some(tokens) = queue.pop() {
             let num_tokens = tokens.len();
 
@@ -56,14 +54,14 @@ impl Process {
                         use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
                         tokens
                             .par_iter()
-                            .map(|output| self.flow(output, data))
+                            .map(|token| self.flow(token, data))
                             .partition(Result::is_ok)
                     }
 
                     #[cfg(not(feature = "parallel"))]
                     tokens
                         .iter()
-                        .map(|output| self.flow(output, data))
+                        .map(|token| self.flow(token, data))
                         .partition(Result::is_ok)
                 };
 
@@ -78,7 +76,7 @@ impl Process {
 
             for result in join_and_ends {
                 match result {
-                    Return::Join(gateway_id) => queue.join_token(gateway_id),
+                    Return::Join(gateway) => queue.join_token(gateway),
                     // Currently only a subprocess use the end symbol and should not end with multiple tokens.
                     Return::End(symbol @ Some(_)) if queue.is_empty() && num_tokens == 1 => {
                         return Ok(symbol);
@@ -134,15 +132,14 @@ impl Process {
     }
 
     // Each flow process one "token" and returns on a Fork, Join or End.
-    fn flow<'a, T>(
+    fn flow<'a: 'b, 'b, T>(
         &'a self,
-        start_id: &usize,
+        mut current_id: &'b usize,
         data: &ExecuteData<'a, T>,
     ) -> Result<Return<'a>, Error>
     where
         T: Send,
     {
-        let mut current_id = start_id;
         loop {
             current_id = match data
                 .process_data
