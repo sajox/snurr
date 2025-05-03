@@ -97,26 +97,15 @@ impl Process {
                 if let Some(mut gateways) = all_joined {
                     if let Some(
                         gw @ Gateway {
-                            gateway,
-                            id,
-                            name,
-                            outputs,
-                            ..
+                            gateway, outputs, ..
                         },
                     ) = gateways.pop()
                     {
-                        let name_or_id = name.as_ref().unwrap_or(id);
                         match gateway {
                             // A regular join, no user code involved.
                             GatewayType::Inclusive if outputs.len() <= 1 => {
-                                let value = *outputs.first().ok_or_else(|| {
-                                    Error::MissingOutput(
-                                        gateway.to_string(),
-                                        name_or_id.to_string(),
-                                    )
-                                })?;
-                                token_stack.push(1);
-                                bpmn_queue.push(Cow::Owned(vec![value]));
+                                token_stack.push(outputs.len());
+                                bpmn_queue.push(Cow::Borrowed(outputs.ids()));
                             }
                             // Handle fork with user code
                             GatewayType::Inclusive if outputs.len() > 1 => {
