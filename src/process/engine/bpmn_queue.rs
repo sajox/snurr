@@ -41,11 +41,11 @@ impl<'a> BpmnQueue<'a> {
     }
 
     pub fn join_token(&mut self, gateway: &'a Gateway) {
-        self.token_handler.join(gateway);
+        self.token_handler.consume_token(Some(gateway));
     }
 
     pub fn end_token(&mut self) {
-        self.token_handler.end();
+        self.token_handler.consume_token(None);
     }
 
     pub fn tokens_consumed(&mut self) -> Option<Vec<&'a Gateway>> {
@@ -54,56 +54,54 @@ impl<'a> BpmnQueue<'a> {
 }
 
 #[derive(Default, Debug)]
-struct Data<'a> {
-    tokens: usize,
-    gateways: Vec<&'a Gateway>,
-    ends: usize,
+struct TokenData<'a> {
+    created: usize,
+    joined: Vec<&'a Gateway>,
+    consumed: usize,
 }
 
-impl Data<'_> {
-    fn new(tokens: usize) -> Self {
+impl TokenData<'_> {
+    fn new(created: usize) -> Self {
         Self {
-            tokens,
-            gateways: Default::default(),
-            ends: Default::default(),
+            created,
+            joined: Default::default(),
+            consumed: Default::default(),
         }
     }
 }
 
 #[derive(Default, Debug)]
 struct TokenHandler<'a> {
-    stack: Vec<Data<'a>>,
+    stack: Vec<TokenData<'a>>,
 }
 
 impl<'a> TokenHandler<'a> {
-    // When all tokens has been consumed with join and end then return the gateways involved.
-    fn join(&mut self, gateway: &'a Gateway) {
-        if let Some(Data { gateways, .. }) = self.stack.last_mut() {
-            gateways.push(gateway);
-        }
-    }
-
-    fn end(&mut self) {
-        if let Some(Data { ends, .. }) = self.stack.last_mut() {
-            *ends += 1;
-        }
-    }
-
-    fn consumed(&mut self) -> Option<Vec<&'a Gateway>> {
-        if let Some(Data {
-            gateways,
-            tokens,
-            ends,
+    fn consume_token(&mut self, join: Option<&'a Gateway>) {
+        if let Some(TokenData {
+            joined, consumed, ..
         }) = self.stack.last_mut()
         {
-            if tokens.saturating_sub(gateways.len() + *ends) == 0 {
-                return self.stack.pop().map(|data| data.gateways);
+            if let Some(gateway) = join {
+                joined.push(gateway)
+            }
+            *consumed += 1;
+        }
+    }
+
+    // Once all tokens have been used up, return the gateways involved.
+    fn consumed(&mut self) -> Option<Vec<&'a Gateway>> {
+        if let Some(TokenData {
+            created, consumed, ..
+        }) = self.stack.last_mut()
+        {
+            if created.saturating_sub(*consumed) == 0 {
+                return self.stack.pop().map(|data| data.joined);
             }
         }
         None
     }
 
     fn push(&mut self, tokens: usize) {
-        self.stack.push(Data::new(tokens));
+        self.stack.push(TokenData::new(tokens));
     }
 }
