@@ -70,6 +70,8 @@ pub enum Error {
 pub const AT_LEAST_TWO_OUTGOING: &str =
     "Event gateway must have at least two outgoing sequence flows";
 
+pub const TOO_MANY_END_SYMBOLS: &str = "Too many end with a symbol";
+
 pub fn cannot_do_events(gateway: &crate::model::GatewayType) -> Error {
     Error::BpmnRequirement(format!("{gateway} cannot do decision based on events"))
 }

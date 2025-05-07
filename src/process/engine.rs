@@ -12,8 +12,8 @@ use std::sync::mpsc::Sender;
 use crate::{
     Data, Eventhandler, Process, Symbol,
     error::{
-        AT_LEAST_TWO_OUTGOING, Error, cannot_do_events, cannot_fork, cannot_use_cond_expr,
-        cannot_use_default,
+        AT_LEAST_TWO_OUTGOING, Error, TOO_MANY_END_SYMBOLS, cannot_do_events, cannot_fork,
+        cannot_use_cond_expr, cannot_use_default,
     },
     model::{ActivityType, Bpmn, BpmnLocal, EventType, Gateway, GatewayType, With},
 };
@@ -42,10 +42,9 @@ impl Process {
     where
         T: Send,
     {
+        let mut end_symbol = None;
         let mut queue = BpmnQueue::new(Cow::from(&[0]));
         while let Some(tokens) = queue.pop() {
-            let num_tokens = tokens.len();
-
             // Run flow single or multi threaded
             let results = {
                 #[cfg(feature = "parallel")]
@@ -65,11 +64,14 @@ impl Process {
             for result in results {
                 match result {
                     Ok(Return::Join(gateway)) => queue.join_token(gateway),
-                    // Currently only a subprocess use the end symbol and should not end with multiple tokens.
-                    Ok(Return::End(symbol @ Some(_))) if queue.is_empty() && num_tokens == 1 => {
-                        return Ok(symbol);
+                    Ok(Return::End(value)) => {
+                        if let Some(symbol) = value {
+                            if let Some(_) = end_symbol.replace(symbol) {
+                                return Err(Error::BpmnRequirement(TOO_MANY_END_SYMBOLS.into()));
+                            }
+                        }
+                        queue.end_token();
                     }
-                    Ok(Return::End(_)) => queue.end_token(),
                     Ok(Return::Fork(item)) => queue.add_pending_fork(item),
                     Err(value) => return Err(value),
                 }
@@ -112,7 +114,7 @@ impl Process {
             // Commit pending forks
             queue.commit_forks();
         }
-        Ok(None)
+        Ok(end_symbol)
     }
 
     // Each flow process one "token" and returns on a Fork, Join or End.

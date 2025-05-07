@@ -36,10 +36,6 @@ impl<'a> BpmnQueue<'a> {
         }
     }
 
-    pub fn is_empty(&mut self) -> bool {
-        self.queue.is_empty()
-    }
-
     pub fn join_token(&mut self, gateway: &'a Gateway) {
         self.token_handler.consume_token(Some(gateway));
     }
