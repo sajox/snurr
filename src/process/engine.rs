@@ -65,10 +65,8 @@ impl Process {
                 match result {
                     Ok(Return::Join(gateway)) => queue.join_token(gateway),
                     Ok(Return::End(value)) => {
-                        if let Some(symbol) = value {
-                            if let Some(_) = end_symbol.replace(symbol) {
-                                return Err(Error::BpmnRequirement(TOO_MANY_END_SYMBOLS.into()));
-                            }
+                        if value.is_some_and(|symbol| end_symbol.replace(symbol).is_some()) {
+                            return Err(Error::BpmnRequirement(TOO_MANY_END_SYMBOLS.into()));
                         }
                         queue.end_token();
                     }
