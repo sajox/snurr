@@ -42,77 +42,89 @@ impl Process {
     where
         T: Send,
     {
-        let mut end_symbol = None;
+        let mut bpmn_end = None;
         let mut queue = BpmnQueue::new(Cow::from(&[0]));
-        while let Some(tokens) = queue.pop() {
-            // Run flow single or multi threaded
-            let results = {
+        loop {
+            let all_tokens = queue.take_tokens();
+            if all_tokens.is_empty() {
+                return Ok(bpmn_end);
+            }
+
+            let result_iter = {
                 #[cfg(feature = "parallel")]
                 {
                     use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-                    // Need to collect the parallel iterator first.
-                    let results: Vec<_> = tokens
+                    let results: Vec<Vec<_>> = all_tokens
                         .par_iter()
-                        .map(|token| self.flow(token, data))
+                        .map(|tokens| {
+                            tokens
+                                .par_iter()
+                                .map(|token| self.flow(token, data))
+                                .collect()
+                        })
                         .collect::<Vec<_>>();
                     results.into_iter()
                 }
                 #[cfg(not(feature = "parallel"))]
-                tokens.iter().map(|token| self.flow(token, data))
+                all_tokens
+                    .iter()
+                    .map(|tokens| tokens.iter().map(|token| self.flow(token, data)))
             };
 
-            for result in results {
-                match result {
-                    Ok(Return::Join(gateway)) => queue.join_token(gateway),
-                    Ok(Return::End(value)) => {
-                        if value.is_some_and(|symbol| end_symbol.replace(symbol).is_some()) {
-                            return Err(Error::BpmnRequirement(TOO_MANY_END_SYMBOLS.into()));
-                        }
-                        queue.end_token();
-                    }
-                    Ok(Return::Fork(item)) => queue.add_pending_fork(item),
-                    Err(value) => return Err(value),
-                }
-            }
-
-            // Once all inputs have been merged for a gateway, then proceed with its outputs.
-            // The gateway vector contains all the gateways involved. Right now we are using balanced diagram
-            // and do not need to investigate further.
-            if let Some(mut gateways) = queue.tokens_consumed() {
-                if let Some(
-                    gw @ Gateway {
-                        gateway, outputs, ..
-                    },
-                ) = gateways.pop()
-                {
-                    match gateway {
-                        GatewayType::Parallel => {
-                            queue.push(Cow::Borrowed(outputs.ids()));
-                        }
-                        GatewayType::Inclusive if outputs.len() == 1 => {
-                            queue.push(Cow::Borrowed(outputs.ids()));
-                        }
-                        // Handle Fork, the user code determine next token(s) to run.
-                        GatewayType::Inclusive if outputs.len() > 1 => {
-                            match self.handle_inclusive_gateway(data, gw)? {
-                                ControlFlow::Continue(value) => {
-                                    queue.push(Cow::Owned(vec![*value]));
-                                }
-                                ControlFlow::Break(Return::Fork(value)) => {
-                                    queue.push(value);
-                                }
-                                _ => {}
+            for inner_iter in result_iter {
+                for result in inner_iter {
+                    match result {
+                        Ok(Return::Join(gateway)) => queue.join_token(gateway),
+                        Ok(Return::End(value)) => {
+                            if value.is_some_and(|symbol| bpmn_end.replace(symbol).is_some()) {
+                                return Err(Error::BpmnRequirement(TOO_MANY_END_SYMBOLS.into()));
                             }
+                            queue.end_token();
                         }
-                        _ => {}
+                        Ok(Return::Fork(item)) => queue.add_pending_fork(item),
+                        Err(value) => return Err(value),
+                    }
+                }
+
+                // Once all inputs have been merged for a gateway, then proceed with its outputs.
+                // The gateway vector contains all the gateways involved. Right now we are using balanced diagram
+                // and do not need to investigate further.
+                if let Some(mut gateways) = queue.tokens_consumed() {
+                    if let Some(
+                        gw @ Gateway {
+                            gateway, outputs, ..
+                        },
+                    ) = gateways.pop()
+                    {
+                        match gateway {
+                            GatewayType::Parallel | GatewayType::Inclusive
+                                if outputs.len() == 1 =>
+                            {
+                                queue.push_output(Cow::Borrowed(outputs.ids()));
+                            }
+                            GatewayType::Parallel => {
+                                queue.push_fork(Cow::Borrowed(outputs.ids()));
+                            }
+                            // Handle Fork, the user code determine next token(s) to run.
+                            GatewayType::Inclusive if outputs.len() > 1 => {
+                                match self.handle_inclusive_gateway(data, gw)? {
+                                    ControlFlow::Continue(value) => {
+                                        queue.push_fork(Cow::Owned(vec![*value]));
+                                    }
+                                    ControlFlow::Break(Return::Fork(value)) => {
+                                        queue.push_fork(value);
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            _ => {}
+                        }
                     }
                 }
             }
-
             // Commit pending forks
             queue.commit_forks();
         }
-        Ok(end_symbol)
     }
 
     // Each flow process one "token" and returns on a Fork, Join or End.

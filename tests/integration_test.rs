@@ -485,7 +485,7 @@ fn parallel_multi() -> Result<()> {
     handler.add_task(COUNT_1, func_cnt(1));
     let bpmn = Process::new("tests/files/parallel_multi.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
-    assert_eq!(pr.result.count, 5);
+    assert_eq!(pr.result.count, 7);
     Ok(())
 }
 

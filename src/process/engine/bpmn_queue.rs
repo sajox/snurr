@@ -17,11 +17,15 @@ impl<'a> BpmnQueue<'a> {
         }
     }
 
-    pub fn pop(&mut self) -> Option<Cow<'a, [usize]>> {
-        self.queue.pop()
+    pub fn take_tokens(&mut self) -> Vec<Cow<'a, [usize]>> {
+        std::mem::take(&mut self.queue)
     }
 
-    pub fn push(&mut self, item: Cow<'a, [usize]>) {
+    pub fn push_output(&mut self, item: Cow<'a, [usize]>) {
+        self.queue.push(item);
+    }
+
+    pub fn push_fork(&mut self, item: Cow<'a, [usize]>) {
         self.token_handler.push(item.len());
         self.queue.push(item);
     }
@@ -32,7 +36,7 @@ impl<'a> BpmnQueue<'a> {
 
     pub fn commit_forks(&mut self) {
         for item in std::mem::take(&mut self.uncommitted) {
-            self.push(item);
+            self.push_fork(item);
         }
     }
 
