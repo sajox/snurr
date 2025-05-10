@@ -293,6 +293,24 @@ fn inclusive_join_fork_gateway_verify_sync() -> Result<()> {
 }
 
 #[test]
+fn parallel_inclusive_join_fork() -> Result<()> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+    handler.add_gateway("GW A", |_| vec!["A", "B"].into());
+    handler.add_gateway("GW AA", |_| vec!["A", "B", "C"].into());
+    handler.add_gateway("GW AAA", |_| vec!["A", "B", "C", "D", "E"].into());
+
+    handler.add_gateway("GW B", |_| vec!["A", "B", "C"].into());
+    handler.add_gateway("GW BB", |_| vec!["A", "B"].into());
+    handler.add_gateway("GW BBB", |_| vec!["A", "B", "C", "D"].into());
+
+    let bpmn = Process::new("tests/files/parallel_inclusive_join_fork.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 23);
+    Ok(())
+}
+
+#[test]
 fn parallell_gateway() -> Result<()> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
     handler.add_task(COUNT_1, func_cnt(1));
@@ -496,6 +514,16 @@ fn parallel_join_fork() -> Result<()> {
     let bpmn = Process::new("tests/files/parallel_join_fork.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
     assert_eq!(pr.result.count, 6);
+    Ok(())
+}
+
+#[test]
+fn parallel_parallel_join_fork() -> Result<()> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+    let bpmn = Process::new("tests/files/parallel_parallel_join_fork.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 23);
     Ok(())
 }
 

@@ -1,3 +1,5 @@
+use log::debug;
+
 use crate::model::Gateway;
 use std::borrow::Cow;
 
@@ -30,11 +32,11 @@ impl<'a> BpmnQueue<'a> {
         self.queue.push(item);
     }
 
-    pub fn add_pending_fork(&mut self, item: Cow<'a, [usize]>) {
+    pub fn add_pending(&mut self, item: Cow<'a, [usize]>) {
         self.uncommitted.push(item);
     }
 
-    pub fn commit_forks(&mut self) {
+    pub fn commit(&mut self) {
         for item in std::mem::take(&mut self.uncommitted) {
             self.push_fork(item);
         }
@@ -85,6 +87,7 @@ impl<'a> TokenHandler<'a> {
                 joined.push(gateway)
             }
             *consumed += 1;
+            debug!("TOKENS CONSUMED {}", consumed);
         }
     }
 
@@ -95,6 +98,7 @@ impl<'a> TokenHandler<'a> {
         }) = self.stack.last_mut()
         {
             if created.saturating_sub(*consumed) == 0 {
+                debug!("ALL CONSUMED expected: {}, consumed: {}", created, consumed);
                 return self.stack.pop().map(|data| data.joined);
             }
         }
@@ -102,6 +106,7 @@ impl<'a> TokenHandler<'a> {
     }
 
     fn push(&mut self, tokens: usize) {
+        debug!("NEW TOKENS {}", tokens);
         self.stack.push(TokenData::new(tokens));
     }
 }
