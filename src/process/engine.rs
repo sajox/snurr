@@ -85,41 +85,41 @@ impl Process {
                         Ok(Return::Fork(item)) => queue.add_pending(item),
                         Err(value) => return Err(value),
                     }
+                }
 
-                    // Once all inputs have been merged for a gateway, then proceed with its outputs.
-                    // The gateway vector contains all the gateways involved. Right now we are using balanced diagram
-                    // and do not need to investigate further.
-                    if let Some(mut gateways) = queue.tokens_consumed() {
-                        if let Some(
-                            gw @ Gateway {
-                                gateway, outputs, ..
-                            },
-                        ) = gateways.pop()
-                        {
-                            // We cannot add new tokens until we have correlated all processed flows.
-                            match gateway {
-                                GatewayType::Parallel | GatewayType::Inclusive
-                                    if outputs.len() == 1 =>
-                                {
-                                    queue.push_output(Cow::Borrowed(outputs.ids()));
-                                }
-                                GatewayType::Parallel => {
-                                    queue.add_pending(Cow::Borrowed(outputs.ids()));
-                                }
-                                // Handle Fork, the user code determine next token(s) to run.
-                                GatewayType::Inclusive if outputs.len() > 1 => {
-                                    match self.handle_inclusive_gateway(data, gw)? {
-                                        ControlFlow::Continue(value) => {
-                                            queue.add_pending(Cow::Owned(vec![*value]));
-                                        }
-                                        ControlFlow::Break(Return::Fork(value)) => {
-                                            queue.add_pending(value);
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                                _ => {}
+                // Once all inputs have been merged for a gateway, then proceed with its outputs.
+                // The gateway vector contains all the gateways involved. Right now we are using balanced diagram
+                // and do not need to investigate further.
+                if let Some(mut gateways) = queue.tokens_consumed() {
+                    if let Some(
+                        gw @ Gateway {
+                            gateway, outputs, ..
+                        },
+                    ) = gateways.pop()
+                    {
+                        // We cannot add new tokens until we have correlated all processed flows.
+                        match gateway {
+                            GatewayType::Parallel | GatewayType::Inclusive
+                                if outputs.len() == 1 =>
+                            {
+                                queue.push_output(Cow::Borrowed(outputs.ids()));
                             }
+                            GatewayType::Parallel => {
+                                queue.add_pending(Cow::Borrowed(outputs.ids()));
+                            }
+                            // Handle Fork, the user code determine next token(s) to run.
+                            GatewayType::Inclusive if outputs.len() > 1 => {
+                                match self.handle_inclusive_gateway(data, gw)? {
+                                    ControlFlow::Continue(value) => {
+                                        queue.add_pending(Cow::Owned(vec![*value]));
+                                    }
+                                    ControlFlow::Break(Return::Fork(value)) => {
+                                        queue.add_pending(value);
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            _ => {}
                         }
                     }
                 }
