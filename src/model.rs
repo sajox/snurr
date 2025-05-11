@@ -5,7 +5,7 @@ use std::fmt::Display;
 pub(crate) type HashMap<K, V, S = std::hash::RandomState> = std::collections::HashMap<K, V, S>;
 
 #[cfg(feature = "hashbrown")]
-pub(crate) type HashMap<K, V, S = hashbrown::DefaultHashBuilder> = hashbrown::HashMap<K, V, S>;
+pub(crate) type HashMap<K, V, S = foldhash::fast::RandomState> = std::collections::HashMap<K, V, S>;
 
 pub(crate) const DEFINITIONS: &[u8] = b"definitions";
 pub(crate) const PROCESS: &[u8] = b"process";
