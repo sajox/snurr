@@ -126,8 +126,12 @@ impl DataBuilder {
                 }
             }
             Bpmn::Gateway(Gateway {
-                default, outputs, ..
+                id,
+                default,
+                outputs,
+                ..
             }) => {
+                update_local_id(id, &bpmn_index);
                 outputs.update_local_ids(&bpmn_index);
                 if let Some(default) = default {
                     update_local_id(default, &bpmn_index);

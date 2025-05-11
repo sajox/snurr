@@ -527,7 +527,6 @@ fn parallel_parallel_join_fork() -> Result<()> {
     Ok(())
 }
 
-#[ignore]
 #[test]
 fn parallel_unbalanced() -> Result<()> {
     let mut handler: Eventhandler<Counter> = Eventhandler::default();
@@ -535,6 +534,16 @@ fn parallel_unbalanced() -> Result<()> {
     let bpmn = Process::new("tests/files/parallel_unbalanced.bpmn")?;
     let pr = bpmn.run(&handler, Counter::default())?;
     assert_eq!(pr.result.count, 5);
+    Ok(())
+}
+
+#[test]
+fn parallel_unbalanced2() -> Result<()> {
+    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    handler.add_task(COUNT_1, func_cnt(1));
+    let bpmn = Process::new("tests/files/parallel_unbalanced2.bpmn")?;
+    let pr = bpmn.run(&handler, Counter::default())?;
+    assert_eq!(pr.result.count, 6);
     Ok(())
 }
 

@@ -315,7 +315,7 @@ impl TryFrom<&[u8]> for Symbol {
 #[derive(Debug)]
 pub(crate) struct Gateway {
     pub(crate) gateway: GatewayType,
-    pub(crate) id: String,
+    pub(crate) id: BpmnLocal,
     pub(crate) name: Option<String>,
     pub(crate) default: Option<BpmnLocal>,
     pub(crate) outputs: Outputs,
@@ -364,10 +364,9 @@ impl Bpmn {
         match self {
             Bpmn::Definitions { id, .. }
             | Bpmn::Process { id, .. }
-            | Bpmn::Gateway(Gateway { id, .. })
             | Bpmn::Activity { id, .. }
             | Bpmn::SequenceFlow { id, .. } => Ok(id),
-            Bpmn::Event { id, .. } => Ok(id.bpmn()),
+            Bpmn::Event { id, .. } | Bpmn::Gateway(Gateway { id, .. }) => Ok(id.bpmn()),
             Bpmn::Direction { direction, .. } => Err(Error::MissingId(direction.to_string())),
         }
     }
@@ -443,7 +442,8 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     gateway: bpmn_type.try_into()?,
                     id: attributes
                         .remove(ATTRIB_ID)
-                        .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
+                        .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
+                        .into(),
                     name: attributes.remove(ATTRIB_NAME),
                     default: attributes.remove(ATTRIB_DEFAULT).map(Into::into),
                     outputs: Default::default(),

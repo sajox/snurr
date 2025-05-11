@@ -1,25 +1,27 @@
 use log::debug;
 
-use crate::model::Gateway;
+use crate::model::{Gateway, GatewayType, HashMap};
 use std::borrow::Cow;
 
 #[derive(Default, Debug)]
 pub struct BpmnQueue<'a> {
     queue: Vec<Cow<'a, [usize]>>,
-    token_handler: TokenHandler<'a>,
     uncommitted: Vec<Cow<'a, [usize]>>,
+    inclusive_handler: InclusiveGatewayHandler<'a>,
+    parallel_handler: ParallelGatewayHandler,
 }
 
 impl<'a> BpmnQueue<'a> {
     pub fn new(item: Cow<'a, [usize]>) -> Self {
         Self {
             queue: vec![item],
-            token_handler: Default::default(),
             uncommitted: Default::default(),
+            inclusive_handler: Default::default(),
+            parallel_handler: Default::default(),
         }
     }
 
-    pub fn take_tokens(&mut self) -> Vec<Cow<'a, [usize]>> {
+    pub fn take(&mut self) -> Vec<Cow<'a, [usize]>> {
         std::mem::take(&mut self.queue)
     }
 
@@ -28,7 +30,7 @@ impl<'a> BpmnQueue<'a> {
     }
 
     pub fn push_fork(&mut self, item: Cow<'a, [usize]>) {
-        self.token_handler.push(item.len());
+        self.inclusive_handler.push(item.len());
         self.queue.push(item);
     }
 
@@ -43,15 +45,23 @@ impl<'a> BpmnQueue<'a> {
     }
 
     pub fn join_token(&mut self, gateway: &'a Gateway) {
-        self.token_handler.consume_token(Some(gateway));
+        match gateway.gateway {
+            GatewayType::Parallel => {
+                if let Some(gw) = self.parallel_handler.consume(gateway) {
+                    self.push_output(Cow::Borrowed(gw.outputs.ids()));
+                }
+            }
+            GatewayType::Inclusive => self.inclusive_handler.consume(Some(gateway)),
+            _ => {}
+        }
     }
 
     pub fn end_token(&mut self) {
-        self.token_handler.consume_token(None);
+        self.inclusive_handler.consume(None);
     }
 
     pub fn tokens_consumed(&mut self) -> Option<Vec<&'a Gateway>> {
-        self.token_handler.consumed()
+        self.inclusive_handler.consumed()
     }
 }
 
@@ -73,12 +83,12 @@ impl TokenData<'_> {
 }
 
 #[derive(Default, Debug)]
-struct TokenHandler<'a> {
+struct InclusiveGatewayHandler<'a> {
     stack: Vec<TokenData<'a>>,
 }
 
-impl<'a> TokenHandler<'a> {
-    fn consume_token(&mut self, join: Option<&'a Gateway>) {
+impl<'a> InclusiveGatewayHandler<'a> {
+    fn consume(&mut self, join: Option<&'a Gateway>) {
         if let Some(TokenData {
             joined, consumed, ..
         }) = self.stack.last_mut()
@@ -108,5 +118,29 @@ impl<'a> TokenHandler<'a> {
     fn push(&mut self, tokens: usize) {
         debug!("NEW TOKENS {}", tokens);
         self.stack.push(TokenData::new(tokens));
+    }
+}
+
+// Keeps the state of the visited parallel gateways.
+#[derive(Debug, Default)]
+struct ParallelGatewayHandler {
+    state: HashMap<usize, usize>,
+}
+
+impl ParallelGatewayHandler {
+    fn consume<'a>(&mut self, join: &'a Gateway) -> Option<&'a Gateway> {
+        let consumed = self.state.entry(*join.id.local()).or_default();
+        *consumed += 1;
+        debug!("TOKENS CONSUMED {}", consumed);
+        if *consumed >= join.inputs.len() {
+            debug!(
+                "ALL CONSUMED expected: {}, consumed: {}",
+                join.inputs.len(),
+                consumed
+            );
+            *consumed -= join.inputs.len();
+            return Some(join);
+        }
+        None
     }
 }

@@ -337,10 +337,6 @@ RUST_LOG=warn cargo run
 
 ![Conditional Sequence Flows](/tests/not_supported/conditional_sequence_flows.png)
 
-### Both join and fork (Inclusive and Parallel gateway) (Supported with version 0.8)
+### Unbalanced Inclusive gateway
 
-![Join and fork](/tests/not_supported/join_and_fork.png)
-
-### Unbalanced Parallel or Inclusive gateway
-
-![Unbalanced Parallel or Inclusive gateway](/tests/not_supported/parallel_unbalanced.png)
+![Unbalanced Inclusive gateway](/tests/not_supported/inclusive_unbalanced.png)

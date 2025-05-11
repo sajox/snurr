@@ -3,7 +3,7 @@ use std::{collections::HashSet, io::Write, path::Path};
 use crate::{
     Process,
     error::Error,
-    model::{ActivityType, Bpmn, Gateway, GatewayType, Symbol},
+    model::{ActivityType, Bpmn, BpmnLocal, Gateway, GatewayType, Symbol},
 };
 
 impl Process {
@@ -153,7 +153,7 @@ impl<'a> Scaffold<'a> {
                 bpmn:
                     Bpmn::Gateway(Gateway {
                         gateway,
-                        id,
+                        id: BpmnLocal(id, _),
                         name,
                         outputs,
                         ..

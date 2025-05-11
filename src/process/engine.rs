@@ -45,7 +45,7 @@ impl Process {
         let mut bpmn_end = None;
         let mut queue = BpmnQueue::new(Cow::from(&[0]));
         loop {
-            let all_tokens = queue.take_tokens();
+            let all_tokens = queue.take();
             if all_tokens.is_empty() {
                 return Ok(bpmn_end);
             }
@@ -99,13 +99,8 @@ impl Process {
                     {
                         // We cannot add new tokens until we have correlated all processed flows.
                         match gateway {
-                            GatewayType::Parallel | GatewayType::Inclusive
-                                if outputs.len() == 1 =>
-                            {
+                            GatewayType::Inclusive if outputs.len() == 1 => {
                                 queue.push_output(Cow::Borrowed(outputs.ids()));
-                            }
-                            GatewayType::Parallel => {
-                                queue.add_pending(Cow::Borrowed(outputs.ids()));
                             }
                             // Handle Fork, the user code determine next token(s) to run.
                             GatewayType::Inclusive if outputs.len() > 1 => {
@@ -244,7 +239,7 @@ impl Process {
                 Bpmn::Gateway(
                     gw @ Gateway {
                         gateway,
-                        id,
+                        id: BpmnLocal(id, _),
                         name,
                         default,
                         outputs,
@@ -336,7 +331,7 @@ impl Process {
         data: &ExecuteData<'a, T>,
         Gateway {
             gateway,
-            id,
+            id: BpmnLocal(id, _),
             name,
             default,
             outputs,
