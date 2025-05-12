@@ -103,16 +103,12 @@ impl Process {
                                 queue.push_output(Cow::Borrowed(outputs.ids()));
                             }
                             // Handle Fork, the user code determine next token(s) to run.
-                            GatewayType::Inclusive if outputs.len() > 1 => {
-                                match self.handle_inclusive_gateway(data, gw)? {
-                                    ControlFlow::Continue(value) => {
-                                        queue.add_pending(Cow::Owned(vec![*value]));
-                                    }
-                                    ControlFlow::Break(Return::Fork(value)) => {
-                                        queue.add_pending(value);
-                                    }
-                                    _ => {}
-                                }
+                            GatewayType::Inclusive => {
+                                let value = match self.handle_inclusive_gateway(data, gw)? {
+                                    ControlFlow::Continue(value) => Cow::Owned(vec![*value]),
+                                    ControlFlow::Break(value) => value,
+                                };
+                                queue.add_pending(value);
                             }
                             _ => {}
                         }
@@ -287,7 +283,7 @@ impl Process {
                         }
                         GatewayType::Inclusive => match self.handle_inclusive_gateway(data, gw)? {
                             ControlFlow::Continue(value) => value,
-                            ControlFlow::Break(value) => return Ok(value),
+                            ControlFlow::Break(value) => return Ok(Return::Fork(value)),
                         },
                         GatewayType::EventBased if outputs.len() == 1 => {
                             return Err(Error::BpmnRequirement(AT_LEAST_TWO_OUTGOING.into()));
@@ -337,35 +333,30 @@ impl Process {
             outputs,
             ..
         }: &'a Gateway,
-    ) -> Result<ControlFlow<Return<'a>, &'a usize>, Error> {
+    ) -> Result<ControlFlow<Cow<'a, [usize]>, &'a usize>, Error> {
         let name_or_id = name.as_ref().unwrap_or(id);
-        let response = data.handler.run_gateway(name_or_id, data.user_data());
-        let value = match response {
+        let value = match data.handler.run_gateway(name_or_id, data.user_data()) {
             With::Flow(value) => output_by_name_or_id(value, outputs.ids(), data.process_data)
                 .ok_or_else(|| Error::MissingOutput(gateway.to_string(), name_or_id.to_string()))?,
-            With::Fork(value) => {
-                if value.is_empty() {
-                    default_path(default, gateway, name_or_id)?
-                } else {
-                    let outputs = outputs.ids();
-                    let responses: Vec<_> = value
-                        .iter()
-                        .filter_map(|&response| {
-                            output_by_name_or_id(response, outputs, data.process_data)
-                        })
-                        .collect();
 
-                    if responses.len() <= 1 {
-                        *responses.first().ok_or_else(|| {
-                            Error::MissingOutput(gateway.to_string(), name_or_id.to_string())
-                        })?
-                    } else {
-                        return Ok(ControlFlow::Break(Return::Fork(Cow::Owned(
-                            responses.into_iter().cloned().collect(),
-                        ))));
-                    }
+            With::Fork(value) => match value.as_slice() {
+                [] => default_path(default, gateway, name_or_id)?,
+                [one] => output_by_name_or_id(one, outputs.ids(), data.process_data).ok_or_else(
+                    || Error::MissingOutput(gateway.to_string(), name_or_id.to_string()),
+                )?,
+                [..] => {
+                    let outputs = outputs.ids();
+                    return Ok(ControlFlow::Break(Cow::Owned(
+                        value
+                            .iter()
+                            .filter_map(|&response| {
+                                output_by_name_or_id(response, outputs, data.process_data)
+                            })
+                            .cloned()
+                            .collect(),
+                    )));
                 }
-            }
+            },
             With::Default => default_path(default, gateway, name_or_id)?,
             With::Symbol(_, _) => return Err(cannot_do_events(gateway)),
         };
