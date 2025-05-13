@@ -1,22 +1,15 @@
 mod bpmn_queue;
 
+use crate::{
+    Process, Symbol,
+    error::{AT_LEAST_TWO_OUTGOING, Error, TOO_MANY_END_SYMBOLS},
+    model::{ActivityType, Bpmn, BpmnLocal, EventType, Gateway, GatewayType, With},
+};
 use bpmn_queue::BpmnQueue;
 use log::info;
 use std::{borrow::Cow, ops::ControlFlow, sync::Arc};
 
-#[cfg(feature = "trace")]
-use crate::process::replay;
-#[cfg(feature = "trace")]
-use std::sync::mpsc::Sender;
-
-use crate::{
-    Data, Eventhandler, Process, Symbol,
-    error::{
-        AT_LEAST_TWO_OUTGOING, Error, TOO_MANY_END_SYMBOLS, cannot_do_events, cannot_fork,
-        cannot_use_cond_expr, cannot_use_default,
-    },
-    model::{ActivityType, Bpmn, BpmnLocal, EventType, Gateway, GatewayType, With},
-};
+use super::handler::Data;
 
 #[derive(Debug)]
 enum Return<'a> {
@@ -37,8 +30,8 @@ macro_rules! maybe_fork {
     };
 }
 
-impl Process {
-    pub(super) fn execute<'a, T>(&'a self, data: &ExecuteData<'a, T>) -> ExecuteResult<'a>
+impl<T> Process<T> {
+    pub(super) fn execute<'a>(&'a self, data: &ExecuteData<'a, T>) -> ExecuteResult<'a>
     where
         T: Send,
     {
@@ -121,7 +114,7 @@ impl Process {
     }
 
     // Each flow process one "token" and returns on a Fork, Join or End.
-    fn flow<'a: 'b, 'b, T>(
+    fn flow<'a: 'b, 'b>(
         &'a self,
         mut current_id: &'b usize,
         data: &ExecuteData<'a, T>,
@@ -172,6 +165,7 @@ impl Process {
                 Bpmn::Activity {
                     activity,
                     id,
+                    func_id,
                     name,
                     outputs,
                     ..
@@ -188,10 +182,8 @@ impl Process {
                         | ActivityType::SendTask
                         | ActivityType::ManualTask
                         | ActivityType::BusinessRuleTask => {
-                            #[cfg(feature = "trace")]
-                            data.trace(replay::TASK, name_or_id)?;
                             if let Some(boundary) =
-                                data.handler.run_task(name_or_id, data.user_data())
+                                self.handler.run_task(func_id.as_ref(), data.user_data())
                             {
                                 self.boundary_lookup(id, boundary.0, &boundary.1, data.process_data)
                                     .ok_or_else(|| {
@@ -206,6 +198,7 @@ impl Process {
                         }
                         ActivityType::SubProcess => {
                             let sp_data = self
+                                .diagram
                                 .data
                                 .get(id)
                                 .ok_or_else(|| Error::MissingProcessData(id.into()))?;
@@ -236,6 +229,7 @@ impl Process {
                     gw @ Gateway {
                         gateway,
                         id: BpmnLocal(id, _),
+                        func_id,
                         name,
                         default,
                         outputs,
@@ -244,9 +238,6 @@ impl Process {
                 ) => {
                     let name_or_id = name.as_ref().unwrap_or(id);
                     info!("{}: {}", gateway, name_or_id);
-                    #[cfg(feature = "trace")]
-                    data.trace(replay::GATEWAY, name_or_id)?;
-
                     match gateway {
                         _ if outputs.len() == 0 => {
                             return Err(Error::MissingOutput(
@@ -258,9 +249,11 @@ impl Process {
                         _ if outputs.len() == 1 && inputs.len() == 1 => outputs.first().unwrap(),
                         GatewayType::Exclusive if outputs.len() == 1 => outputs.first().unwrap(),
                         GatewayType::Exclusive => {
-                            let response = data.handler.run_gateway(name_or_id, data.user_data());
-                            match response {
-                                With::Flow(value) => {
+                            match self
+                                .handler
+                                .run_exclusive(func_id.as_ref(), data.user_data())
+                            {
+                                Some(value) => {
                                     output_by_name_or_id(value, outputs.ids(), data.process_data)
                                         .ok_or_else(|| {
                                             Error::MissingOutput(
@@ -269,9 +262,7 @@ impl Process {
                                             )
                                         })?
                                 }
-                                With::Default => default_path(default, gateway, name_or_id)?,
-                                With::Fork(_) => return Err(cannot_fork(gateway)),
-                                With::Symbol(_, _) => return Err(cannot_do_events(gateway)),
+                                None => default_path(default, gateway, name_or_id)?,
                             }
                         }
                         // Handle a regular Join or a JoinFork. In both cases, we need to wait for all tokens.
@@ -289,10 +280,12 @@ impl Process {
                             return Err(Error::BpmnRequirement(AT_LEAST_TWO_OUTGOING.into()));
                         }
                         GatewayType::EventBased => {
-                            let response = data.handler.run_gateway(name_or_id, data.user_data());
-                            match response {
-                                With::Symbol(_, _) => {
-                                    output_by_symbol(&response, outputs.ids(), data.process_data)
+                            match self
+                                .handler
+                                .run_event_based(func_id.as_ref(), data.user_data())
+                            {
+                                Some(value) => {
+                                    output_by_symbol(value, outputs.ids(), data.process_data)
                                         .ok_or_else(|| {
                                             Error::MissingOutput(
                                                 gateway.to_string(),
@@ -300,9 +293,7 @@ impl Process {
                                             )
                                         })?
                                 }
-                                With::Default => return Err(cannot_use_default(gateway)),
-                                With::Flow(_) => return Err(cannot_use_cond_expr(gateway)),
-                                With::Fork(_) => return Err(cannot_fork(gateway)),
+                                None => panic!("TODO"),
                             }
                         }
                     }
@@ -322,12 +313,13 @@ impl Process {
         Ok(Return::End(None))
     }
 
-    fn handle_inclusive_gateway<'a, T>(
+    fn handle_inclusive_gateway<'a>(
         &'a self,
         data: &ExecuteData<'a, T>,
         Gateway {
             gateway,
             id: BpmnLocal(id, _),
+            func_id,
             name,
             default,
             outputs,
@@ -335,7 +327,10 @@ impl Process {
         }: &'a Gateway,
     ) -> Result<ControlFlow<Cow<'a, [usize]>, &'a usize>, Error> {
         let name_or_id = name.as_ref().unwrap_or(id);
-        let value = match data.handler.run_gateway(name_or_id, data.user_data()) {
+        let value = match self
+            .handler
+            .run_inclusive(func_id.as_ref(), data.user_data())
+        {
             With::Flow(value) => output_by_name_or_id(value, outputs.ids(), data.process_data)
                 .ok_or_else(|| Error::MissingOutput(gateway.to_string(), name_or_id.to_string()))?,
 
@@ -358,7 +353,6 @@ impl Process {
                 }
             },
             With::Default => default_path(default, gateway, name_or_id)?,
-            With::Symbol(_, _) => return Err(cannot_do_events(gateway)),
         };
         Ok(ControlFlow::Continue(value))
     }
@@ -370,7 +364,8 @@ impl Process {
         search_symbol: &Symbol,
         process_data: &'a [Bpmn],
     ) -> Option<&'a usize> {
-        self.boundaries
+        self.diagram
+            .boundaries
             .get(activity_id)?
             .iter()
             .filter_map(|index| process_data.get(*index))
@@ -396,7 +391,8 @@ impl Process {
         symbol: &Symbol,
         process_id: &str,
     ) -> Result<&usize, Error> {
-        self.catch_event_links
+        self.diagram
+            .catch_event_links
             .get(process_id)
             .and_then(|links| links.get(throw_event_name))
             .ok_or_else(|| {
@@ -417,12 +413,12 @@ fn default_path<'a>(
 }
 
 fn output_by_symbol<'a>(
-    search: &With,
+    search: (Option<&'static str>, Symbol),
     outputs: &'a [usize],
     process_data: &'a [Bpmn],
 ) -> Option<&'a usize> {
-    outputs.iter().find(|index| match search {
-        With::Symbol(search, search_symbol) => process_data
+    outputs.iter().find(|index| {
+        process_data
             .get(**index)
             .and_then(|bpmn| {
                 if let Bpmn::SequenceFlow { target_ref, .. } = bpmn {
@@ -436,8 +432,9 @@ fn output_by_symbol<'a>(
                     id, activity, name, ..
                 } => {
                     activity == &ActivityType::ReceiveTask
-                        && search_symbol == &Symbol::Message
-                        && (search.filter(|&sn| sn == id).is_some() || *search == name.as_deref())
+                        && search.1 == Symbol::Message
+                        && (search.0.filter(|&sn| sn == id).is_some()
+                            || search.0 == name.as_deref())
                 }
                 Bpmn::Event {
                     id,
@@ -451,14 +448,13 @@ fn output_by_symbol<'a>(
                     name,
                     ..
                 } => {
-                    symbol == search_symbol
-                        && (search.filter(|&sn| sn == id.bpmn()).is_some()
-                            || *search == name.as_deref())
+                    *symbol == search.1
+                        && (search.0.filter(|&sn| sn == id.bpmn()).is_some()
+                            || search.0 == name.as_deref())
                 }
                 _ => false,
             })
-            .is_some(),
-        _ => false,
+            .is_some()
     })
 }
 
@@ -485,27 +481,19 @@ pub(super) type ExecuteResult<'a> = Result<Option<&'a Bpmn>, Error>;
 pub(super) struct ExecuteData<'a, T> {
     process_data: &'a Vec<Bpmn>,
     process_id: &'a str,
-    handler: &'a Eventhandler<T>,
     user_data: Data<T>,
-    #[cfg(feature = "trace")]
-    trace: Sender<(&'static str, String)>,
 }
 
 impl<'a, T> ExecuteData<'a, T> {
     pub(super) fn new(
         process_data: &'a Vec<Bpmn>,
         process_id: &'a str,
-        handler: &'a Eventhandler<T>,
         user_data: Data<T>,
-        #[cfg(feature = "trace")] trace: Sender<(&'static str, String)>,
     ) -> Self {
         Self {
             process_data,
             process_id,
-            handler,
             user_data,
-            #[cfg(feature = "trace")]
-            trace,
         }
     }
 
@@ -514,16 +502,8 @@ impl<'a, T> ExecuteData<'a, T> {
         Self {
             process_data,
             process_id,
-            handler: self.handler,
             user_data: self.user_data(),
-            #[cfg(feature = "trace")]
-            trace: self.trace.clone(),
         }
-    }
-
-    #[cfg(feature = "trace")]
-    fn trace(&self, bpmn_type: &'static str, value: impl Into<String>) -> Result<(), Error> {
-        Ok(self.trace.send((bpmn_type, value.into()))?)
     }
 
     fn user_data(&self) -> Data<T> {

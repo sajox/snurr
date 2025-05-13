@@ -1,7 +1,7 @@
 use crate::{
-    Process,
     error::Error,
     model::{Gateway, *},
+    process::Diagram,
 };
 
 const BUILD_PROCESS_ERROR_MSG: &str = "couldn't build process";
@@ -143,7 +143,7 @@ impl DataBuilder {
     }
 }
 
-impl TryFrom<DataBuilder> for Process {
+impl TryFrom<DataBuilder> for Diagram {
     type Error = Error;
 
     fn try_from(builder: DataBuilder) -> Result<Self, Self::Error> {

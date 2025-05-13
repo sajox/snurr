@@ -23,7 +23,7 @@
 //! ### main.rs
 //!
 //! ```
-//! use snurr::{Eventhandler, Process};
+//! use snurr::Process;
 //!
 //! extern crate pretty_env_logger;
 //!
@@ -36,42 +36,33 @@
 //!     pretty_env_logger::init();
 //!
 //!     // Create process from BPMN file
-//!     let bpmn = Process::new("examples/example.bpmn")?;
-//!
-//!     // Create Eventhandler with struct type
-//!     let mut handler: Eventhandler<Counter> = Eventhandler::default();
-//!
-//!     // Register task function for handler.
-//!     handler.add_task("Count 1", |input| {
-//!         input.lock().unwrap().count += 1;
-//!         None
-//!     });
-//!
-//!     // Register gateway function for handler.
-//!     handler.add_gateway("equal to 3", |input| {
-//!         let result = if input.lock().unwrap().count == 3 {
-//!             "YES"
-//!         } else {
-//!             "NO"
-//!         };
-//!         result.into()
-//!     });
+//!     let bpmn = Process::<Counter>::new("examples/example.bpmn")?
+//!         .task("Count 1", |input| {
+//!             input.lock().unwrap().count += 1;
+//!             None
+//!         })
+//!         .exclusive("equal to 3", |input| {
+//!             let result = if input.lock().unwrap().count == 3 {
+//!                 "YES"
+//!             } else {
+//!                 "NO"
+//!             };
+//!             result.into()
+//!         });
 //!
 //!     // Run the process with handler and data
-//!     let pr = bpmn.run(&handler, Counter::default())?;
+//!     let result = bpmn.run(Counter::default())?;
 //!
 //!     // Print the result.
-//!     println!("Result: {:?}", pr.result);
+//!     println!("Result: {:?}", result);
 //!     Ok(())
 //! }
 //! ```
 
 mod error;
-mod handler;
 mod model;
 mod process;
 
 pub use error::{Error, Result};
-pub use handler::{Data, Eventhandler, TaskResult};
 pub use model::{Boundary, Symbol, With};
-pub use process::{Process, ProcessResult};
+pub use process::{Process, handler::Data, handler::TaskResult};

@@ -6,21 +6,21 @@ use crate::{
     model::{ActivityType, Bpmn, BpmnLocal, Gateway, GatewayType, Symbol},
 };
 
-impl Process {
+impl<T> Process<T> {
     /// Generate code from all the task and gateways to the given file path.
     /// No file with same name is allowed to exist at the target location.
     /// ```
     /// use snurr::Process;
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let bpmn = Process::new("examples/example.bpmn")?;
+    ///     let bpmn: Process<()> = Process::new("examples/example.bpmn")?;
     ///     bpmn.scaffold("examples/scaffold.rs")?;
     ///     Ok(())
     /// }
     /// ```
     pub fn scaffold(&self, path: impl AsRef<Path>) -> Result<(), Error> {
         let mut scaffold = Scaffold::default();
-        self.data.values().for_each(|process: &Vec<Bpmn>| {
+        self.diagram.data.values().for_each(|process: &Vec<Bpmn>| {
             process.iter().for_each(|bpmn| {
                 if let Bpmn::Activity {
                     activity: ActivityType::Task,
@@ -28,7 +28,7 @@ impl Process {
                     ..
                 } = bpmn
                 {
-                    let symbols = if let Some(boundaries) = self.boundaries.get(id) {
+                    let symbols = if let Some(boundaries) = self.diagram.boundaries.get(id) {
                         boundaries
                             .iter()
                             .filter_map(|index| process.get(*index))
@@ -110,11 +110,10 @@ impl<'a> Scaffold<'a> {
     // No file is allowed to exist at the target location.
     fn create(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
         let mut content = vec![];
-        content.push(
-            "// Replace the '()' in the Eventhandler<()> return type with your own type.".into(),
-        );
-        content.push("pub fn create_handler() -> snurr::Eventhandler<()> {".into());
-        content.push("    let mut handler = snurr::Eventhandler::default();".into());
+        content.push("// Replace the '()' in the Process<()> with your own type.".into());
+        content
+            .push("fn create_handler<T>(process: snurr::Process<T>) -> snurr::Process<T> {".into());
+        content.push("    process".into());
 
         // Do not generate duplicates
         let mut seen_tasks: HashSet<&String> = HashSet::new();
@@ -139,10 +138,7 @@ impl<'a> Scaffold<'a> {
                     ));
                 }
 
-                content.push(format!(
-                    r#"    handler.add_task("{}", |input| None);"#,
-                    name_or_id,
-                ));
+                content.push(format!(r#"    .task("{}", |input| None)"#, name_or_id,));
                 content.push("".into());
             }
         }
@@ -177,14 +173,13 @@ impl<'a> Scaffold<'a> {
                     outputs
                 ));
                 content.push(format!(
-                    r#"    handler.add_gateway("{}", |input| Default::default());"#,
+                    r#"    .exclusive("{}", |input| Default::default())"#,
                     name_or_id,
                 ));
                 content.push("".into());
             }
         }
-
-        content.push("    handler\n}".into());
+        content.push("}".into());
 
         let mut file = std::fs::OpenOptions::new()
             .create_new(true)
