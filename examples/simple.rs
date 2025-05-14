@@ -11,7 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     pretty_env_logger::init();
 
     // Create process from BPMN file
-    let bpmn = Process::<Counter>::new("examples/example.bpmn")?
+    let bpmn = Process::<_, Counter>::new("examples/example.bpmn")?
         .task("Count 1", |input| {
             input.lock().unwrap().count += 1;
             None
@@ -23,7 +23,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "NO"
             };
             result.into()
-        });
+        })
+        .build();
 
     // Run the process with handler and data
     let result = bpmn.run(Counter::default())?;

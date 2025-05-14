@@ -6,14 +6,16 @@ use crate::{
     model::{ActivityType, Bpmn, BpmnLocal, Gateway, GatewayType, Symbol},
 };
 
-impl<T> Process<T> {
+use super::Build;
+
+impl<T> Process<Build, T> {
     /// Generate code from all the task and gateways to the given file path.
     /// No file with same name is allowed to exist at the target location.
     /// ```
     /// use snurr::Process;
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let bpmn: Process<()> = Process::new("examples/example.bpmn")?;
+    ///     let bpmn: Process<_, ()> = Process::new("examples/example.bpmn")?;
     ///     bpmn.scaffold("examples/scaffold.rs")?;
     ///     Ok(())
     /// }
@@ -112,7 +114,7 @@ impl<'a> Scaffold<'a> {
         let mut content = vec![];
         content.push("// Replace the '()' in the Process<()> with your own type.".into());
         content
-            .push("fn create_handler<T>(process: snurr::Process<T>) -> snurr::Process<T> {".into());
+            .push("fn create_handler<T>(process: snurr::Process<snurr::Build, T>) -> snurr::Process<snurr::Run, T> {".into());
         content.push("    process".into());
 
         // Do not generate duplicates
@@ -179,7 +181,7 @@ impl<'a> Scaffold<'a> {
                 content.push("".into());
             }
         }
-        content.push("}".into());
+        content.push("    .build()\n}".into());
 
         let mut file = std::fs::OpenOptions::new()
             .create_new(true)

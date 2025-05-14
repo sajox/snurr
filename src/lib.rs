@@ -36,7 +36,7 @@
 //!     pretty_env_logger::init();
 //!
 //!     // Create process from BPMN file
-//!     let bpmn = Process::<Counter>::new("examples/example.bpmn")?
+//!     let bpmn = Process::<_, Counter>::new("examples/example.bpmn")?
 //!         .task("Count 1", |input| {
 //!             input.lock().unwrap().count += 1;
 //!             None
@@ -48,7 +48,7 @@
 //!                 "NO"
 //!             };
 //!             result.into()
-//!         });
+//!         }).build();
 //!
 //!     // Run the process with handler and data
 //!     let result = bpmn.run(Counter::default())?;
@@ -65,4 +65,4 @@ mod process;
 
 pub use error::{Error, Result};
 pub use model::{Boundary, Symbol, With};
-pub use process::{Process, handler::Data, handler::TaskResult};
+pub use process::{Build, Process, Run, handler::Data, handler::TaskResult};

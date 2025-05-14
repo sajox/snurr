@@ -6,6 +6,7 @@ mod scaffold;
 use engine::ExecuteData;
 use handler::{Data, Handler, TaskResult};
 use std::{
+    marker::PhantomData,
     path::Path,
     str::FromStr,
     sync::{Arc, Mutex},
@@ -14,7 +15,7 @@ use std::{
 use crate::{
     Symbol, With,
     error::Error,
-    model::{Bpmn, BpmnLocal, Gateway, HashMap},
+    model::{Bpmn, BpmnLocal, Gateway, GatewayType, HashMap},
 };
 
 #[derive(Debug)]
@@ -26,59 +27,60 @@ pub struct Diagram {
 }
 
 impl Diagram {
-    pub fn update_func_id_task(&mut self, index: usize, match_name: &str) {
-        self.data.iter_mut().for_each(|process| {
-            process.1.iter_mut().for_each(|bpmn| match bpmn {
-                Bpmn::Activity {
-                    id, func_id, name, ..
-                } if name
-                    .as_ref()
-                    .map(|v| v.as_str() == match_name)
-                    .unwrap_or(false)
-                    || id.as_str() == match_name =>
-                {
-                    *func_id = Some(index);
+    pub fn install_task_func(&mut self, match_value: &str, index: usize) {
+        for bpmn in self.data.values_mut().flatten() {
+            if let Bpmn::Activity {
+                id, func_id, name, ..
+            } = bpmn
+            {
+                if Diagram::match_name_or_id(name.as_deref(), id, match_value) {
+                    *func_id = Some(index)
                 }
-                _ => {}
-            })
-        });
+            }
+        }
     }
 
-    pub fn update_func_id_gw(&mut self, index: usize, match_name: &str) {
-        self.data.iter_mut().for_each(|process| {
-            process.1.iter_mut().for_each(|bpmn| match bpmn {
-                Bpmn::Gateway(Gateway {
-                    id: BpmnLocal(bid, _),
-                    func_id,
-                    name,
-                    ..
-                }) if name
-                    .as_ref()
-                    .map(|v| v.as_str() == match_name)
-                    .unwrap_or(false)
-                    || bid.as_str() == match_name =>
+    pub fn install_gateway_func(&mut self, gw_type: GatewayType, match_value: &str, index: usize) {
+        for bpmn in self.data.values_mut().flatten() {
+            if let Bpmn::Gateway(Gateway {
+                gateway,
+                id: BpmnLocal(id, _),
+                func_id,
+                name,
+                ..
+            }) = bpmn
+            {
+                if Diagram::match_name_or_id(name.as_deref(), id, match_value)
+                    && gw_type == *gateway
                 {
                     *func_id = Some(index)
                 }
-                _ => {}
-            })
-        });
+            }
+        }
+    }
+
+    fn match_name_or_id(name: Option<&str>, id: &str, value: &str) -> bool {
+        name.map(|name| name == value).unwrap_or(false) || id == value
     }
 }
 
 /// Process that contains information from the BPMN file
-pub struct Process<T> {
+pub struct Process<S, T> {
     diagram: Diagram,
     handler: Handler<T>,
+    _marker: PhantomData<S>,
 }
 
-impl<T> Process<T> {
+pub struct Build;
+pub struct Run;
+
+impl<T> Process<Build, T> {
     /// Create new process and initialize it from the BPMN file path.
     /// ```
-    /// use snurr::Process;
+    /// use snurr::{Build, Process};
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let bpmn: Process<()> = Process::new("examples/example.bpmn")?;
+    ///     let bpmn: Process<Build, ()> = Process::new("examples/example.bpmn")?;
     ///     Ok(())
     /// }
     /// ```
@@ -86,9 +88,82 @@ impl<T> Process<T> {
         Ok(Self {
             diagram: reader::read_bpmn(quick_xml::Reader::from_file(path)?)?,
             handler: Default::default(),
+            _marker: Default::default(),
         })
     }
 
+    pub fn task<F>(mut self, name: impl AsRef<str>, func: F) -> Self
+    where
+        F: Fn(Data<T>) -> TaskResult + 'static + Sync,
+    {
+        let index = self.handler.add_task(func);
+        self.diagram.install_task_func(name.as_ref(), index);
+        self
+    }
+
+    pub fn exclusive<F>(mut self, name: impl AsRef<str>, func: F) -> Self
+    where
+        F: Fn(Data<T>) -> Option<&'static str> + 'static + Sync,
+    {
+        let index = self.handler.add_exclusive(func);
+        self.diagram
+            .install_gateway_func(GatewayType::Exclusive, name.as_ref(), index);
+        self
+    }
+
+    pub fn inclusive<F>(mut self, name: impl AsRef<str>, func: F) -> Self
+    where
+        F: Fn(Data<T>) -> With + 'static + Sync,
+    {
+        let index = self.handler.add_inclusive(func);
+        self.diagram
+            .install_gateway_func(GatewayType::Inclusive, name.as_ref(), index);
+        self
+    }
+
+    pub fn event_based<F>(mut self, name: impl AsRef<str>, func: F) -> Self
+    where
+        F: Fn(Data<T>) -> (Option<&'static str>, Symbol) + 'static + Sync,
+    {
+        let index = self.handler.add_event_based(func);
+        self.diagram
+            .install_gateway_func(GatewayType::EventBased, name.as_ref(), index);
+        self
+    }
+
+    pub fn build(self) -> Process<Run, T> {
+        Process {
+            diagram: self.diagram,
+            handler: self.handler,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<T> FromStr for Process<Build, T> {
+    type Err = Error;
+
+    /// Create new process and initialize it from a BPMN `&str`.
+    /// ```
+    /// use snurr::{Build, Process};
+    ///
+    /// static BPMN_DATA: &str = include_str!("../examples/example.bpmn");
+    ///
+    /// fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let bpmn: Process<Build, ()> = BPMN_DATA.parse()?;
+    ///     Ok(())
+    /// }
+    /// ```
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            diagram: reader::read_bpmn(quick_xml::Reader::from_str(s))?,
+            handler: Default::default(),
+            _marker: Default::default(),
+        })
+    }
+}
+
+impl<T> Process<Run, T> {
     /// Run the process and return the `ProcessResult` or an `Error`.
     /// ```
     /// use snurr::Process;
@@ -99,9 +174,29 @@ impl<T> Process<T> {
     /// }
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let bpmn = Process::new("examples/example.bpmn")?;
-    ///     // Register Task and Gateways...
-    ///     let pr = bpmn.run(Counter::default())?;
+    ///     pretty_env_logger::init();
+    ///
+    ///     // Create process from BPMN file
+    ///     let bpmn = Process::<_, Counter>::new("examples/example.bpmn")?
+    ///         .task("Count 1", |input| {
+    ///             input.lock().unwrap().count += 1;
+    ///             None
+    ///         })
+    ///         .exclusive("equal to 3", |input| {
+    ///             let result = if input.lock().unwrap().count == 3 {
+    ///                 "YES"
+    ///             } else {
+    ///                 "NO"
+    ///             };
+    ///             result.into()
+    ///         })
+    ///         .build();
+    ///
+    ///     // Run the process with handler and data
+    ///     let result = bpmn.run(Counter::default())?;
+    ///
+    ///     // Print the result.
+    ///     println!("Result: {:?}", result);
     ///     Ok(())
     /// }
     /// ```
@@ -135,64 +230,6 @@ impl<T> Process<T> {
             .into_inner()
             .map_err(|_| Error::NoProcessResult)
     }
-
-    pub fn task<F>(mut self, name: impl AsRef<str>, func: F) -> Self
-    where
-        F: Fn(Data<T>) -> TaskResult + 'static + Sync,
-    {
-        let index = self.handler.add_task(func);
-        self.diagram.update_func_id_task(index, name.as_ref());
-        self
-    }
-
-    pub fn exclusive<F>(mut self, name: impl AsRef<str>, func: F) -> Self
-    where
-        F: Fn(Data<T>) -> Option<&'static str> + 'static + Sync,
-    {
-        let index = self.handler.add_exclusive(func);
-        self.diagram.update_func_id_gw(index, name.as_ref());
-        self
-    }
-
-    pub fn inclusive<F>(mut self, name: impl AsRef<str>, func: F) -> Self
-    where
-        F: Fn(Data<T>) -> With + 'static + Sync,
-    {
-        let index = self.handler.add_inclusive(func);
-        self.diagram.update_func_id_gw(index, name.as_ref());
-        self
-    }
-
-    pub fn event_based<F>(mut self, name: impl AsRef<str>, func: F) -> Self
-    where
-        F: Fn(Data<T>) -> (Option<&'static str>, Symbol) + 'static + Sync,
-    {
-        let index = self.handler.add_event_based(func);
-        self.diagram.update_func_id_gw(index, name.as_ref());
-        self
-    }
-}
-
-impl<T> FromStr for Process<T> {
-    type Err = Error;
-
-    /// Create new process and initialize it from a BPMN `&str`.
-    /// ```
-    /// use snurr::Process;
-    ///
-    /// static BPMN_DATA: &str = include_str!("../examples/example.bpmn");
-    ///
-    /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let bpmn: Process<()> = BPMN_DATA.parse()?;
-    ///     Ok(())
-    /// }
-    /// ```
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self {
-            diagram: reader::read_bpmn(quick_xml::Reader::from_str(s))?,
-            handler: Default::default(),
-        })
-    }
 }
 
 #[cfg(test)]
@@ -201,7 +238,10 @@ mod tests {
 
     #[test]
     fn create_and_run() -> Result<(), Box<dyn std::error::Error>> {
-        let bpmn = Process::new("examples/example.bpmn")?;
+        let bpmn = Process::new("examples/example.bpmn")?
+            .task("Count 1", |_| None)
+            .exclusive("equal to 3", |_| None)
+            .build();
         bpmn.run({})?;
         Ok(())
     }

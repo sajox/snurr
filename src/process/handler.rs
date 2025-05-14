@@ -1,5 +1,8 @@
 use crate::{Boundary, Symbol, With};
-use std::sync::{Arc, Mutex};
+use std::{
+    ops::ControlFlow,
+    sync::{Arc, Mutex},
+};
 
 /// Generic type for the task and gateway inputs.
 pub type Data<T> = Arc<Mutex<T>>;
@@ -67,39 +70,47 @@ impl<T> Handler<T> {
         len
     }
 
-    pub(crate) fn run_task(&self, maybe_index: Option<&usize>, data: Data<T>) -> TaskResult {
+    pub(crate) fn run_task(
+        &self,
+        maybe_index: Option<&usize>,
+        data: Data<T>,
+    ) -> ControlFlow<(), TaskResult> {
         if let Some(func) = maybe_index.and_then(|index| self.task.get(*index)) {
-            return (*func)(data);
+            return ControlFlow::Continue((*func)(data));
         }
-        None
+        ControlFlow::Break(())
     }
 
     pub(crate) fn run_exclusive(
         &self,
         maybe_index: Option<&usize>,
         data: Data<T>,
-    ) -> Option<&'static str> {
+    ) -> ControlFlow<(), Option<&'static str>> {
         if let Some(func) = maybe_index.and_then(|index| self.exclusive.get(*index)) {
-            return (*func)(data);
+            return ControlFlow::Continue((*func)(data));
         }
-        None
+        ControlFlow::Break(())
     }
 
-    pub(crate) fn run_inclusive(&self, maybe_index: Option<&usize>, data: Data<T>) -> With {
+    pub(crate) fn run_inclusive(
+        &self,
+        maybe_index: Option<&usize>,
+        data: Data<T>,
+    ) -> ControlFlow<(), With> {
         if let Some(func) = maybe_index.and_then(|index| self.inclusive.get(*index)) {
-            return (*func)(data);
+            return ControlFlow::Continue((*func)(data));
         }
-        With::default()
+        ControlFlow::Break(())
     }
 
     pub(crate) fn run_event_based(
         &self,
         maybe_index: Option<&usize>,
         data: Data<T>,
-    ) -> Option<(Option<&'static str>, Symbol)> {
+    ) -> ControlFlow<(), (Option<&'static str>, Symbol)> {
         if let Some(func) = maybe_index.and_then(|index| self.event_based.get(*index)) {
-            return Some((*func)(data));
+            return ControlFlow::Continue((*func)(data));
         }
-        None
+        ControlFlow::Break(())
     }
 }
