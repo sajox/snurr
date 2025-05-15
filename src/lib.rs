@@ -48,7 +48,7 @@
 //!                 "NO"
 //!             };
 //!             result.into()
-//!         }).build();
+//!         }).build()?;
 //!
 //!     // Run the process with handler and data
 //!     let result = bpmn.run(Counter::default())?;

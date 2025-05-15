@@ -299,7 +299,7 @@ impl TryFrom<&[u8]> for Symbol {
 pub(crate) struct Gateway {
     pub(crate) gateway: GatewayType,
     pub(crate) id: BpmnLocal,
-    pub(crate) func_id: Option<usize>,
+    pub(crate) func_idx: Option<usize>,
     pub(crate) name: Option<String>,
     pub(crate) default: Option<BpmnLocal>,
     pub(crate) outputs: Outputs,
@@ -311,7 +311,7 @@ pub(crate) enum Bpmn {
     Activity {
         activity: ActivityType,
         id: String,
-        func_id: Option<usize>,
+        func_idx: Option<usize>,
         name: Option<String>,
         outputs: Outputs,
     },
@@ -418,7 +418,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     id: attributes
                         .remove(ATTRIB_ID)
                         .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
-                    func_id: None,
+                    func_idx: None,
                     name: attributes.remove(ATTRIB_NAME),
                     outputs: Default::default(),
                 }
@@ -430,7 +430,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                         .remove(ATTRIB_ID)
                         .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
                         .into(),
-                    func_id: None,
+                    func_idx: None,
                     name: attributes.remove(ATTRIB_NAME),
                     default: attributes.remove(ATTRIB_DEFAULT).map(Into::into),
                     outputs: Default::default(),

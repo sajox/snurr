@@ -1,8 +1,5 @@
 use crate::{Boundary, Symbol, With};
-use std::{
-    ops::ControlFlow,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 /// Generic type for the task and gateway inputs.
 pub type Data<T> = Arc<Mutex<T>>;
@@ -70,47 +67,27 @@ impl<T> Handler<T> {
         len
     }
 
-    pub(crate) fn run_task(
-        &self,
-        maybe_index: Option<&usize>,
-        data: Data<T>,
-    ) -> ControlFlow<(), TaskResult> {
-        if let Some(func) = maybe_index.and_then(|index| self.task.get(*index)) {
-            return ControlFlow::Continue((*func)(data));
-        }
-        ControlFlow::Break(())
+    pub(crate) fn run_task(&self, index: usize, data: Data<T>) -> Option<TaskResult> {
+        self.task.get(index).map(|value| (*value)(data))
     }
 
     pub(crate) fn run_exclusive(
         &self,
-        maybe_index: Option<&usize>,
+        index: usize,
         data: Data<T>,
-    ) -> ControlFlow<(), Option<&'static str>> {
-        if let Some(func) = maybe_index.and_then(|index| self.exclusive.get(*index)) {
-            return ControlFlow::Continue((*func)(data));
-        }
-        ControlFlow::Break(())
+    ) -> Option<Option<&'static str>> {
+        self.exclusive.get(index).map(|value| (*value)(data))
     }
 
-    pub(crate) fn run_inclusive(
-        &self,
-        maybe_index: Option<&usize>,
-        data: Data<T>,
-    ) -> ControlFlow<(), With> {
-        if let Some(func) = maybe_index.and_then(|index| self.inclusive.get(*index)) {
-            return ControlFlow::Continue((*func)(data));
-        }
-        ControlFlow::Break(())
+    pub(crate) fn run_inclusive(&self, index: usize, data: Data<T>) -> Option<With> {
+        self.inclusive.get(index).map(|value| (*value)(data))
     }
 
     pub(crate) fn run_event_based(
         &self,
-        maybe_index: Option<&usize>,
+        index: usize,
         data: Data<T>,
-    ) -> ControlFlow<(), (Option<&'static str>, Symbol)> {
-        if let Some(func) = maybe_index.and_then(|index| self.event_based.get(*index)) {
-            return ControlFlow::Continue((*func)(data));
-        }
-        ControlFlow::Break(())
+    ) -> Option<(Option<&'static str>, Symbol)> {
+        self.event_based.get(index).map(|value| (*value)(data))
     }
 }

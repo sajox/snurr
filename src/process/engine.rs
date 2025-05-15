@@ -165,7 +165,7 @@ impl<T> Process<Run, T> {
                 Bpmn::Activity {
                     activity,
                     id,
-                    func_id,
+                    func_idx,
                     name,
                     outputs,
                     ..
@@ -182,29 +182,23 @@ impl<T> Process<Run, T> {
                         | ActivityType::SendTask
                         | ActivityType::ManualTask
                         | ActivityType::BusinessRuleTask => {
-                            match self.handler.run_task(func_id.as_ref(), data.user_data()) {
-                                ControlFlow::Continue(value) => match value {
-                                    Some(boundary) => self
-                                        .boundary_lookup(
-                                            id,
-                                            boundary.0,
-                                            &boundary.1,
-                                            data.process_data,
-                                        )
-                                        .ok_or_else(|| {
-                                            Error::MissingBoundary(
-                                                format!("{}", boundary),
-                                                name_or_id.into(),
-                                            )
-                                        })?,
-                                    None => maybe_fork!(self, outputs, data, activity, name_or_id),
-                                },
-                                ControlFlow::Break(_) => {
-                                    return Err(Error::MissingImplementation(
+                            match func_idx
+                                .and_then(|index| self.handler.run_task(index, data.user_data()))
+                                .ok_or_else(|| {
+                                    Error::MissingImplementation(
                                         activity.to_string(),
                                         name_or_id.to_string(),
-                                    ));
-                                }
+                                    )
+                                })? {
+                                Some(boundary) => self
+                                    .boundary_lookup(id, boundary.0, &boundary.1, data.process_data)
+                                    .ok_or_else(|| {
+                                        Error::MissingBoundary(
+                                            format!("{}", boundary),
+                                            name_or_id.into(),
+                                        )
+                                    })?,
+                                None => maybe_fork!(self, outputs, data, activity, name_or_id),
                             }
                         }
                         ActivityType::SubProcess => {
@@ -240,7 +234,7 @@ impl<T> Process<Run, T> {
                     gw @ Gateway {
                         gateway,
                         id: BpmnLocal(id, _),
-                        func_id,
+                        func_idx,
                         name,
                         default,
                         outputs,
@@ -260,30 +254,26 @@ impl<T> Process<Run, T> {
                         _ if outputs.len() == 1 && inputs.len() == 1 => outputs.first().unwrap(),
                         GatewayType::Exclusive if outputs.len() == 1 => outputs.first().unwrap(),
                         GatewayType::Exclusive => {
-                            match self
-                                .handler
-                                .run_exclusive(func_id.as_ref(), data.user_data())
-                            {
-                                ControlFlow::Continue(value) => match value {
-                                    Some(value) => output_by_name_or_id(
-                                        value,
-                                        outputs.ids(),
-                                        data.process_data,
-                                    )
-                                    .ok_or_else(|| {
-                                        Error::MissingOutput(
-                                            gateway.to_string(),
-                                            name_or_id.to_string(),
-                                        )
-                                    })?,
-                                    None => default_path(default, gateway, name_or_id)?,
-                                },
-                                ControlFlow::Break(_) => {
-                                    return Err(Error::MissingImplementation(
+                            match func_idx
+                                .and_then(|index| {
+                                    self.handler.run_exclusive(index, data.user_data())
+                                })
+                                .ok_or_else(|| {
+                                    Error::MissingImplementation(
                                         gateway.to_string(),
                                         name_or_id.to_string(),
-                                    ));
+                                    )
+                                })? {
+                                Some(value) => {
+                                    output_by_name_or_id(value, outputs.ids(), data.process_data)
+                                        .ok_or_else(|| {
+                                            Error::MissingOutput(
+                                                gateway.to_string(),
+                                                name_or_id.to_string(),
+                                            )
+                                        })?
                                 }
+                                None => default_path(default, gateway, name_or_id)?,
                             }
                         }
                         // Handle a regular Join or a JoinFork. In both cases, we need to wait for all tokens.
@@ -301,26 +291,25 @@ impl<T> Process<Run, T> {
                             return Err(Error::BpmnRequirement(AT_LEAST_TWO_OUTGOING.into()));
                         }
                         GatewayType::EventBased => {
-                            match self
-                                .handler
-                                .run_event_based(func_id.as_ref(), data.user_data())
-                            {
-                                ControlFlow::Continue(value) => {
-                                    output_by_symbol(value, outputs.ids(), data.process_data)
-                                        .ok_or_else(|| {
-                                            Error::MissingOutput(
-                                                gateway.to_string(),
-                                                name_or_id.to_string(),
-                                            )
-                                        })?
-                                }
-                                ControlFlow::Break(_) => {
-                                    return Err(Error::MissingImplementation(
+                            let value = func_idx
+                                .and_then(|index| {
+                                    self.handler.run_event_based(index, data.user_data())
+                                })
+                                .ok_or_else(|| {
+                                    Error::MissingImplementation(
                                         gateway.to_string(),
                                         name_or_id.to_string(),
-                                    ));
-                                }
-                            }
+                                    )
+                                })?;
+
+                            output_by_symbol(value, outputs.ids(), data.process_data).ok_or_else(
+                                || {
+                                    Error::MissingOutput(
+                                        gateway.to_string(),
+                                        name_or_id.to_string(),
+                                    )
+                                },
+                            )?
                         }
                     }
                 }
@@ -345,7 +334,7 @@ impl<T> Process<Run, T> {
         Gateway {
             gateway,
             id: BpmnLocal(id, _),
-            func_id,
+            func_idx,
             name,
             default,
             outputs,
@@ -353,43 +342,33 @@ impl<T> Process<Run, T> {
         }: &'a Gateway,
     ) -> Result<ControlFlow<Cow<'a, [usize]>, &'a usize>, Error> {
         let name_or_id = name.as_ref().unwrap_or(id);
-        let value = match self
-            .handler
-            .run_inclusive(func_id.as_ref(), data.user_data())
-        {
-            ControlFlow::Continue(value) => match value {
-                With::Flow(value) => output_by_name_or_id(value, outputs.ids(), data.process_data)
-                    .ok_or_else(|| {
-                        Error::MissingOutput(gateway.to_string(), name_or_id.to_string())
-                    })?,
+        let value = match func_idx
+            .and_then(|index| self.handler.run_inclusive(index, data.user_data()))
+            .ok_or_else(|| {
+                Error::MissingImplementation(gateway.to_string(), name_or_id.to_string())
+            })? {
+            With::Flow(value) => output_by_name_or_id(value, outputs.ids(), data.process_data)
+                .ok_or_else(|| Error::MissingOutput(gateway.to_string(), name_or_id.to_string()))?,
 
-                With::Fork(value) => match value.as_slice() {
-                    [] => default_path(default, gateway, name_or_id)?,
-                    [one] => output_by_name_or_id(one, outputs.ids(), data.process_data)
-                        .ok_or_else(|| {
-                            Error::MissingOutput(gateway.to_string(), name_or_id.to_string())
-                        })?,
-                    [..] => {
-                        let outputs = outputs.ids();
-                        return Ok(ControlFlow::Break(Cow::Owned(
-                            value
-                                .iter()
-                                .filter_map(|&response| {
-                                    output_by_name_or_id(response, outputs, data.process_data)
-                                })
-                                .cloned()
-                                .collect(),
-                        )));
-                    }
-                },
-                With::Default => default_path(default, gateway, name_or_id)?,
+            With::Fork(value) => match value.as_slice() {
+                [] => default_path(default, gateway, name_or_id)?,
+                [one] => output_by_name_or_id(one, outputs.ids(), data.process_data).ok_or_else(
+                    || Error::MissingOutput(gateway.to_string(), name_or_id.to_string()),
+                )?,
+                [..] => {
+                    let outputs = outputs.ids();
+                    return Ok(ControlFlow::Break(Cow::Owned(
+                        value
+                            .iter()
+                            .filter_map(|&response| {
+                                output_by_name_or_id(response, outputs, data.process_data)
+                            })
+                            .cloned()
+                            .collect(),
+                    )));
+                }
             },
-            ControlFlow::Break(_) => {
-                return Err(Error::MissingImplementation(
-                    gateway.to_string(),
-                    name_or_id.to_string(),
-                ));
-            }
+            With::Default => default_path(default, gateway, name_or_id)?,
         };
 
         Ok(ControlFlow::Continue(value))

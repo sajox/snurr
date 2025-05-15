@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             result.into()
         })
-        .build();
+        .build()?;
 
     // Run the process with handler and data
     let result = bpmn.run(Counter::default())?;

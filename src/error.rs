@@ -11,6 +11,9 @@ pub enum Error {
     #[error("{0} with name or id '{1}' has no implementation")]
     MissingImplementation(String, String),
 
+    #[error("Missing implementations {0:?}")]
+    MissingImplementations(Vec<(String, String)>),
+
     #[error("{0} with name or id '{1}' has no default flow")]
     MissingDefault(String, String),
 

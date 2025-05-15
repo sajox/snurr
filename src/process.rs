@@ -15,7 +15,7 @@ use std::{
 use crate::{
     Symbol, With,
     error::Error,
-    model::{Bpmn, BpmnLocal, Gateway, GatewayType, HashMap},
+    model::{ActivityType, Bpmn, BpmnLocal, Gateway, GatewayType, HashMap},
 };
 
 #[derive(Debug)]
@@ -27,25 +27,30 @@ pub struct Diagram {
 }
 
 impl Diagram {
-    pub fn install_task_func(&mut self, match_value: &str, index: usize) {
+    pub fn install_task_function(&mut self, match_value: &str, index: usize) {
         for bpmn in self.data.values_mut().flatten() {
             if let Bpmn::Activity {
-                id, func_id, name, ..
+                id, func_idx, name, ..
             } = bpmn
             {
                 if Diagram::match_name_or_id(name.as_deref(), id, match_value) {
-                    *func_id = Some(index)
+                    *func_idx = Some(index)
                 }
             }
         }
     }
 
-    pub fn install_gateway_func(&mut self, gw_type: GatewayType, match_value: &str, index: usize) {
+    pub fn install_gateway_function(
+        &mut self,
+        gw_type: GatewayType,
+        match_value: &str,
+        index: usize,
+    ) {
         for bpmn in self.data.values_mut().flatten() {
             if let Bpmn::Gateway(Gateway {
                 gateway,
                 id: BpmnLocal(id, _),
-                func_id,
+                func_idx,
                 name,
                 ..
             }) = bpmn
@@ -53,10 +58,53 @@ impl Diagram {
                 if Diagram::match_name_or_id(name.as_deref(), id, match_value)
                     && gw_type == *gateway
                 {
-                    *func_id = Some(index)
+                    *func_idx = Some(index)
                 }
             }
         }
+    }
+
+    pub fn find_uninstalled_functions(&self) -> Vec<(String, String)> {
+        self.data.values().flatten().fold(vec![], |mut acc, bpmn| {
+            acc.push(match bpmn {
+                Bpmn::Activity {
+                    id,
+                    name,
+                    func_idx: None,
+                    activity:
+                        activity @ (ActivityType::Task
+                        | ActivityType::ScriptTask
+                        | ActivityType::UserTask
+                        | ActivityType::ServiceTask
+                        | ActivityType::CallActivity
+                        | ActivityType::ReceiveTask
+                        | ActivityType::SendTask
+                        | ActivityType::ManualTask
+                        | ActivityType::BusinessRuleTask),
+                    ..
+                } => (
+                    activity.to_string(),
+                    name.as_ref().unwrap_or(id).to_string(),
+                ),
+                Bpmn::Gateway(Gateway {
+                    gateway:
+                        gateway @ (GatewayType::EventBased
+                        | GatewayType::Exclusive
+                        | GatewayType::Inclusive),
+                    name,
+                    id: BpmnLocal(id, _),
+                    func_idx: None,
+                    outputs,
+                    ..
+                }) if outputs.len() > 1 => {
+                    (gateway.to_string(), name.as_ref().unwrap_or(id).to_string())
+                }
+                _ => {
+                    return acc;
+                }
+            });
+            acc
+        })
     }
 
     fn match_name_or_id(name: Option<&str>, id: &str, value: &str) -> bool {
@@ -97,7 +145,7 @@ impl<T> Process<Build, T> {
         F: Fn(Data<T>) -> TaskResult + 'static + Sync,
     {
         let index = self.handler.add_task(func);
-        self.diagram.install_task_func(name.as_ref(), index);
+        self.diagram.install_task_function(name.as_ref(), index);
         self
     }
 
@@ -107,7 +155,7 @@ impl<T> Process<Build, T> {
     {
         let index = self.handler.add_exclusive(func);
         self.diagram
-            .install_gateway_func(GatewayType::Exclusive, name.as_ref(), index);
+            .install_gateway_function(GatewayType::Exclusive, name.as_ref(), index);
         self
     }
 
@@ -117,7 +165,7 @@ impl<T> Process<Build, T> {
     {
         let index = self.handler.add_inclusive(func);
         self.diagram
-            .install_gateway_func(GatewayType::Inclusive, name.as_ref(), index);
+            .install_gateway_function(GatewayType::Inclusive, name.as_ref(), index);
         self
     }
 
@@ -127,15 +175,20 @@ impl<T> Process<Build, T> {
     {
         let index = self.handler.add_event_based(func);
         self.diagram
-            .install_gateway_func(GatewayType::EventBased, name.as_ref(), index);
+            .install_gateway_function(GatewayType::EventBased, name.as_ref(), index);
         self
     }
 
-    pub fn build(self) -> Process<Run, T> {
-        Process {
-            diagram: self.diagram,
-            handler: self.handler,
-            _marker: PhantomData,
+    pub fn build(self) -> Result<Process<Run, T>, Error> {
+        let result = self.diagram.find_uninstalled_functions();
+        if result.is_empty() {
+            Ok(Process {
+                diagram: self.diagram,
+                handler: self.handler,
+                _marker: PhantomData,
+            })
+        } else {
+            Err(Error::MissingImplementations(result))
         }
     }
 }
@@ -190,7 +243,7 @@ impl<T> Process<Run, T> {
     ///             };
     ///             result.into()
     ///         })
-    ///         .build();
+    ///         .build()?;
     ///
     ///     // Run the process with handler and data
     ///     let result = bpmn.run(Counter::default())?;
@@ -241,7 +294,7 @@ mod tests {
         let bpmn = Process::new("examples/example.bpmn")?
             .task("Count 1", |_| None)
             .exclusive("equal to 3", |_| None)
-            .build();
+            .build()?;
         bpmn.run({})?;
         Ok(())
     }
