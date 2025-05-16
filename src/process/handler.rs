@@ -1,16 +1,16 @@
-use crate::{Boundary, Symbol, With};
+use crate::{IntermediateEvent, With};
 use std::sync::{Arc, Mutex};
 
 /// Generic type for the task and gateway inputs.
 pub type Data<T> = Arc<Mutex<T>>;
 
 /// Task result type
-pub type TaskResult = Option<Boundary>;
+pub type TaskResult = Option<IntermediateEvent>;
 
 type TaskCallback<T> = Box<dyn Fn(Data<T>) -> TaskResult + Sync>;
 type ExclusiveCallback<T> = Box<dyn Fn(Data<T>) -> Option<&'static str> + Sync>;
 type InclusiveCallback<T> = Box<dyn Fn(Data<T>) -> With + Sync>;
-type EventBasedCallback<T> = Box<dyn Fn(Data<T>) -> (Option<&'static str>, Symbol) + Sync>;
+type EventBasedCallback<T> = Box<dyn Fn(Data<T>) -> IntermediateEvent + Sync>;
 
 pub struct Handler<T> {
     task: Vec<TaskCallback<T>>,
@@ -60,7 +60,7 @@ impl<T> Handler<T> {
 
     pub fn add_event_based<F>(&mut self, func: F) -> usize
     where
-        F: Fn(Data<T>) -> (Option<&'static str>, Symbol) + 'static + Sync,
+        F: Fn(Data<T>) -> IntermediateEvent + 'static + Sync,
     {
         let len = self.event_based.len();
         self.event_based.push(Box::new(func));
@@ -83,11 +83,7 @@ impl<T> Handler<T> {
         self.inclusive.get(index).map(|value| (*value)(data))
     }
 
-    pub(crate) fn run_event_based(
-        &self,
-        index: usize,
-        data: Data<T>,
-    ) -> Option<(Option<&'static str>, Symbol)> {
+    pub(crate) fn run_event_based(&self, index: usize, data: Data<T>) -> Option<IntermediateEvent> {
         self.event_based.get(index).map(|value| (*value)(data))
     }
 }

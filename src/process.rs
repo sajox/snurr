@@ -13,7 +13,7 @@ use std::{
 };
 
 use crate::{
-    Symbol, With,
+    IntermediateEvent, With,
     error::Error,
     model::{ActivityType, Bpmn, BpmnLocal, Gateway, GatewayType, HashMap},
 };
@@ -171,7 +171,7 @@ impl<T> Process<Build, T> {
 
     pub fn event_based<F>(mut self, name: impl AsRef<str>, func: F) -> Self
     where
-        F: Fn(Data<T>) -> (Option<&'static str>, Symbol) + 'static + Sync,
+        F: Fn(Data<T>) -> IntermediateEvent + 'static + Sync,
     {
         let index = self.handler.add_event_based(func);
         self.diagram
@@ -185,7 +185,7 @@ impl<T> Process<Build, T> {
             Ok(Process {
                 diagram: self.diagram,
                 handler: self.handler,
-                _marker: PhantomData,
+                _marker: Default::default(),
             })
         } else {
             Err(Error::MissingImplementations(result))

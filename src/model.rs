@@ -89,23 +89,29 @@ impl From<Vec<&'static str>> for With {
     }
 }
 
-/// Boundary with an optional name and a symbol
+/// Boundary / Intermediate event with an optional name and a symbol
 #[derive(Debug)]
-pub struct Boundary(pub Option<&'static str>, pub Symbol);
+pub struct IntermediateEvent(pub Option<&'static str>, pub Symbol);
 
-impl From<Symbol> for Boundary {
+impl From<Symbol> for IntermediateEvent {
     fn from(value: Symbol) -> Self {
         Self(None, value)
     }
 }
 
-impl From<(&'static str, Symbol)> for Boundary {
+impl From<Symbol> for Option<IntermediateEvent> {
+    fn from(value: Symbol) -> Self {
+        Some(IntermediateEvent(None, value))
+    }
+}
+
+impl From<(&'static str, Symbol)> for IntermediateEvent {
     fn from((name, symbol): (&'static str, Symbol)) -> Self {
         Self(Some(name), symbol)
     }
 }
 
-impl Display for Boundary {
+impl Display for IntermediateEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {:?})", self.0.unwrap_or_default(), self.1)
     }

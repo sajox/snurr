@@ -529,9 +529,9 @@ fn event_gateway() -> Result<()> {
         .task(COUNT_3, func_cnt(3))
         .task("Investigate", |_| None)
         .event_based("JUNIOR GATEKEEPER", |_| {
-            (Some("Investigate"), Symbol::Message)
+            ("Investigate", Symbol::Message).into()
         })
-        .event_based("SENIOR GATEKEEPER", |_| (Some("Sleeping"), Symbol::Timer))
+        .event_based("SENIOR GATEKEEPER", |_| ("Sleeping", Symbol::Timer).into())
         .build()?;
     let result = bpmn.run(Counter::default())?;
     assert_eq!(result.count, 2);
@@ -545,8 +545,8 @@ fn event_gateway_blank_symbol() -> Result<()> {
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
         .task("Investigate", |_| None)
-        .event_based("JUNIOR GATEKEEPER", |_| (None, Symbol::Timer))
-        .event_based("SENIOR GATEKEEPER", |_| (Some("Sleeping"), Symbol::Timer))
+        .event_based("JUNIOR GATEKEEPER", |_| Symbol::Timer.into())
+        .event_based("SENIOR GATEKEEPER", |_| ("Sleeping", Symbol::Timer).into())
         .build()?;
     let result = bpmn.run(Counter::default())?;
     assert_eq!(result.count, 3);

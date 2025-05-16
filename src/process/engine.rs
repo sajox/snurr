@@ -1,7 +1,7 @@
 mod bpmn_queue;
 
 use crate::{
-    Process, Symbol,
+    IntermediateEvent, Process, Symbol,
     error::{AT_LEAST_TWO_OUTGOING, Error, TOO_MANY_END_SYMBOLS},
     model::{ActivityType, Bpmn, BpmnLocal, EventType, Gateway, GatewayType, With},
 };
@@ -430,7 +430,7 @@ fn default_path<'a>(
 }
 
 fn output_by_symbol<'a>(
-    search: (Option<&'static str>, Symbol),
+    search: IntermediateEvent,
     outputs: &'a [usize],
     process_data: &'a [Bpmn],
 ) -> Option<&'a usize> {
