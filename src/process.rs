@@ -64,7 +64,7 @@ impl Diagram {
         }
     }
 
-    pub fn find_uninstalled_functions(&self) -> Vec<(String, String)> {
+    pub fn find_missing_functions(&self) -> Vec<String> {
         self.data.values().flatten().fold(vec![], |mut acc, bpmn| {
             acc.push(match bpmn {
                 Bpmn::Activity {
@@ -82,10 +82,7 @@ impl Diagram {
                         | ActivityType::ManualTask
                         | ActivityType::BusinessRuleTask),
                     ..
-                } => (
-                    activity.to_string(),
-                    name.as_ref().unwrap_or(id).to_string(),
-                ),
+                } => format!("{}: {}", activity, name.as_ref().unwrap_or(id)),
                 Bpmn::Gateway(Gateway {
                     gateway:
                         gateway @ (GatewayType::EventBased
@@ -97,7 +94,7 @@ impl Diagram {
                     outputs,
                     ..
                 }) if outputs.len() > 1 => {
-                    (gateway.to_string(), name.as_ref().unwrap_or(id).to_string())
+                    format!("{}: {}", gateway, name.as_ref().unwrap_or(id))
                 }
                 _ => {
                     return acc;
@@ -180,7 +177,7 @@ impl<T> Process<Build, T> {
     }
 
     pub fn build(self) -> Result<Process<Run, T>, Error> {
-        let result = self.diagram.find_uninstalled_functions();
+        let result = self.diagram.find_missing_functions();
         if result.is_empty() {
             Ok(Process {
                 diagram: self.diagram,

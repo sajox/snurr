@@ -12,7 +12,7 @@ pub enum Error {
     MissingImplementation(String, String),
 
     #[error("Missing implementations {0:?}")]
-    MissingImplementations(Vec<(String, String)>),
+    MissingImplementations(Vec<String>),
 
     #[error("{0} with name or id '{1}' has no default flow")]
     MissingDefault(String, String),
