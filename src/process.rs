@@ -6,6 +6,7 @@ mod scaffold;
 use engine::ExecuteData;
 use handler::{Data, Handler, TaskResult};
 use std::{
+    collections::HashSet,
     marker::PhantomData,
     path::Path,
     str::FromStr,
@@ -64,44 +65,47 @@ impl Diagram {
         }
     }
 
-    pub fn find_missing_functions(&self) -> Vec<String> {
-        self.data.values().flatten().fold(vec![], |mut acc, bpmn| {
-            acc.push(match bpmn {
-                Bpmn::Activity {
-                    id,
-                    name,
-                    func_idx: None,
-                    activity:
-                        activity @ (ActivityType::Task
-                        | ActivityType::ScriptTask
-                        | ActivityType::UserTask
-                        | ActivityType::ServiceTask
-                        | ActivityType::CallActivity
-                        | ActivityType::ReceiveTask
-                        | ActivityType::SendTask
-                        | ActivityType::ManualTask
-                        | ActivityType::BusinessRuleTask),
-                    ..
-                } => format!("{}: {}", activity, name.as_ref().unwrap_or(id)),
-                Bpmn::Gateway(Gateway {
-                    gateway:
-                        gateway @ (GatewayType::EventBased
-                        | GatewayType::Exclusive
-                        | GatewayType::Inclusive),
-                    name,
-                    id: BpmnLocal(id, _),
-                    func_idx: None,
-                    outputs,
-                    ..
-                }) if outputs.len() > 1 => {
-                    format!("{}: {}", gateway, name.as_ref().unwrap_or(id))
-                }
-                _ => {
-                    return acc;
-                }
-            });
-            acc
-        })
+    pub fn find_missing_functions(&self) -> HashSet<String> {
+        self.data
+            .values()
+            .flatten()
+            .fold(HashSet::new(), |mut acc, bpmn| {
+                acc.insert(match bpmn {
+                    Bpmn::Activity {
+                        id,
+                        name,
+                        func_idx: None,
+                        activity:
+                            activity @ (ActivityType::Task
+                            | ActivityType::ScriptTask
+                            | ActivityType::UserTask
+                            | ActivityType::ServiceTask
+                            | ActivityType::CallActivity
+                            | ActivityType::ReceiveTask
+                            | ActivityType::SendTask
+                            | ActivityType::ManualTask
+                            | ActivityType::BusinessRuleTask),
+                        ..
+                    } => format!("{}: {}", activity, name.as_ref().unwrap_or(id)),
+                    Bpmn::Gateway(Gateway {
+                        gateway:
+                            gateway @ (GatewayType::EventBased
+                            | GatewayType::Exclusive
+                            | GatewayType::Inclusive),
+                        name,
+                        id: BpmnLocal(id, _),
+                        func_idx: None,
+                        outputs,
+                        ..
+                    }) if outputs.len() > 1 => {
+                        format!("{}: {}", gateway, name.as_ref().unwrap_or(id))
+                    }
+                    _ => {
+                        return acc;
+                    }
+                });
+                acc
+            })
     }
 
     fn match_name_or_id(name: Option<&str>, id: &str, value: &str) -> bool {
@@ -185,7 +189,9 @@ impl<T> Process<Build, T> {
                 _marker: Default::default(),
             })
         } else {
-            Err(Error::MissingImplementations(result))
+            Err(Error::MissingImplementations(
+                result.into_iter().collect::<Vec<_>>().join(", "),
+            ))
         }
     }
 }
