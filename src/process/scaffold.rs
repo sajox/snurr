@@ -52,7 +52,8 @@ impl<U, T> Process<U, T> {
                 }
 
                 if let Bpmn::Gateway(Gateway {
-                    gateway: GatewayType::Exclusive | GatewayType::Inclusive,
+                    gateway:
+                        GatewayType::Exclusive | GatewayType::Inclusive | GatewayType::EventBased,
                     outputs,
                     ..
                 }) = bpmn
@@ -172,10 +173,23 @@ impl<'a> Scaffold<'a> {
                         .join(", "),
                     outputs
                 ));
-                content.push(format!(
-                    r#"    .exclusive("{}", |input| Default::default())"#,
-                    name_or_id,
-                ));
+
+                match gateway {
+                    GatewayType::Exclusive => content.push(format!(
+                        r#"    .exclusive("{}", |input| Default::default())"#,
+                        name_or_id,
+                    )),
+                    GatewayType::Inclusive => content.push(format!(
+                        r#"    .inclusive("{}", |input| Default::default())"#,
+                        name_or_id,
+                    )),
+                    GatewayType::EventBased => content.push(format!(
+                        r#"    .event_based("{}", |input| // Implement)"#,
+                        name_or_id,
+                    )),
+                    _ => {}
+                }
+
                 content.push("".into());
             }
         }
