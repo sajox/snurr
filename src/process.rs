@@ -6,7 +6,7 @@ mod scaffold;
 use engine::ExecuteData;
 use handler::{Data, Handler, TaskResult};
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     marker::PhantomData,
     path::Path,
     str::FromStr,
@@ -16,7 +16,7 @@ use std::{
 use crate::{
     IntermediateEvent, With,
     error::Error,
-    model::{ActivityType, Bpmn, BpmnLocal, Gateway, GatewayType, HashMap},
+    model::{ActivityType, Bpmn, BpmnLocal, Gateway, GatewayType},
 };
 
 #[derive(Debug)]

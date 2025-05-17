@@ -1,7 +1,7 @@
 use log::debug;
 
-use crate::model::{Gateway, GatewayType, HashMap};
-use std::borrow::Cow;
+use crate::model::{Gateway, GatewayType};
+use std::{borrow::Cow, collections::HashMap};
 
 #[derive(Default, Debug)]
 pub struct BpmnQueue<'a> {

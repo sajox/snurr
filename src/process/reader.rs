@@ -1,5 +1,6 @@
 mod builder;
 
+use std::collections::HashMap;
 use std::io::BufRead;
 
 use builder::DataBuilder;

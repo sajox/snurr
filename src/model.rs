@@ -1,11 +1,5 @@
 use crate::error::Error;
-use std::fmt::Display;
-
-#[cfg(not(feature = "hashbrown"))]
-pub(crate) type HashMap<K, V, S = std::hash::RandomState> = std::collections::HashMap<K, V, S>;
-
-#[cfg(feature = "hashbrown")]
-pub(crate) type HashMap<K, V, S = foldhash::fast::RandomState> = std::collections::HashMap<K, V, S>;
+use std::{collections::HashMap, fmt::Display};
 
 pub(crate) const DEFINITIONS: &[u8] = b"definitions";
 pub(crate) const PROCESS: &[u8] = b"process";
