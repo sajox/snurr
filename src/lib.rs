@@ -64,5 +64,5 @@ mod model;
 mod process;
 
 pub use error::{Error, Result};
-pub use model::{IntermediateEvent, Symbol, With};
+pub use model::{Boundary, IntermediateEvent, Symbol, With};
 pub use process::{Build, Process, Run, handler::Data, handler::TaskResult};
