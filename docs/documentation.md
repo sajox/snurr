@@ -1,4 +1,4 @@
-# Documentation
+# Documentation (Snurr 0.9)
 
 **Snurr** can run the process flow from a Business Process Model and Notation (BPMN) 2.0 file created by <https://demo.bpmn.io/new>.
 
@@ -13,58 +13,40 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
 
 ## Migration 
 
-### Version 0.7 -> 0.8
+### Version 0.8 -> 0.9
 
-Rust edition 2024
+- Added builder pattern on Process to register task and gateways.
+- Added validation on `.build()` that requires all Tasks and Gateways to have a registered function.
+- Changed return types for Task, Exclusive and Event-based gateway. (If tuple conversion was used then no changes is needed.)
+- Removed Eventhandler type.
+- Removed trace feature (Use the `log` facility instead)
+- Removed hashbrown feature (Was used by default)
+- Removed replay trace
 
-### Version 0.6 -> 0.7
-
-Snurr Error and Result type is now public
-
-### Version 0.5 -> 0.6
-
-#### Gateway
-
-Default flow
+#### Exclusive gateway
 
 ```rust
-vec![] => With::Default;
-// or
-vec![] => Default::default;
+Some("YES")
+// or with conversion
+"YES".into()
 ```
 
-One flow
+#### Event-based gateway
 
 ```rust
-vec!["YES"] => With::Flow("YES");
-// or
-vec!["YES"] => "YES".into();
-```
-
-Many flows
-
-```rust
-vec!["YES", "NO"] => With::Fork(vec!["YES", "NO"]);
-// or
-vec!["YES", "NO"] => vec!["YES", "NO"].into();
+IntermediateEvent("Name", Symbol::Message)
+// or with conversion
+("Name", Symbol::Message).into()
 ```
 
 #### Task
 
-Updated return type ```Result<(), Symbol>``` to ```Option<Boundary>```
-
 ```rust
-Symbol::Timer => Boundary(None, Symbol::Timer);
-// or
-Symbol::Timer => Symbol::Timer.into();
-```
-
-Match both name and symbol (new)
-
-```rust
-Boundary(Some("timeout"), Symbol::Timer);
-// or
-("timeout", Symbol::Timer).into();
+Boundary::Symbol(Symbol::Message)
+Boundary::NameSymbol("Name", Symbol::Message)
+// or with conversion
+Symbol::Message.into()
+("Name", Symbol::Message).into()
 ```
 
 ## Lib
@@ -73,31 +55,25 @@ Boundary(Some("timeout"), Symbol::Timer);
 
 ```toml
 [dependencies]
-snurr = "0.8"
+snurr = "0.9"
 ```
 
 With parallel feature enabled, new threads are spawned with parallel, inclusive, task and event forks.
 
 ```toml
 [dependencies]
-snurr = { version = "0.8", features = ["parallel"] }
+snurr = { version = "0.9", features = ["parallel"] }
 ```
-
-Trace is disabled by default. It start a collector thread and trace the visited Task or Gateways for a given run.
-
-```toml
-[dependencies]
-snurr = { version = "0.8", features = ["trace"] }
-```
-
 
 ## Process
 
-Create a process by giving a path to a bpmn file. The created process do not mutate and can be run several times. The **ProcessResult** contains the result and a trace. Use scaffold to generate code from the read BPMN file.
+Create a process by providing a path to a bpmn file. Add tasks and gateways. When `.build()` is called, the BPMN process validates that the required functions are installed. You cannot run a process before `.build()` is called. If `.build()` returns an error, it contains the required functions that are missing. The created process can be run multiple times. 
+
+Use scaffold to generate code from the read BPMN file as a good starting point. Described below.
 
 ### Create and run process
 
-Use your own model to be used by the process.
+Use your own model to be used by the process. 
 
 ```rust
 #[derive(Debug, Default)]
@@ -105,21 +81,25 @@ struct Counter {
     count: u32,
 }
 ```
-Read the bpmn file, add the handlers and run the process.
+Read the bpmn file, add the behavior and run the process.
 
 ```rust
-let bpmn = Process::new("example.bpmn")?;
-let mut handler: Eventhandler<Counter> = Eventhandler::default();
-// ... Add task and gateway closures here ...
-let process_result = bpmn.run(&handler, Counter::default())?;
-```
+let bpmn = Process::<_, Counter>::new("example.bpmn")?
+        .task("Count 1", |input| {
+            input.lock().unwrap().count += 1;
+            None
+        })
+        .exclusive("equal to 3", |input| {
+            let result = if input.lock().unwrap().count == 3 {
+                "YES"
+            } else {
+                "NO"
+            };
+            result.into()
+        })
+        .build()?;
 
-### Replay trace
-
-Run the flow from a previous process run. **NOTE** Requires feature **trace** enabled to actually trace something. If data is nondeterministic then do not expect same result by replay_trace.
-
-```rust
-let trace_result = Process::replay_trace(&handler, Counter::default(), &process_result.trace);
+let result = bpmn.run(Counter::default())?;
 ```
 
 ### Scaffold
@@ -134,31 +114,15 @@ bpmn.scaffold("scaffold.rs")?;
 Output file: **scaffold.rs**
 
 ```rust scaffold.rs
-// Replace the '()' in the Eventhandler<()> return type with your own type.
-pub fn create_handler() -> snurr::Eventhandler<()> {
-    let mut handler = snurr::Eventhandler::default();
-    handler.add_task("Count 1", |input| None);
-
-    // Exclusive gateway. Names: YES, NO. Flows: Flow_1h0jtl6, Flow_0rsqhpi.
-    handler.add_gateway("equal to 3", |input| Default::default());
-
-    handler
+fn add_and_build<T>(
+    process: snurr::Process<snurr::Build, T>,
+) -> Result<snurr::Process<snurr::Run, T>, snurr::Error> {
+    process
+        .task("Count 1", |input| None)
+        // Exclusive gateway. Names: YES, NO. Flows: Flow_1h0jtl6, Flow_0rsqhpi.
+        .exclusive("equal to 3", |input| Default::default())
+        .build()
 }
-```
-
-## Eventhandler
-
-Create an event handler for a type you want to use as input to task and gateways. Register your own task and gateway closures to the eventhandler and pass it to the process.
-
-### Usage
-
-```rust
-#[derive(Debug, Default)]
-struct Counter {
-    count: u32,
-}
-
-let mut handler: Eventhandler<Counter> = Eventhandler::default();
 ```
 
 ## Tasks
@@ -172,9 +136,9 @@ All tasks is used in the same way regardless of which icon is used in the BPMN d
 Register task by **name** (if it exist) or **id**. Return a **None** if no boundary is used and follow regular flow.
 
 ```rust
-handler.add_task("Name or id", |input| {
+.task("Name or id", |input| {
     None
-});
+})
 ```
 
 If one or more boundaries exist on a task, then a boundary can be returned. If a name exist it must match.
@@ -182,16 +146,16 @@ If one or more boundaries exist on a task, then a boundary can be returned. If a
 Boundary with no name
 
 ```rust
-handler.add_task("Name or id", |input| {
+.task("Name or id", |input| {
     Some(Symbol::Error.into())
-});
+})
 ```
 Boundary with name
 
 ```rust
-handler.add_task("Name or id", |input| {
+.task("Name or id", |input| {
     Some(("Not good", Symbol::Error).into())
-});
+})
 ```
 
 ## Gateways
@@ -209,15 +173,15 @@ Only branching/forking exclusive, event-based and inclusive gateways need to be 
 One flow is returned or default.
 
 ```rust
-handler.add_gateway("CHOOSE", |input| {
-    With::Flow("YES")
-});
+.exclusive("CHOOSE", |input| {
+    "YES".into()
+})
 ```
 
 ```rust
-handler.add_gateway("CHOOSE", |input| {
-    With::Default
-});
+.exclusive("CHOOSE", |input| {
+    Default::default()
+})
 ```
 
 ### Event-based gateway
@@ -227,9 +191,9 @@ handler.add_gateway("CHOOSE", |input| {
 One flow is returned.
 
 ```rust
-handler.add_gateway("CHOOSE", |input| {
+.event_based("CHOOSE", |input| {
      ("Message", Symbol::Message).into()
-});
+})
 ```
 
 ### Inclusive gateway
@@ -239,28 +203,28 @@ handler.add_gateway("CHOOSE", |input| {
 One or more flows is returned and processed. Inclusive gateway should always have a default flow in the BPMN diagram.
 
 ```rust
-handler.add_gateway("CHOOSE", |input| {
+.inclusive("CHOOSE", |input| {
     With::Fork(vec!["YES", "NO"])
-});
+})
 ```
 
 ```rust
-handler.add_gateway("CHOOSE", |input| {
+.inclusive("CHOOSE", |input| {
     With::Flow("YES")
-});
+})
 ```
 
 ```rust
-handler.add_gateway("CHOOSE", |input| {
+.inclusive("CHOOSE", |input| {
     With::Default
-});
+})
 ```
 
 ### Parallel gateway
 
 ![Parallel gateway](/assets/images/parallel-gateway.png)
 
-**Parallel gateways** run **all** available flows. No need to add gateway.
+**Parallel gateways** run **all** available flows. No need to add gateway. (And you can't)
 
 ## Intermediate event
 
@@ -294,9 +258,8 @@ Example with a task error boundary:
 
 If one or more boundary's exist on a task, then a boundary can be returned.
 
-
 ```rust
-handler.add_task("Name or id", |input| {
+.task("Name or id", |input| {
     Some(Symbol::Error.into())
 });
 ```
@@ -317,18 +280,6 @@ An end event symbol kan be used in a sub-process to use the boundary as an alter
 
 ```
 RUST_LOG=info cargo run
-```
-
-### warn
-
-Identify missing functions in the flow with warn.
-
-```
-RUST_LOG=warn cargo run
-```
-```
- WARN  snurr::model > Missing function. Please register: Count 1
- WARN  snurr::model > Missing function. Please register: equal to 3
 ```
 
 ## Not supported

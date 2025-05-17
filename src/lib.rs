@@ -16,7 +16,7 @@
 //! ### Cargo.toml
 //! ```toml
 //! [dependencies]
-//! snurr = "0.8"
+//! snurr = "0.9"
 //! log = "0.4"
 //! pretty_env_logger = "0.5"
 //! ```
@@ -48,13 +48,14 @@
 //!                 "NO"
 //!             };
 //!             result.into()
-//!         }).build()?;
+//!         })
+//!         .build()?;
 //!
-//!     // Run the process with handler and data
-//!     let result = bpmn.run(Counter::default())?;
+//!     // Run the process with input data
+//!     let counter = bpmn.run(Counter::default())?;
 //!
 //!     // Print the result.
-//!     println!("Result: {:?}", result);
+//!     println!("Count: {}", counter.count);
 //!     Ok(())
 //! }
 //! ```

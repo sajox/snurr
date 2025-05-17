@@ -26,10 +26,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .build()?;
 
-    // Run the process with handler and data
-    let result = bpmn.run(Counter::default())?;
+    // Run the process with input data
+    let counter = bpmn.run(Counter::default())?;
 
     // Print the result.
-    println!("Result: {:?}", result);
+    println!("Count: {}", counter.count);
     Ok(())
 }

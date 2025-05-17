@@ -113,9 +113,8 @@ impl<'a> Scaffold<'a> {
     // No file is allowed to exist at the target location.
     fn create(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
         let mut content = vec![];
-        content.push("// Replace the '()' in the Process<()> with your own type.".into());
         content
-            .push("fn create_handler<T>(process: snurr::Process<snurr::Build, T>) -> Result<snurr::Process<snurr::Run, T>, snurr::Error> {".into());
+            .push("fn add_and_build<T>(process: snurr::Process<snurr::Build, T>) -> Result<snurr::Process<snurr::Run, T>, snurr::Error> {".into());
         content.push("    process".into());
 
         // Do not generate duplicates

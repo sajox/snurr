@@ -60,7 +60,7 @@ pub(crate) const _ATTRIB_EXPORTER_VERSION: &[u8] = b"exporterVersion";
 pub(crate) const ATTRIB_ATTACHED_TO_REF: &[u8] = b"attachedToRef";
 pub(crate) const ATTRIB_CANCEL_ACTIVITY: &[u8] = b"cancelActivity";
 
-/// Gateway return type
+/// Inclusive gateway return type
 #[derive(Default, Debug)]
 pub enum With {
     #[default]
@@ -83,6 +83,7 @@ impl From<Vec<&'static str>> for With {
     }
 }
 
+/// Task return type
 #[derive(Debug)]
 pub enum Boundary {
     Symbol(Symbol),
@@ -125,6 +126,7 @@ impl Display for Boundary {
     }
 }
 
+/// Event based gateway return type
 #[derive(Debug)]
 pub struct IntermediateEvent(pub &'static str, pub Symbol);
 

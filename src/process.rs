@@ -27,7 +27,10 @@ pub struct Process<S, T> {
     _marker: PhantomData<S>,
 }
 
+/// Process Build state
 pub struct Build;
+
+/// Process Run state
 pub struct Run;
 
 impl<T> Process<Build, T> {
@@ -36,7 +39,7 @@ impl<T> Process<Build, T> {
     /// use snurr::{Build, Process};
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let bpmn: Process<Build, ()> = Process::new("examples/example.bpmn")?;
+    ///     let bpmn: Process<_, ()> = Process::new("examples/example.bpmn")?;
     ///     Ok(())
     /// }
     /// ```
@@ -113,7 +116,7 @@ impl<T> FromStr for Process<Build, T> {
     /// static BPMN_DATA: &str = include_str!("../examples/example.bpmn");
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let bpmn: Process<Build, ()> = BPMN_DATA.parse()?;
+    ///     let bpmn: Process<_, ()> = BPMN_DATA.parse()?;
     ///     Ok(())
     /// }
     /// ```
@@ -127,7 +130,7 @@ impl<T> FromStr for Process<Build, T> {
 }
 
 impl<T> Process<Run, T> {
-    /// Run the process and return the `ProcessResult` or an `Error`.
+    /// Run the process and return the `T` or an `Error`.
     /// ```
     /// use snurr::Process;
     ///
@@ -155,11 +158,11 @@ impl<T> Process<Run, T> {
     ///         })
     ///         .build()?;
     ///
-    ///     // Run the process with handler and data
-    ///     let result = bpmn.run(Counter::default())?;
+    ///     // Run the process with input data
+    ///     let counter = bpmn.run(Counter::default())?;
     ///
     ///     // Print the result.
-    ///     println!("Result: {:?}", result);
+    ///     println!("Count: {}", counter.count);
     ///     Ok(())
     /// }
     /// ```

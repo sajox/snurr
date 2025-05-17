@@ -27,14 +27,13 @@ BPMN diagram used in example.
 
 ```toml
 [dependencies]
-snurr = "0.8"
+snurr = "0.9"
 log = "0.4"
 pretty_env_logger = "0.5"
 ```
 
-
 ```rust
-use snurr::{Eventhandler, Process};
+use snurr::Process;
 
 extern crate pretty_env_logger;
 
@@ -46,25 +45,23 @@ struct Counter {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     pretty_env_logger::init();
 
-    let bpmn = Process::new("example.bpmn")?;
-    let mut handler: Eventhandler<Counter> = Eventhandler::default();
+    let bpmn = Process::<_, Counter>::new("examples/example.bpmn")?
+        .task("Count 1", |input| {
+            input.lock().unwrap().count += 1;
+            None
+        })
+        .exclusive("equal to 3", |input| {
+            let result = if input.lock().unwrap().count == 3 {
+                "YES"
+            } else {
+                "NO"
+            };
+            result.into()
+        })
+        .build()?;
 
-    handler.add_task("Count 1", |input| {
-        input.lock().unwrap().count += 1;
-        None
-    });
-
-    handler.add_gateway("equal to 3", |input| {
-        let result = if input.lock().unwrap().count == 3 {
-            "YES"
-        } else {
-            "NO"
-        };
-        result.into()
-    });
-
-    let pr = bpmn.run(&handler, Counter::default())?;
-    println!("Result: {:?}", pr.result);
+    let counter = bpmn.run(Counter::default())?;
+    println!("Count: {}", counter.count);
     Ok(())
 }
 ```
@@ -89,7 +86,7 @@ If RUST_LOG=info is set when running [example](#usage)
  INFO  snurr::process::engine > Exclusive: equal to 3
  INFO  snurr::process::engine > SequenceFlow: YES
  INFO  snurr::process::engine > End: End process
-Result: Counter { count: 3 }
+Count: 3
 ```
 
 ### Prepared sample
