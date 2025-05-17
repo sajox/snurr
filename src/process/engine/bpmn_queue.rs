@@ -4,7 +4,7 @@ use crate::model::{Gateway, GatewayType};
 use std::{borrow::Cow, collections::HashMap};
 
 #[derive(Default, Debug)]
-pub struct BpmnQueue<'a> {
+pub(super) struct BpmnQueue<'a> {
     queue: Vec<Cow<'a, [usize]>>,
     uncommitted: Vec<Cow<'a, [usize]>>,
     inclusive_handler: InclusiveGatewayHandler<'a>,
@@ -12,7 +12,7 @@ pub struct BpmnQueue<'a> {
 }
 
 impl<'a> BpmnQueue<'a> {
-    pub fn new(item: Cow<'a, [usize]>) -> Self {
+    pub(super) fn new(item: Cow<'a, [usize]>) -> Self {
         Self {
             queue: vec![item],
             uncommitted: Default::default(),
@@ -21,30 +21,30 @@ impl<'a> BpmnQueue<'a> {
         }
     }
 
-    pub fn take(&mut self) -> Vec<Cow<'a, [usize]>> {
+    pub(super) fn take(&mut self) -> Vec<Cow<'a, [usize]>> {
         std::mem::take(&mut self.queue)
     }
 
-    pub fn push_output(&mut self, item: Cow<'a, [usize]>) {
+    pub(super) fn push_output(&mut self, item: Cow<'a, [usize]>) {
         self.queue.push(item);
     }
 
-    pub fn push_fork(&mut self, item: Cow<'a, [usize]>) {
+    pub(super) fn push_fork(&mut self, item: Cow<'a, [usize]>) {
         self.inclusive_handler.push(item.len());
         self.queue.push(item);
     }
 
-    pub fn add_pending(&mut self, item: Cow<'a, [usize]>) {
+    pub(super) fn add_pending(&mut self, item: Cow<'a, [usize]>) {
         self.uncommitted.push(item);
     }
 
-    pub fn commit(&mut self) {
+    pub(super) fn commit(&mut self) {
         for item in std::mem::take(&mut self.uncommitted) {
             self.push_fork(item);
         }
     }
 
-    pub fn join_token(&mut self, gateway: &'a Gateway) {
+    pub(super) fn join_token(&mut self, gateway: &'a Gateway) {
         match gateway.gateway {
             GatewayType::Parallel => {
                 if let Some(gw) = self.parallel_handler.consume(gateway) {
@@ -56,11 +56,11 @@ impl<'a> BpmnQueue<'a> {
         }
     }
 
-    pub fn end_token(&mut self) {
+    pub(super) fn end_token(&mut self) {
         self.inclusive_handler.consume(None);
     }
 
-    pub fn tokens_consumed(&mut self) -> Option<Vec<&'a Gateway>> {
+    pub(super) fn tokens_consumed(&mut self) -> Option<Vec<&'a Gateway>> {
         self.inclusive_handler.consumed()
     }
 }

@@ -31,7 +31,7 @@ impl<T> Default for Handler<T> {
 }
 
 impl<T> Handler<T> {
-    pub fn add_task<F>(&mut self, func: F) -> usize
+    pub(super) fn add_task<F>(&mut self, func: F) -> usize
     where
         F: Fn(Data<T>) -> TaskResult + 'static + Sync,
     {
@@ -40,7 +40,7 @@ impl<T> Handler<T> {
         len
     }
 
-    pub fn add_exclusive<F>(&mut self, func: F) -> usize
+    pub(super) fn add_exclusive<F>(&mut self, func: F) -> usize
     where
         F: Fn(Data<T>) -> Option<&'static str> + 'static + Sync,
     {
@@ -49,7 +49,7 @@ impl<T> Handler<T> {
         len
     }
 
-    pub fn add_inclusive<F>(&mut self, func: F) -> usize
+    pub(super) fn add_inclusive<F>(&mut self, func: F) -> usize
     where
         F: Fn(Data<T>) -> With + 'static + Sync,
     {
@@ -58,7 +58,7 @@ impl<T> Handler<T> {
         len
     }
 
-    pub fn add_event_based<F>(&mut self, func: F) -> usize
+    pub(super) fn add_event_based<F>(&mut self, func: F) -> usize
     where
         F: Fn(Data<T>) -> IntermediateEvent + 'static + Sync,
     {
@@ -67,11 +67,11 @@ impl<T> Handler<T> {
         len
     }
 
-    pub(crate) fn run_task(&self, index: usize, data: Data<T>) -> Option<TaskResult> {
+    pub(super) fn run_task(&self, index: usize, data: Data<T>) -> Option<TaskResult> {
         self.task.get(index).map(|value| (*value)(data))
     }
 
-    pub(crate) fn run_exclusive(
+    pub(super) fn run_exclusive(
         &self,
         index: usize,
         data: Data<T>,
@@ -79,11 +79,11 @@ impl<T> Handler<T> {
         self.exclusive.get(index).map(|value| (*value)(data))
     }
 
-    pub(crate) fn run_inclusive(&self, index: usize, data: Data<T>) -> Option<With> {
+    pub(super) fn run_inclusive(&self, index: usize, data: Data<T>) -> Option<With> {
         self.inclusive.get(index).map(|value| (*value)(data))
     }
 
-    pub(crate) fn run_event_based(&self, index: usize, data: Data<T>) -> Option<IntermediateEvent> {
+    pub(super) fn run_event_based(&self, index: usize, data: Data<T>) -> Option<IntermediateEvent> {
         self.event_based.get(index).map(|value| (*value)(data))
     }
 }
