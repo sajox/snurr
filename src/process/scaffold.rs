@@ -6,7 +6,9 @@ use crate::{
     model::{ActivityType, Bpmn, BpmnLocal, Gateway, GatewayType, Symbol},
 };
 
-impl<U, T> Process<U, T> {
+use super::Build;
+
+impl<T> Process<Build, T> {
     /// Generate code from all the task and gateways to the given file path.
     /// No file with same name is allowed to exist at the target location.
     /// ```
