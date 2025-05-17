@@ -83,31 +83,60 @@ impl From<Vec<&'static str>> for With {
     }
 }
 
-/// Boundary / Intermediate event with an optional name and a symbol
 #[derive(Debug)]
-pub struct IntermediateEvent(pub Option<&'static str>, pub Symbol);
+pub enum Boundary {
+    Symbol(Symbol),
+    NameSymbol(&'static str, Symbol),
+}
 
-impl From<Symbol> for IntermediateEvent {
-    fn from(value: Symbol) -> Self {
-        Self(None, value)
+impl Boundary {
+    pub(crate) fn symbol(&self) -> &Symbol {
+        match self {
+            Boundary::Symbol(symbol) | Boundary::NameSymbol(_, symbol) => symbol,
+        }
+    }
+
+    pub(crate) fn name(&self) -> Option<&'static str> {
+        match self {
+            Boundary::NameSymbol(name, _) => Some(name),
+            _ => None,
+        }
     }
 }
 
-impl From<Symbol> for Option<IntermediateEvent> {
-    fn from(value: Symbol) -> Self {
-        Some(IntermediateEvent(None, value))
+impl From<(&'static str, Symbol)> for Boundary {
+    fn from(value: (&'static str, Symbol)) -> Self {
+        Self::NameSymbol(value.0, value.1)
     }
 }
+
+impl From<Symbol> for Boundary {
+    fn from(symbol: Symbol) -> Self {
+        Self::Symbol(symbol)
+    }
+}
+
+impl Display for Boundary {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Boundary::Symbol(symbol) => write!(f, "{}", symbol),
+            Boundary::NameSymbol(name, symbol) => write!(f, "({}, {})", name, symbol),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct IntermediateEvent(pub &'static str, pub Symbol);
 
 impl From<(&'static str, Symbol)> for IntermediateEvent {
-    fn from((name, symbol): (&'static str, Symbol)) -> Self {
-        Self(Some(name), symbol)
+    fn from(value: (&'static str, Symbol)) -> Self {
+        Self(value.0, value.1)
     }
 }
 
 impl Display for IntermediateEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}, {:?})", self.0.unwrap_or_default(), self.1)
+        write!(f, "({}, {})", self.0, self.1)
     }
 }
 

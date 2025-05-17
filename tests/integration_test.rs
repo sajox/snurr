@@ -539,21 +539,6 @@ fn event_gateway() -> Result<()> {
 }
 
 #[test]
-fn event_gateway_blank_symbol() -> Result<()> {
-    let bpmn = Process::new("tests/files/event_gateway.bpmn")?
-        .task(COUNT_1, func_cnt(1))
-        .task(COUNT_2, func_cnt(2))
-        .task(COUNT_3, func_cnt(3))
-        .task("Investigate", |_| None)
-        .event_based("JUNIOR GATEKEEPER", |_| Symbol::Timer.into())
-        .event_based("SENIOR GATEKEEPER", |_| ("Sleeping", Symbol::Timer).into())
-        .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 3);
-    Ok(())
-}
-
-#[test]
 fn single_flow() -> Result<()> {
     let bpmn = Process::new("tests/files/single_flow.bpmn")?
         .task(COUNT_1, func_cnt(1))

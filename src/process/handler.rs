@@ -1,11 +1,11 @@
-use crate::{IntermediateEvent, With};
+use crate::{IntermediateEvent, With, model::Boundary};
 use std::sync::{Arc, Mutex};
 
 /// Generic type for the task and gateway inputs.
 pub type Data<T> = Arc<Mutex<T>>;
 
 /// Task result type
-pub type TaskResult = Option<IntermediateEvent>;
+pub type TaskResult = Option<Boundary>;
 
 type TaskCallback<T> = Box<dyn Fn(Data<T>) -> TaskResult + Sync>;
 type ExclusiveCallback<T> = Box<dyn Fn(Data<T>) -> Option<&'static str> + Sync>;

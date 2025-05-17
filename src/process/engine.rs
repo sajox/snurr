@@ -191,7 +191,12 @@ impl<T> Process<Run, T> {
                                     )
                                 })? {
                                 Some(boundary) => self
-                                    .boundary_lookup(id, boundary.0, &boundary.1, data.process_data)
+                                    .boundary_lookup(
+                                        id,
+                                        boundary.name(),
+                                        boundary.symbol(),
+                                        data.process_data,
+                                    )
                                     .ok_or_else(|| {
                                         Error::MissingBoundary(
                                             format!("{}", boundary),
@@ -302,11 +307,12 @@ impl<T> Process<Run, T> {
                                     )
                                 })?;
 
-                            output_by_symbol(value, outputs.ids(), data.process_data).ok_or_else(
+                            output_by_symbol(&value, outputs.ids(), data.process_data).ok_or_else(
                                 || {
-                                    Error::MissingOutput(
+                                    Error::MissingIntermediateEvent(
                                         gateway.to_string(),
                                         name_or_id.to_string(),
+                                        value.to_string(),
                                     )
                                 },
                             )?
@@ -430,7 +436,7 @@ fn default_path<'a>(
 }
 
 fn output_by_symbol<'a>(
-    search: IntermediateEvent,
+    search: &IntermediateEvent,
     outputs: &'a [usize],
     process_data: &'a [Bpmn],
 ) -> Option<&'a usize> {
@@ -446,15 +452,15 @@ fn output_by_symbol<'a>(
             .filter(|bpmn| match bpmn {
                 // We can target both ReceiveTask or Events.
                 Bpmn::Activity {
-                    id, activity, name, ..
+                    activity,
+                    name: Some(name),
+                    ..
                 } => {
-                    activity == &ActivityType::ReceiveTask
+                    *activity == ActivityType::ReceiveTask
                         && search.1 == Symbol::Message
-                        && (search.0.filter(|&sn| sn == id).is_some()
-                            || search.0 == name.as_deref())
+                        && name.as_str() == search.0
                 }
                 Bpmn::Event {
-                    id,
                     symbol:
                         Some(
                             symbol @ (Symbol::Message
@@ -462,13 +468,9 @@ fn output_by_symbol<'a>(
                             | Symbol::Timer
                             | Symbol::Conditional),
                         ),
-                    name,
+                    name: Some(name),
                     ..
-                } => {
-                    *symbol == search.1
-                        && (search.0.filter(|&sn| sn == id.bpmn()).is_some()
-                            || search.0 == name.as_deref())
-                }
+                } => *symbol == search.1 && name.as_str() == search.0,
                 _ => false,
             })
             .is_some()

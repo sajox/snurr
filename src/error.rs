@@ -41,6 +41,9 @@ pub enum Error {
     #[error("could not find {0} boundary symbol attached to {1}")]
     MissingBoundary(String, String),
 
+    #[error("{0} with name or id '{1}' could not find {2}")]
+    MissingIntermediateEvent(String, String, String),
+
     #[error("missing intermediate throw event name on {0}")]
     MissingIntermediateThrowEventName(String),
 
