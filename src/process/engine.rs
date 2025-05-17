@@ -209,8 +209,7 @@ impl<T> Process<Run, T> {
                         ActivityType::SubProcess => {
                             let sp_data = self
                                 .diagram
-                                .data
-                                .get(id)
+                                .get_process(id)
                                 .ok_or_else(|| Error::MissingProcessData(id.into()))?;
 
                             if let Some(Bpmn::Event {

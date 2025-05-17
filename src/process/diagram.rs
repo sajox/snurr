@@ -11,6 +11,16 @@ pub(super) struct Diagram {
 }
 
 impl Diagram {
+    // All processes
+    pub(super) fn get_processes(&self) -> Option<&Vec<Bpmn>> {
+        self.data.get(&self.definitions_id)
+    }
+
+    // Can be process or sub process
+    pub(super) fn get_process(&self, process_id: &str) -> Option<&Vec<Bpmn>> {
+        self.data.get(process_id)
+    }
+
     pub(super) fn install_task_function(&mut self, match_value: &str, index: usize) {
         for bpmn in self.data.values_mut().flatten() {
             if let Bpmn::Activity {

@@ -172,16 +172,14 @@ impl<T> Process<Run, T> {
         // Run every process specified in the diagram
         for bpmn in self
             .diagram
-            .data
-            .get(&self.diagram.definitions_id)
+            .get_processes()
             .ok_or(Error::MissingDefinitionsId)?
             .iter()
         {
             if let Bpmn::Process { id, .. } = bpmn {
                 let process_data = self
                     .diagram
-                    .data
-                    .get(id)
+                    .get_process(id)
                     .ok_or_else(|| Error::MissingProcessData(id.into()))?;
 
                 self.execute(&ExecuteData::new(process_data, id, Arc::clone(&data)))?;
