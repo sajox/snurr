@@ -8,6 +8,24 @@ use crate::{
 
 const BUILD_PROCESS_ERROR_MSG: &str = "couldn't build process";
 
+//
+// data: [
+//            [ // Might contain a sub process that has its data at index 1
+//                Process 0 DATA
+//            ],
+//            [
+//                Sub Process DATA
+//            ],
+//            [
+//                Process 1 DATA
+//            ],
+//            [ // Definitions contains all top level processes. Always last.
+//                Process 0, data at index 0
+//                Process 1, data at index 2
+//            ],
+//        ]
+//
+
 #[derive(Default)]
 pub(super) struct DataBuilder {
     data: Vec<Vec<Bpmn>>,
