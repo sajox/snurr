@@ -75,7 +75,7 @@ impl DataBuilder {
 
     pub(super) fn add_text(&mut self, value: String) {
         if let Some(Bpmn::Direction { text, .. }) = self.stack.last_mut() {
-            *text = Some(value);
+            text.replace(value);
         }
     }
 

@@ -28,7 +28,7 @@ impl Diagram {
             } = bpmn
             {
                 if Diagram::match_name_or_id(name.as_deref(), id.bpmn(), match_value) {
-                    *func_idx = Some(index)
+                    func_idx.replace(index);
                 }
             }
         }
@@ -52,7 +52,7 @@ impl Diagram {
                 if Diagram::match_name_or_id(name.as_deref(), id.bpmn(), match_value)
                     && gw_type == *gateway
                 {
-                    *func_idx = Some(index)
+                    func_idx.replace(index);
                 }
             }
         }
