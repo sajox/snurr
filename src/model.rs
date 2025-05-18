@@ -396,7 +396,6 @@ impl Bpmn {
         }
     }
 
-    // Only use input to check unsupported join and fork
     pub(crate) fn add_input(&mut self, text: String) {
         if let Bpmn::Gateway(Gateway { inputs, .. }) = self {
             inputs.push(text)

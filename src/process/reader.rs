@@ -12,7 +12,7 @@ use super::Diagram;
 use crate::error::Error;
 use crate::model::*;
 
-// Read BPMN content and return the Process
+// Read BPMN content and return the Diagram
 pub(super) fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, Error> {
     let mut builder = DataBuilder::default();
     let mut buf = Vec::new();
