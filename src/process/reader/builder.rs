@@ -10,12 +10,11 @@ const BUILD_PROCESS_ERROR_MSG: &str = "couldn't build process";
 
 #[derive(Default)]
 pub(super) struct DataBuilder {
-    data: HashMap<String, Vec<Bpmn>>,
+    data: Vec<Vec<Bpmn>>,
     boundaries: HashMap<String, Vec<usize>>,
     catch_event_links: HashMap<String, HashMap<String, usize>>,
     process_stack: Vec<Vec<Bpmn>>,
     stack: Vec<Bpmn>,
-    definitions_id: Option<String>,
 }
 
 impl DataBuilder {
@@ -28,8 +27,9 @@ impl DataBuilder {
         self.add(bpmn);
     }
 
-    pub(super) fn add_to_process(&mut self, bpmn: Bpmn) {
+    pub(super) fn add_to_process(&mut self, mut bpmn: Bpmn) {
         if let Some(current) = self.process_stack.last_mut() {
+            bpmn.set_local_id(current.len());
             current.push(bpmn);
         }
     }
@@ -70,22 +70,24 @@ impl DataBuilder {
     }
 
     pub(super) fn end_process(&mut self) -> Result<(), Error> {
-        let Some((bpmn, mut data)) = self.stack.pop().zip(self.process_stack.pop()) else {
+        let Some((mut bpmn, mut data)) = self.stack.pop().zip(self.process_stack.pop()) else {
             return Err(Error::Builder(BUILD_PROCESS_ERROR_MSG.into()));
         };
+
+        bpmn.set_local_id(self.data.len());
 
         let id = bpmn.id()?.to_string();
         self.update_data(&id, &mut data);
         // Definitions collect all Processes
         // Processes collect all related sub processes
-        match self.process_stack.last_mut() {
-            Some(parent_data) => parent_data.push(bpmn),
-            None => self.definitions_id = Some(id.clone()),
+        if let Some(parent_data) = self.process_stack.last_mut() {
+            parent_data.push(bpmn)
         }
-        self.data.insert(id, data);
+        self.data.push(data);
         Ok(())
     }
 
+    // Post process to fill local ids to some bpmn objects.
     fn update_data(&mut self, process_id: &str, data: &mut [Bpmn]) {
         // Collect Bpmn id to index in array
         let bpmn_index: HashMap<String, usize> = data
@@ -106,7 +108,6 @@ impl DataBuilder {
                 ..
             } => {
                 outputs.update_local_ids(&bpmn_index);
-                update_local_id(id, &bpmn_index);
                 if let Some(attached_to_ref) = attached_to_ref {
                     update_local_id(attached_to_ref, &bpmn_index);
 
@@ -128,12 +129,8 @@ impl DataBuilder {
                 }
             }
             Bpmn::Gateway(Gateway {
-                id,
-                default,
-                outputs,
-                ..
+                default, outputs, ..
             }) => {
-                update_local_id(id, &bpmn_index);
                 outputs.update_local_ids(&bpmn_index);
                 if let Some(default) = default {
                     update_local_id(default, &bpmn_index);
@@ -151,16 +148,15 @@ impl TryFrom<DataBuilder> for Diagram {
     fn try_from(builder: DataBuilder) -> Result<Self, Self::Error> {
         Ok(Self {
             data: builder.data,
-            definitions_id: builder.definitions_id.ok_or(Error::MissingDefinitionsId)?,
             boundaries: builder.boundaries,
             catch_event_links: builder.catch_event_links,
         })
     }
 }
 
-fn update_local_id(BpmnLocal(bid, lid): &mut BpmnLocal, map: &HashMap<String, usize>) {
-    if let Some(index) = map.get(bid) {
-        *lid = *index;
+fn update_local_id(Id { bpmn_id, local_id }: &mut Id, map: &HashMap<String, usize>) {
+    if let Some(index) = map.get(bpmn_id) {
+        *local_id = *index;
     }
 }
 
@@ -169,7 +165,7 @@ fn check_unsupported(bpmn: &Bpmn) -> Result<(), Error> {
         // SequenceFlow with Start and End tag is Conditional Sequence Flow
         Bpmn::SequenceFlow { id, name, .. } => Error::NotSupported(format!(
             "{}: {}",
-            name.as_ref().unwrap_or(id),
+            name.as_deref().unwrap_or(id.bpmn()),
             "conditional sequence flow",
         )),
         _ => return Ok(()),

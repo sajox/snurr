@@ -1,33 +1,33 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::model::{ActivityType, Bpmn, BpmnLocal, Gateway, GatewayType};
+use crate::model::{ActivityType, Bpmn, Gateway, GatewayType};
 
 #[derive(Debug)]
 pub(super) struct Diagram {
-    pub(super) data: HashMap<String, Vec<Bpmn>>,
-    pub(super) definitions_id: String,
+    pub(super) data: Vec<Vec<Bpmn>>,
     pub(super) boundaries: HashMap<String, Vec<usize>>,
     pub(super) catch_event_links: HashMap<String, HashMap<String, usize>>,
 }
 
 impl Diagram {
-    // All processes
+    // All top level processes defined in Definitions.
+    // Always last in the Vec as it is a top level construct in the XML.
     pub(super) fn get_processes(&self) -> Option<&Vec<Bpmn>> {
-        self.data.get(&self.definitions_id)
+        self.data.last()
     }
 
-    // Can be process or sub process
-    pub(super) fn get_process(&self, process_id: &str) -> Option<&Vec<Bpmn>> {
+    // Can be a process or sub process
+    pub(super) fn get_process(&self, process_id: usize) -> Option<&Vec<Bpmn>> {
         self.data.get(process_id)
     }
 
     pub(super) fn install_task_function(&mut self, match_value: &str, index: usize) {
-        for bpmn in self.data.values_mut().flatten() {
+        for bpmn in self.data.iter_mut().flatten() {
             if let Bpmn::Activity {
                 id, func_idx, name, ..
             } = bpmn
             {
-                if Diagram::match_name_or_id(name.as_deref(), id, match_value) {
+                if Diagram::match_name_or_id(name.as_deref(), id.bpmn(), match_value) {
                     *func_idx = Some(index)
                 }
             }
@@ -40,16 +40,16 @@ impl Diagram {
         match_value: &str,
         index: usize,
     ) {
-        for bpmn in self.data.values_mut().flatten() {
+        for bpmn in self.data.iter_mut().flatten() {
             if let Bpmn::Gateway(Gateway {
                 gateway,
-                id: BpmnLocal(id, _),
+                id,
                 func_idx,
                 name,
                 ..
             }) = bpmn
             {
-                if Diagram::match_name_or_id(name.as_deref(), id, match_value)
+                if Diagram::match_name_or_id(name.as_deref(), id.bpmn(), match_value)
                     && gw_type == *gateway
                 {
                     *func_idx = Some(index)
@@ -60,7 +60,7 @@ impl Diagram {
 
     pub(super) fn find_missing_functions(&self) -> HashSet<String> {
         self.data
-            .values()
+            .iter()
             .flatten()
             .fold(HashSet::new(), |mut acc, bpmn| {
                 acc.insert(match bpmn {
@@ -79,19 +79,19 @@ impl Diagram {
                             | ActivityType::ManualTask
                             | ActivityType::BusinessRuleTask),
                         ..
-                    } => format!("{}: {}", activity, name.as_ref().unwrap_or(id)),
+                    } => format!("{}: {}", activity, name.as_deref().unwrap_or(id.bpmn())),
                     Bpmn::Gateway(Gateway {
                         gateway:
                             gateway @ (GatewayType::EventBased
                             | GatewayType::Exclusive
                             | GatewayType::Inclusive),
                         name,
-                        id: BpmnLocal(id, _),
+                        id,
                         func_idx: None,
                         outputs,
                         ..
                     }) if outputs.len() > 1 => {
-                        format!("{}: {}", gateway, name.as_ref().unwrap_or(id))
+                        format!("{}: {}", gateway, name.as_deref().unwrap_or(id.bpmn()))
                     }
                     _ => {
                         return acc;

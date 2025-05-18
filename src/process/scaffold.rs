@@ -3,7 +3,7 @@ use std::{collections::HashSet, io::Write, path::Path};
 use crate::{
     Process,
     error::Error,
-    model::{ActivityType, Bpmn, BpmnLocal, Gateway, GatewayType, Symbol},
+    model::{ActivityType, Bpmn, Gateway, GatewayType, Symbol},
 };
 
 use super::Build;
@@ -22,7 +22,7 @@ impl<T> Process<Build, T> {
     /// ```
     pub fn scaffold(&self, path: impl AsRef<Path>) -> Result<(), Error> {
         let mut scaffold = Scaffold::default();
-        self.diagram.data.values().for_each(|process: &Vec<Bpmn>| {
+        self.diagram.data.iter().for_each(|process: &Vec<Bpmn>| {
             process.iter().for_each(|bpmn| {
                 if let Bpmn::Activity {
                     activity: ActivityType::Task,
@@ -30,7 +30,7 @@ impl<T> Process<Build, T> {
                     ..
                 } = bpmn
                 {
-                    let symbols = if let Some(boundaries) = self.diagram.boundaries.get(id) {
+                    let symbols = if let Some(boundaries) = self.diagram.boundaries.get(id.bpmn()) {
                         boundaries
                             .iter()
                             .filter_map(|index| process.get(*index))
@@ -118,8 +118,8 @@ impl<'a> Scaffold<'a> {
         content.push("    process".into());
 
         // Do not generate duplicates
-        let mut seen_tasks: HashSet<&String> = HashSet::new();
-        let mut seen_gateways: HashSet<&String> = HashSet::new();
+        let mut seen_tasks: HashSet<&str> = HashSet::new();
+        let mut seen_gateways: HashSet<&str> = HashSet::new();
 
         // First all tasks
         for task in self.tasks.iter() {
@@ -131,7 +131,7 @@ impl<'a> Scaffold<'a> {
                 continue;
             };
 
-            let name_or_id = name.as_ref().unwrap_or(id);
+            let name_or_id = name.as_deref().unwrap_or(id.bpmn());
             if seen_tasks.insert(name_or_id) {
                 if !symbols.is_empty() {
                     content.push(format!(
@@ -151,7 +151,7 @@ impl<'a> Scaffold<'a> {
                 bpmn:
                     Bpmn::Gateway(Gateway {
                         gateway,
-                        id: BpmnLocal(id, _),
+                        id,
                         name,
                         outputs,
                         ..
@@ -162,7 +162,7 @@ impl<'a> Scaffold<'a> {
                 continue;
             };
 
-            let name_or_id = name.as_ref().unwrap_or(id);
+            let name_or_id = name.as_deref().unwrap_or(id.bpmn());
             if seen_gateways.insert(name_or_id) {
                 content.push(format!(
                     r#"    // {} gateway. Names: {}. Flows: {}."#,

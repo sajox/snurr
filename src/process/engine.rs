@@ -3,7 +3,7 @@ mod bpmn_queue;
 use crate::{
     IntermediateEvent, Process, Symbol,
     error::{AT_LEAST_TWO_OUTGOING, Error, TOO_MANY_END_SYMBOLS},
-    model::{ActivityType, Bpmn, BpmnLocal, EventType, Gateway, GatewayType, With},
+    model::{ActivityType, Bpmn, EventType, Gateway, GatewayType, Id, With},
 };
 use bpmn_queue::BpmnQueue;
 use log::info;
@@ -131,12 +131,12 @@ impl<T> Process<Run, T> {
                 bpmn @ Bpmn::Event {
                     event,
                     symbol,
-                    id: BpmnLocal(bid, _),
+                    id,
                     name,
                     outputs,
                     ..
                 } => {
-                    let name_or_id = name.as_ref().unwrap_or(bid);
+                    let name_or_id = name.as_deref().unwrap_or(id.bpmn());
                     info!("{}: {}", event, name_or_id);
                     match event {
                         EventType::Start | EventType::IntermediateCatch | EventType::Boundary => {
@@ -151,7 +151,9 @@ impl<T> Process<Run, T> {
                                 (Some(_), _) => {
                                     maybe_fork!(self, outputs, data, event, name_or_id)
                                 }
-                                _ => Err(Error::MissingIntermediateThrowEventName(bid.into()))?,
+                                _ => {
+                                    Err(Error::MissingIntermediateThrowEventName(id.bpmn().into()))?
+                                }
                             }
                         }
                         EventType::End => {
@@ -164,13 +166,13 @@ impl<T> Process<Run, T> {
                 }
                 Bpmn::Activity {
                     activity,
-                    id,
+                    id: id @ Id { bpmn_id, local_id },
                     func_idx,
                     name,
                     outputs,
                     ..
                 } => {
-                    let name_or_id = name.as_ref().unwrap_or(id);
+                    let name_or_id = name.as_ref().unwrap_or(bpmn_id);
                     info!("{}: {}", activity, name_or_id);
                     match activity {
                         ActivityType::Task
@@ -192,7 +194,7 @@ impl<T> Process<Run, T> {
                                 })? {
                                 Some(boundary) => self
                                     .boundary_lookup(
-                                        id,
+                                        bpmn_id,
                                         boundary.name(),
                                         boundary.symbol(),
                                         data.process_data,
@@ -209,8 +211,8 @@ impl<T> Process<Run, T> {
                         ActivityType::SubProcess => {
                             let sp_data = self
                                 .diagram
-                                .get_process(id)
-                                .ok_or_else(|| Error::MissingProcessData(id.into()))?;
+                                .get_process(*local_id)
+                                .ok_or_else(|| Error::MissingProcessData(bpmn_id.into()))?;
 
                             if let Some(Bpmn::Event {
                                 event: EventType::End,
@@ -219,13 +221,15 @@ impl<T> Process<Run, T> {
                                 ..
                             }) = self.execute(&data.update(id, sp_data))?
                             {
-                                self.boundary_lookup(id, name.as_deref(), symbol, data.process_data)
-                                    .ok_or_else(|| {
-                                        Error::MissingBoundary(
-                                            symbol.to_string(),
-                                            name_or_id.into(),
-                                        )
-                                    })?
+                                self.boundary_lookup(
+                                    bpmn_id,
+                                    name.as_deref(),
+                                    symbol,
+                                    data.process_data,
+                                )
+                                .ok_or_else(|| {
+                                    Error::MissingBoundary(symbol.to_string(), name_or_id.into())
+                                })?
                             } else {
                                 // Continue from subprocess
                                 maybe_fork!(self, outputs, data, activity, name_or_id)
@@ -237,7 +241,7 @@ impl<T> Process<Run, T> {
                 Bpmn::Gateway(
                     gw @ Gateway {
                         gateway,
-                        id: BpmnLocal(id, _),
+                        id,
                         func_idx,
                         name,
                         default,
@@ -245,7 +249,7 @@ impl<T> Process<Run, T> {
                         inputs,
                     },
                 ) => {
-                    let name_or_id = name.as_ref().unwrap_or(id);
+                    let name_or_id = name.as_deref().unwrap_or(id.bpmn());
                     info!("{}: {}", gateway, name_or_id);
                     match gateway {
                         _ if outputs.len() == 0 => {
@@ -324,7 +328,7 @@ impl<T> Process<Run, T> {
                     target_ref,
                     ..
                 } => {
-                    info!("SequenceFlow: {}", name.as_ref().unwrap_or(id));
+                    info!("SequenceFlow: {}", name.as_deref().unwrap_or(id.bpmn()));
                     target_ref.local()
                 }
                 bpmn => return Err(Error::TypeNotImplemented(format!("{bpmn:?}"))),
@@ -338,7 +342,7 @@ impl<T> Process<Run, T> {
         data: &ExecuteData<'a, T>,
         Gateway {
             gateway,
-            id: BpmnLocal(id, _),
+            id,
             func_idx,
             name,
             default,
@@ -346,7 +350,7 @@ impl<T> Process<Run, T> {
             ..
         }: &'a Gateway,
     ) -> Result<ControlFlow<Cow<'a, [usize]>, &'a usize>, Error> {
-        let name_or_id = name.as_ref().unwrap_or(id);
+        let name_or_id = name.as_deref().unwrap_or(id.bpmn());
         let value = match func_idx
             .and_then(|index| self.handler.run_inclusive(index, data.user_data()))
             .ok_or_else(|| {
@@ -411,11 +415,11 @@ impl<T> Process<Run, T> {
         &self,
         throw_event_name: &str,
         symbol: &Symbol,
-        process_id: &str,
+        process_id: &Id,
     ) -> Result<&usize, Error> {
         self.diagram
             .catch_event_links
-            .get(process_id)
+            .get(process_id.bpmn())
             .and_then(|links| links.get(throw_event_name))
             .ok_or_else(|| {
                 Error::MissingIntermediateCatchEvent(symbol.to_string(), throw_event_name.into())
@@ -424,13 +428,13 @@ impl<T> Process<Run, T> {
 }
 
 fn default_path<'a>(
-    default: &'a Option<BpmnLocal>,
+    default: &'a Option<Id>,
     gateway: &GatewayType,
-    name_or_id: &String,
+    name_or_id: &str,
 ) -> Result<&'a usize, Error> {
     default
         .as_ref()
-        .map(BpmnLocal::local)
+        .map(Id::local)
         .ok_or_else(|| Error::MissingDefault(gateway.to_string(), name_or_id.to_string()))
 }
 
@@ -487,7 +491,7 @@ fn output_by_name_or_id<'a>(
                 .as_deref()
                 .filter(|&name| name == search.as_ref())
                 .is_some()
-                || id == search.as_ref();
+                || id.bpmn() == search.as_ref();
         }
         false
     })
@@ -498,16 +502,12 @@ pub(super) type ExecuteResult<'a> = Result<Option<&'a Bpmn>, Error>;
 // Data for the execution engine.
 pub(super) struct ExecuteData<'a, T> {
     process_data: &'a Vec<Bpmn>,
-    process_id: &'a str,
+    process_id: &'a Id,
     user_data: Data<T>,
 }
 
 impl<'a, T> ExecuteData<'a, T> {
-    pub(super) fn new(
-        process_data: &'a Vec<Bpmn>,
-        process_id: &'a str,
-        user_data: Data<T>,
-    ) -> Self {
+    pub(super) fn new(process_data: &'a Vec<Bpmn>, process_id: &'a Id, user_data: Data<T>) -> Self {
         Self {
             process_data,
             process_id,
@@ -516,7 +516,7 @@ impl<'a, T> ExecuteData<'a, T> {
     }
 
     // When we change to a sub process we must change process id and data.
-    fn update(&self, process_id: &'a str, process_data: &'a Vec<Bpmn>) -> Self {
+    fn update(&self, process_id: &'a Id, process_data: &'a Vec<Bpmn>) -> Self {
         Self {
             process_data,
             process_id,

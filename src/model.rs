@@ -329,10 +329,10 @@ impl TryFrom<&[u8]> for Symbol {
 #[derive(Debug)]
 pub(crate) struct Gateway {
     pub(crate) gateway: GatewayType,
-    pub(crate) id: BpmnLocal,
+    pub(crate) id: Id,
     pub(crate) func_idx: Option<usize>,
     pub(crate) name: Option<String>,
-    pub(crate) default: Option<BpmnLocal>,
+    pub(crate) default: Option<Id>,
     pub(crate) outputs: Outputs,
     pub(crate) inputs: Vec<String>,
 }
@@ -341,13 +341,13 @@ pub(crate) struct Gateway {
 pub(crate) enum Bpmn {
     Activity {
         activity: ActivityType,
-        id: String,
+        id: Id,
         func_idx: Option<usize>,
         name: Option<String>,
         outputs: Outputs,
     },
     Definitions {
-        id: String,
+        id: Id,
     },
     Direction {
         direction: DirectionType,
@@ -356,34 +356,47 @@ pub(crate) enum Bpmn {
     Event {
         event: EventType,
         symbol: Option<Symbol>,
-        id: BpmnLocal,
+        id: Id,
         name: Option<String>,
-        attached_to_ref: Option<BpmnLocal>,
+        attached_to_ref: Option<Id>,
         _cancel_activity: Option<String>,
         outputs: Outputs,
     },
     Gateway(Gateway),
     Process {
-        id: String,
+        id: Id,
         _is_executable: bool,
     },
     SequenceFlow {
-        id: String,
+        id: Id,
         name: Option<String>,
         _source_ref: String,
-        target_ref: BpmnLocal,
+        target_ref: Id,
     },
 }
 
 impl Bpmn {
     pub(crate) fn id(&self) -> Result<&str, Error> {
         match self {
-            Bpmn::Definitions { id, .. }
-            | Bpmn::Process { id, .. }
+            Bpmn::Event { id, .. }
+            | Bpmn::SequenceFlow { id, .. }
             | Bpmn::Activity { id, .. }
-            | Bpmn::SequenceFlow { id, .. } => Ok(id),
-            Bpmn::Event { id, .. } | Bpmn::Gateway(Gateway { id, .. }) => Ok(id.bpmn()),
+            | Bpmn::Definitions { id, .. }
+            | Bpmn::Gateway(Gateway { id, .. })
+            | Bpmn::Process { id, .. } => Ok(id.bpmn()),
             Bpmn::Direction { direction, .. } => Err(Error::MissingId(direction.to_string())),
+        }
+    }
+
+    pub(crate) fn set_local_id(&mut self, value: usize) {
+        match self {
+            Bpmn::Event { id, .. }
+            | Bpmn::SequenceFlow { id, .. }
+            | Bpmn::Activity { id, .. }
+            | Bpmn::Definitions { id, .. }
+            | Bpmn::Gateway(Gateway { id, .. })
+            | Bpmn::Process { id, .. } => id.local_id = value,
+            _ => {}
         }
     }
 
@@ -414,12 +427,14 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
             DEFINITIONS => Bpmn::Definitions {
                 id: attributes
                     .remove(ATTRIB_ID)
-                    .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
+                    .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
+                    .into(),
             },
             PROCESS => Bpmn::Process {
                 id: attributes
                     .remove(ATTRIB_ID)
-                    .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
+                    .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
+                    .into(),
                 _is_executable: attributes
                     .remove(ATTRIB_IS_EXECUTABLE)
                     .and_then(|s| s.parse::<bool>().ok())
@@ -447,7 +462,8 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     activity: bpmn_type.try_into()?,
                     id: attributes
                         .remove(ATTRIB_ID)
-                        .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
+                        .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
+                        .into(),
                     func_idx: None,
                     name: attributes.remove(ATTRIB_NAME),
                     outputs: Default::default(),
@@ -470,7 +486,8 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
             SEQUENCE_FLOW => Bpmn::SequenceFlow {
                 id: attributes
                     .remove(ATTRIB_ID)
-                    .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?,
+                    .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
+                    .into(),
                 name: attributes.remove(ATTRIB_NAME),
                 _source_ref: attributes
                     .remove(ATTRIB_SOURCE_REF)
@@ -530,26 +547,32 @@ impl Outputs {
 }
 
 #[derive(Debug)]
-pub(crate) struct BpmnLocal(pub(crate) String, pub(crate) usize);
+pub(crate) struct Id {
+    pub(crate) bpmn_id: String,
+    pub(crate) local_id: usize,
+}
 
-impl Display for BpmnLocal {
+impl Display for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({} {})", self.0, self.1)
+        write!(f, "({} {})", self.bpmn_id, self.local_id)
     }
 }
 
-impl BpmnLocal {
+impl Id {
     pub(crate) fn bpmn(&self) -> &str {
-        &self.0
+        &self.bpmn_id
     }
 
     pub(crate) fn local(&self) -> &usize {
-        &self.1
+        &self.local_id
     }
 }
 
-impl From<String> for BpmnLocal {
-    fn from(value: String) -> Self {
-        Self(value, 0)
+impl From<String> for Id {
+    fn from(bpmn_id: String) -> Self {
+        Self {
+            bpmn_id,
+            local_id: 0,
+        }
     }
 }
