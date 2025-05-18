@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use log::warn;
+
 use crate::model::{ActivityType, Bpmn, Gateway, GatewayType};
 
 #[derive(Debug)]
@@ -28,7 +30,12 @@ impl Diagram {
             } = bpmn
             {
                 if Diagram::match_name_or_id(name.as_deref(), id.bpmn(), match_value) {
-                    func_idx.replace(index);
+                    if let Some(_) = func_idx.replace(index) {
+                        warn!(
+                            r#"Installed Task with name "{}" multiple times"#,
+                            match_value
+                        );
+                    }
                 }
             }
         }
@@ -52,7 +59,12 @@ impl Diagram {
                 if Diagram::match_name_or_id(name.as_deref(), id.bpmn(), match_value)
                     && gw_type == *gateway
                 {
-                    func_idx.replace(index);
+                    if let Some(_) = func_idx.replace(index) {
+                        warn!(
+                            r#"Installed {} with name "{}" multiple times"#,
+                            gw_type, match_value
+                        );
+                    }
                 }
             }
         }
