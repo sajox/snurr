@@ -452,7 +452,7 @@ fn output_by_symbol<'a>(
                 }
                 None
             })
-            .filter(|bpmn| match bpmn {
+            .is_some_and(|bpmn| match bpmn {
                 // We can target both ReceiveTask or Events.
                 Bpmn::Activity {
                     activity,
@@ -476,7 +476,6 @@ fn output_by_symbol<'a>(
                 } => *symbol == search.1 && name.as_str() == search.0,
                 _ => false,
             })
-            .is_some()
     })
 }
 
@@ -487,10 +486,7 @@ fn output_by_name_or_id<'a>(
 ) -> Option<&'a usize> {
     outputs.iter().find(|index| {
         if let Some(Bpmn::SequenceFlow { id, name, .. }) = process_data.get(**index) {
-            return name
-                .as_deref()
-                .filter(|&name| name == search.as_ref())
-                .is_some()
+            return name.as_deref().is_some_and(|name| name == search.as_ref())
                 || id.bpmn() == search.as_ref();
         }
         false

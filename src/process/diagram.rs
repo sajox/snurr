@@ -114,6 +114,6 @@ impl Diagram {
     }
 
     fn match_name_or_id(name: Option<&str>, id: &str, value: &str) -> bool {
-        name.map(|name| name == value).unwrap_or(false) || id == value
+        name.is_some_and(|name| name == value) || id == value
     }
 }
