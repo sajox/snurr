@@ -4,6 +4,7 @@ pub mod handler;
 mod reader;
 mod scaffold;
 
+use crate::{IntermediateEvent, With, error::Error, model::Bpmn};
 use diagram::Diagram;
 use engine::ExecuteData;
 use handler::{Data, Handler, TaskResult};
@@ -12,12 +13,6 @@ use std::{
     path::Path,
     str::FromStr,
     sync::{Arc, Mutex},
-};
-
-use crate::{
-    IntermediateEvent, With,
-    error::Error,
-    model::{Bpmn, GatewayType},
 };
 
 /// Process that contains information from the BPMN file
@@ -51,47 +46,42 @@ impl<T> Process<Build, T> {
         })
     }
 
-    pub fn task<F>(mut self, name: impl AsRef<str>, func: F) -> Self
+    pub fn task<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
         F: Fn(Data<T>) -> TaskResult + 'static + Sync,
     {
-        let index = self.handler.add_task(func);
-        self.diagram.install_task_function(name.as_ref(), index);
+        self.handler.add_task(name, func);
         self
     }
 
-    pub fn exclusive<F>(mut self, name: impl AsRef<str>, func: F) -> Self
+    pub fn exclusive<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
         F: Fn(Data<T>) -> Option<&'static str> + 'static + Sync,
     {
-        let index = self.handler.add_exclusive(func);
-        self.diagram
-            .install_gateway_function(GatewayType::Exclusive, name.as_ref(), index);
+        self.handler.add_exclusive(name, func);
         self
     }
 
-    pub fn inclusive<F>(mut self, name: impl AsRef<str>, func: F) -> Self
+    pub fn inclusive<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
         F: Fn(Data<T>) -> With + 'static + Sync,
     {
-        let index = self.handler.add_inclusive(func);
-        self.diagram
-            .install_gateway_function(GatewayType::Inclusive, name.as_ref(), index);
+        self.handler.add_inclusive(name, func);
         self
     }
 
-    pub fn event_based<F>(mut self, name: impl AsRef<str>, func: F) -> Self
+    pub fn event_based<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
         F: Fn(Data<T>) -> IntermediateEvent + 'static + Sync,
     {
-        let index = self.handler.add_event_based(func);
-        self.diagram
-            .install_gateway_function(GatewayType::EventBased, name.as_ref(), index);
+        self.handler.add_event_based(name, func);
         self
     }
 
-    pub fn build(self) -> Result<Process<Run, T>, Error> {
-        let result = self.diagram.find_missing_functions();
+    pub fn build(mut self) -> Result<Process<Run, T>, Error> {
+        let result = self
+            .diagram
+            .install_and_check(self.handler.take_handler_map());
         if result.is_empty() {
             Ok(Process {
                 diagram: self.diagram,

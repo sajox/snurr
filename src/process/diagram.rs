@@ -1,8 +1,6 @@
-use std::collections::{HashMap, HashSet};
-
-use log::warn;
-
+use super::handler::HandlerMap;
 use crate::model::{ActivityType, Bpmn, Gateway, GatewayType};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
 pub(super) struct Diagram {
@@ -23,97 +21,61 @@ impl Diagram {
         self.data.get(process_id)
     }
 
-    pub(super) fn install_task_function(&mut self, match_value: &str, index: usize) {
+    pub(super) fn install_and_check(&mut self, handler_map: HandlerMap) -> HashSet<String> {
+        let mut missing = HashSet::new();
         for bpmn in self.data.iter_mut().flatten() {
-            if let Bpmn::Activity {
-                id, func_idx, name, ..
-            } = bpmn
-            {
-                if Diagram::match_name_or_id(name.as_deref(), id.bpmn(), match_value) {
-                    if let Some(_) = func_idx.replace(index) {
-                        warn!(
-                            r#"Installed Task with name "{}" multiple times"#,
-                            match_value
-                        );
+            match bpmn {
+                Bpmn::Activity {
+                    id,
+                    name,
+                    func_idx,
+                    activity:
+                        activity @ (ActivityType::Task
+                        | ActivityType::ScriptTask
+                        | ActivityType::UserTask
+                        | ActivityType::ServiceTask
+                        | ActivityType::CallActivity
+                        | ActivityType::ReceiveTask
+                        | ActivityType::SendTask
+                        | ActivityType::ManualTask
+                        | ActivityType::BusinessRuleTask),
+                    ..
+                } => {
+                    let name_or_id: &str = name.as_deref().unwrap_or(id.bpmn());
+                    if let Some(id) = handler_map.task.get(name_or_id) {
+                        func_idx.replace(*id);
+                    } else {
+                        missing.insert(format!("{}: {}", activity, name_or_id));
                     }
                 }
-            }
-        }
-    }
+                Bpmn::Gateway(Gateway {
+                    gateway:
+                        gateway @ (GatewayType::EventBased
+                        | GatewayType::Exclusive
+                        | GatewayType::Inclusive),
+                    name,
+                    id,
+                    func_idx,
+                    outputs,
+                    ..
+                }) if outputs.len() > 1 => {
+                    let map = match gateway {
+                        GatewayType::Exclusive => &handler_map.exclusive,
+                        GatewayType::Inclusive => &handler_map.inclusive,
+                        GatewayType::EventBased => &handler_map.event_based,
+                        _ => continue,
+                    };
 
-    pub(super) fn install_gateway_function(
-        &mut self,
-        gw_type: GatewayType,
-        match_value: &str,
-        index: usize,
-    ) {
-        for bpmn in self.data.iter_mut().flatten() {
-            if let Bpmn::Gateway(Gateway {
-                gateway,
-                id,
-                func_idx,
-                name,
-                ..
-            }) = bpmn
-            {
-                if Diagram::match_name_or_id(name.as_deref(), id.bpmn(), match_value)
-                    && gw_type == *gateway
-                {
-                    if let Some(_) = func_idx.replace(index) {
-                        warn!(
-                            r#"Installed {} with name "{}" multiple times"#,
-                            gw_type, match_value
-                        );
+                    let name_or_id: &str = name.as_deref().unwrap_or(id.bpmn());
+                    if let Some(id) = map.get(name_or_id) {
+                        func_idx.replace(*id);
+                    } else {
+                        missing.insert(format!("{}: {}", gateway, name_or_id));
                     }
                 }
+                _ => {}
             }
         }
-    }
-
-    pub(super) fn find_missing_functions(&self) -> HashSet<String> {
-        self.data
-            .iter()
-            .flatten()
-            .fold(HashSet::new(), |mut acc, bpmn| {
-                acc.insert(match bpmn {
-                    Bpmn::Activity {
-                        id,
-                        name,
-                        func_idx: None,
-                        activity:
-                            activity @ (ActivityType::Task
-                            | ActivityType::ScriptTask
-                            | ActivityType::UserTask
-                            | ActivityType::ServiceTask
-                            | ActivityType::CallActivity
-                            | ActivityType::ReceiveTask
-                            | ActivityType::SendTask
-                            | ActivityType::ManualTask
-                            | ActivityType::BusinessRuleTask),
-                        ..
-                    } => format!("{}: {}", activity, name.as_deref().unwrap_or(id.bpmn())),
-                    Bpmn::Gateway(Gateway {
-                        gateway:
-                            gateway @ (GatewayType::EventBased
-                            | GatewayType::Exclusive
-                            | GatewayType::Inclusive),
-                        name,
-                        id,
-                        func_idx: None,
-                        outputs,
-                        ..
-                    }) if outputs.len() > 1 => {
-                        format!("{}: {}", gateway, name.as_deref().unwrap_or(id.bpmn()))
-                    }
-                    _ => {
-                        return acc;
-                    }
-                });
-                acc
-            })
-    }
-
-    fn match_name_or_id(name: Option<&str>, id: &str, value: &str) -> bool {
-        name.is_some_and(|name| name == value) || id == value
+        missing
     }
 }
