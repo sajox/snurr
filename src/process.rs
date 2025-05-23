@@ -79,9 +79,7 @@ impl<T> Process<Build, T> {
     }
 
     pub fn build(mut self) -> Result<Process<Run, T>, Error> {
-        let result = self
-            .diagram
-            .install_and_check(self.handler.take_handler_map());
+        let result = self.diagram.install_and_check(self.handler.build()?);
         if result.is_empty() {
             Ok(Process {
                 diagram: self.diagram,
