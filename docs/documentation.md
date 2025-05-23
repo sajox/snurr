@@ -1,4 +1,4 @@
-# Documentation (Snurr 0.9)
+# Documentation
 
 **Snurr** can run the process flow from a Business Process Model and Notation (BPMN) 2.0 file created by <https://demo.bpmn.io/new>.
 
@@ -12,6 +12,10 @@
 This is not a complete implementation of the BPMN 2.0 specification but intend to be a light weight subset of it.
 
 ## Migration 
+
+### Version 0.9 -> 0.10
+
+- Changed API from AsRef to Into when installing Task or Gateways
 
 ### Version 0.8 -> 0.9
 
@@ -55,14 +59,14 @@ Symbol::Message.into()
 
 ```toml
 [dependencies]
-snurr = "0.9"
+snurr = "0.10"
 ```
 
 With parallel feature enabled, new threads are spawned with parallel, inclusive, task and event forks.
 
 ```toml
 [dependencies]
-snurr = { version = "0.9", features = ["parallel"] }
+snurr = { version = "0.10", features = ["parallel"] }
 ```
 
 ## Process

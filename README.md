@@ -27,7 +27,7 @@ BPMN diagram used in example.
 
 ```toml
 [dependencies]
-snurr = "0.9"
+snurr = "0.10"
 log = "0.4"
 pretty_env_logger = "0.5"
 ```
