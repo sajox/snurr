@@ -1,9 +1,10 @@
 use crate::{
     Error, IntermediateEvent, With,
-    model::{Boundary, GatewayType},
+    model::{ActivityType, Boundary, GatewayType},
 };
 use std::{
     collections::HashMap,
+    fmt::Display,
     sync::{Arc, Mutex},
 };
 
@@ -55,76 +56,76 @@ impl<T> Handler<T> {
     where
         F: Fn(Data<T>) -> TaskResult + 'static + Sync,
     {
-        if let Some(hm) = &mut self.handler_map {
-            let name = name.into();
-            if hm.task.insert(name.clone(), self.task.len()).is_some() {
-                log::warn!(r#"Installed Task with name "{}" multiple times"#, name);
-            }
-            self.task.push(Box::new(func));
+        let Some(hm) = &mut self.handler_map else {
+            return;
+        };
+
+        let name = name.into();
+        if hm.task.insert(name.clone(), self.task.len()).is_some() {
+            Self::warn(ActivityType::Task, name);
         }
+        self.task.push(Box::new(func));
     }
 
     pub(super) fn add_exclusive<F>(&mut self, name: impl Into<String>, func: F)
     where
         F: Fn(Data<T>) -> Option<&'static str> + 'static + Sync,
     {
-        if let Some(hm) = &mut self.handler_map {
-            let name = name.into();
-            if hm
-                .exclusive
-                .insert(name.clone(), self.exclusive.len())
-                .is_some()
-            {
-                log::warn!(
-                    r#"Installed {} with name "{}" multiple times"#,
-                    GatewayType::Exclusive,
-                    name
-                );
-            }
-            self.exclusive.push(Box::new(func));
+        let Some(hm) = &mut self.handler_map else {
+            return;
+        };
+
+        let name = name.into();
+        if hm
+            .exclusive
+            .insert(name.clone(), self.exclusive.len())
+            .is_some()
+        {
+            Self::warn(GatewayType::Exclusive, name);
         }
+        self.exclusive.push(Box::new(func));
     }
 
     pub(super) fn add_inclusive<F>(&mut self, name: impl Into<String>, func: F)
     where
         F: Fn(Data<T>) -> With + 'static + Sync,
     {
-        if let Some(hm) = &mut self.handler_map {
-            let name = name.into();
-            if hm
-                .inclusive
-                .insert(name.clone(), self.inclusive.len())
-                .is_some()
-            {
-                log::warn!(
-                    r#"Installed {} with name "{}" multiple times"#,
-                    GatewayType::Inclusive,
-                    name
-                );
-            }
-            self.inclusive.push(Box::new(func));
+        let Some(hm) = &mut self.handler_map else {
+            return;
+        };
+
+        let name = name.into();
+        if hm
+            .inclusive
+            .insert(name.clone(), self.inclusive.len())
+            .is_some()
+        {
+            Self::warn(GatewayType::Inclusive, name);
         }
+        self.inclusive.push(Box::new(func));
     }
 
     pub(super) fn add_event_based<F>(&mut self, name: impl Into<String>, func: F)
     where
         F: Fn(Data<T>) -> IntermediateEvent + 'static + Sync,
     {
-        if let Some(hm) = &mut self.handler_map {
-            let name = name.into();
-            if hm
-                .event_based
-                .insert(name.clone(), self.event_based.len())
-                .is_some()
-            {
-                log::warn!(
-                    r#"Installed {} with name "{}" multiple times"#,
-                    GatewayType::EventBased,
-                    name
-                );
-            }
-            self.event_based.push(Box::new(func));
+        let Some(hm) = &mut self.handler_map else {
+            return;
+        };
+
+        let name = name.into();
+        if hm
+            .event_based
+            .insert(name.clone(), self.event_based.len())
+            .is_some()
+        {
+            Self::warn(GatewayType::EventBased, name);
         }
+        self.event_based.push(Box::new(func));
+    }
+
+    fn warn(ty: impl Display, name: impl Display) {
+        log::warn!(r#"Installed {ty} with name "{name}" multiple times"#);
     }
 
     // Consumes the handler_map and cannot add more things with add_
