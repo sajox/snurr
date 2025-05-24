@@ -395,7 +395,7 @@ impl<T> Process<Run, T> {
             .get(activity_id)?
             .iter()
             .filter_map(|index| process_data.get(*index))
-            .filter_map(|bpmn| {
+            .find_map(|bpmn| {
                 // TODO rewrite with let chains when stable
                 if let Bpmn::Event {
                     symbol, id, name, ..
@@ -407,7 +407,6 @@ impl<T> Process<Run, T> {
                 }
                 None
             })
-            .next()
     }
 
     // Links in specified process.
