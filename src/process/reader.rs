@@ -1,16 +1,14 @@
 mod builder;
 
-use std::collections::HashMap;
-use std::io::BufRead;
-
+use super::Diagram;
+use crate::error::Error;
+use crate::model::*;
 use builder::DataBuilder;
 use log::error;
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
-
-use super::Diagram;
-use crate::error::Error;
-use crate::model::*;
+use std::collections::HashMap;
+use std::io::BufRead;
 
 // Read BPMN content and return the Diagram
 pub(super) fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, Error> {
@@ -110,13 +108,12 @@ pub(super) fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, Er
 fn collect_attributes<'a>(bs: &'a quick_xml::events::BytesStart<'_>) -> HashMap<&'a [u8], String> {
     bs.attributes()
         .filter_map(Result::ok)
-        .map(|attribute| {
-            (
-                attribute.key.local_name().into_inner(),
-                String::from_utf8(attribute.value.to_vec()).unwrap_or_default(),
-            )
+        .filter_map(|attribute| {
+            str::from_utf8(&attribute.value)
+                .ok()
+                .filter(|value| !value.is_empty())
+                .map(|value| (attribute.key.local_name().into_inner(), value.into()))
         })
-        .filter(|(_, s)| !s.is_empty())
         .collect::<HashMap<&'a [u8], String>>()
 }
 
