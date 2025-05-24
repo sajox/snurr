@@ -22,7 +22,7 @@ impl<T> Process<Build, T> {
     /// ```
     pub fn scaffold(&self, path: impl AsRef<Path>) -> Result<(), Error> {
         let mut scaffold = Scaffold::default();
-        self.diagram.data.iter().for_each(|process: &Vec<Bpmn>| {
+        self.diagram.data().iter().for_each(|process: &Vec<Bpmn>| {
             process.iter().for_each(|bpmn| {
                 if let Bpmn::Activity {
                     activity: ActivityType::Task,
@@ -30,7 +30,8 @@ impl<T> Process<Build, T> {
                     ..
                 } = bpmn
                 {
-                    let symbols = if let Some(boundaries) = self.diagram.boundaries.get(id.bpmn()) {
+                    let symbols = if let Some(boundaries) = self.diagram.boundaries().get(id.bpmn())
+                    {
                         boundaries
                             .iter()
                             .filter_map(|index| process.get(*index))

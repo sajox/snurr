@@ -391,7 +391,7 @@ impl<T> Process<Run, T> {
         process_data: &'a [Bpmn],
     ) -> Option<&'a usize> {
         self.diagram
-            .boundaries
+            .boundaries()
             .get(activity_id)?
             .iter()
             .filter_map(|index| process_data.get(*index))
@@ -417,7 +417,7 @@ impl<T> Process<Run, T> {
         process_id: &Id,
     ) -> Result<&usize, Error> {
         self.diagram
-            .catch_event_links
+            .catch_event_links()
             .get(process_id.bpmn())
             .and_then(|links| links.get(throw_event_name))
             .ok_or_else(|| {

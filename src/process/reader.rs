@@ -102,7 +102,7 @@ pub(super) fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, Er
         }
         buf.clear();
     }
-    builder.try_into()
+    Ok(builder.into())
 }
 
 fn collect_attributes<'a>(bs: &'a quick_xml::events::BytesStart<'_>) -> HashMap<&'a [u8], String> {

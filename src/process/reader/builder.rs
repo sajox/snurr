@@ -160,15 +160,9 @@ impl DataBuilder {
     }
 }
 
-impl TryFrom<DataBuilder> for Diagram {
-    type Error = Error;
-
-    fn try_from(builder: DataBuilder) -> Result<Self, Self::Error> {
-        Ok(Self {
-            data: builder.data,
-            boundaries: builder.boundaries,
-            catch_event_links: builder.catch_event_links,
-        })
+impl From<DataBuilder> for Diagram {
+    fn from(builder: DataBuilder) -> Self {
+        Diagram::new(builder.data, builder.boundaries, builder.catch_event_links)
     }
 }
 

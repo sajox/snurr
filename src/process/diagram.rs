@@ -4,12 +4,23 @@ use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
 pub(super) struct Diagram {
-    pub(super) data: Vec<Vec<Bpmn>>,
-    pub(super) boundaries: HashMap<String, Vec<usize>>,
-    pub(super) catch_event_links: HashMap<String, HashMap<String, usize>>,
+    data: Vec<Vec<Bpmn>>,
+    boundaries: HashMap<String, Vec<usize>>,
+    catch_event_links: HashMap<String, HashMap<String, usize>>,
 }
 
 impl Diagram {
+    pub(super) fn new(
+        data: Vec<Vec<Bpmn>>,
+        boundaries: HashMap<String, Vec<usize>>,
+        catch_event_links: HashMap<String, HashMap<String, usize>>,
+    ) -> Self {
+        Self {
+            data,
+            boundaries,
+            catch_event_links,
+        }
+    }
     // All top level processes defined in Definitions.
     // Always last in the Vec as it is a top level construct in the XML.
     pub(super) fn get_processes(&self) -> Option<&Vec<Bpmn>> {
@@ -19,6 +30,18 @@ impl Diagram {
     // Can be a process or sub process
     pub(super) fn get_process(&self, process_id: usize) -> Option<&Vec<Bpmn>> {
         self.data.get(process_id)
+    }
+
+    pub(super) fn data(&self) -> &[Vec<Bpmn>] {
+        self.data.as_slice()
+    }
+
+    pub(super) fn boundaries(&self) -> &HashMap<String, Vec<usize>> {
+        &self.boundaries
+    }
+
+    pub(super) fn catch_event_links(&self) -> &HashMap<String, HashMap<String, usize>> {
+        &self.catch_event_links
     }
 
     pub(super) fn install_and_check(&mut self, handler_map: HandlerMap) -> HashSet<String> {
