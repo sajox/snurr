@@ -62,7 +62,7 @@ impl<T> Handler<T> {
 
         let name = name.into();
         if hm.task.insert(name.clone(), self.task.len()).is_some() {
-            Self::warn(ActivityType::Task, name);
+            warn(ActivityType::Task, name);
         }
         self.task.push(Box::new(func));
     }
@@ -81,7 +81,7 @@ impl<T> Handler<T> {
             .insert(name.clone(), self.exclusive.len())
             .is_some()
         {
-            Self::warn(GatewayType::Exclusive, name);
+            warn(GatewayType::Exclusive, name);
         }
         self.exclusive.push(Box::new(func));
     }
@@ -100,7 +100,7 @@ impl<T> Handler<T> {
             .insert(name.clone(), self.inclusive.len())
             .is_some()
         {
-            Self::warn(GatewayType::Inclusive, name);
+            warn(GatewayType::Inclusive, name);
         }
         self.inclusive.push(Box::new(func));
     }
@@ -119,13 +119,9 @@ impl<T> Handler<T> {
             .insert(name.clone(), self.event_based.len())
             .is_some()
         {
-            Self::warn(GatewayType::EventBased, name);
+            warn(GatewayType::EventBased, name);
         }
         self.event_based.push(Box::new(func));
-    }
-
-    fn warn(ty: impl Display, name: impl Display) {
-        log::warn!(r#"Installed {ty} with name "{name}" multiple times"#);
     }
 
     // Consumes the handler_map and cannot add more things with add_
@@ -154,4 +150,8 @@ impl<T> Handler<T> {
     pub(super) fn run_event_based(&self, index: usize, data: Data<T>) -> Option<IntermediateEvent> {
         self.event_based.get(index).map(|value| (*value)(data))
     }
+}
+
+fn warn(ty: impl Display, name: impl Display) {
+    log::warn!(r#"Installed {ty} with name "{name}" multiple times"#);
 }
