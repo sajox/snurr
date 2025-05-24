@@ -17,12 +17,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             None
         })
         .exclusive("equal to 3", |input| {
-            let result = if input.lock().unwrap().count == 3 {
+            if input.lock().unwrap().count == 3 {
                 "YES"
             } else {
                 "NO"
-            };
-            result.into()
+            }
+            .into()
         })
         .build()?;
 
