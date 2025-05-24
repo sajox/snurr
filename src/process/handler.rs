@@ -21,14 +21,6 @@ type ExclusiveCallback<T> = Box<dyn Fn(Data<T>) -> Option<&'static str> + Sync>;
 type InclusiveCallback<T> = Box<dyn Fn(Data<T>) -> With + Sync>;
 type EventBasedCallback<T> = Box<dyn Fn(Data<T>) -> IntermediateEvent + Sync>;
 
-#[derive(Default, Debug)]
-pub(super) struct HandlerMap {
-    pub task: HashMap<String, usize>,
-    pub exclusive: HashMap<String, usize>,
-    pub inclusive: HashMap<String, usize>,
-    pub event_based: HashMap<String, usize>,
-}
-
 pub(super) struct Handler<T> {
     task: Vec<TaskCallback<T>>,
     exclusive: Vec<ExclusiveCallback<T>>,
@@ -56,72 +48,40 @@ impl<T> Handler<T> {
     where
         F: Fn(Data<T>) -> TaskResult + 'static + Sync,
     {
-        let Some(hm) = &mut self.handler_map else {
-            return;
-        };
-
-        let name = name.into();
-        if hm.task.insert(name.clone(), self.task.len()).is_some() {
-            warn(ActivityType::Task, name);
+        if let Some(hm) = &mut self.handler_map {
+            hm.insert_task(name, self.task.len());
+            self.task.push(Box::new(func));
         }
-        self.task.push(Box::new(func));
     }
 
     pub(super) fn add_exclusive<F>(&mut self, name: impl Into<String>, func: F)
     where
         F: Fn(Data<T>) -> Option<&'static str> + 'static + Sync,
     {
-        let Some(hm) = &mut self.handler_map else {
-            return;
-        };
-
-        let name = name.into();
-        if hm
-            .exclusive
-            .insert(name.clone(), self.exclusive.len())
-            .is_some()
-        {
-            warn(GatewayType::Exclusive, name);
+        if let Some(hm) = &mut self.handler_map {
+            hm.insert_exclusive(name, self.exclusive.len());
+            self.exclusive.push(Box::new(func));
         }
-        self.exclusive.push(Box::new(func));
     }
 
     pub(super) fn add_inclusive<F>(&mut self, name: impl Into<String>, func: F)
     where
         F: Fn(Data<T>) -> With + 'static + Sync,
     {
-        let Some(hm) = &mut self.handler_map else {
-            return;
-        };
-
-        let name = name.into();
-        if hm
-            .inclusive
-            .insert(name.clone(), self.inclusive.len())
-            .is_some()
-        {
-            warn(GatewayType::Inclusive, name);
+        if let Some(hm) = &mut self.handler_map {
+            hm.insert_inclusive(name, self.inclusive.len());
+            self.inclusive.push(Box::new(func));
         }
-        self.inclusive.push(Box::new(func));
     }
 
     pub(super) fn add_event_based<F>(&mut self, name: impl Into<String>, func: F)
     where
         F: Fn(Data<T>) -> IntermediateEvent + 'static + Sync,
     {
-        let Some(hm) = &mut self.handler_map else {
-            return;
-        };
-
-        let name = name.into();
-        if hm
-            .event_based
-            .insert(name.clone(), self.event_based.len())
-            .is_some()
-        {
-            warn(GatewayType::EventBased, name);
+        if let Some(hm) = &mut self.handler_map {
+            hm.insert_event_based(name, self.event_based.len());
+            self.event_based.push(Box::new(func));
         }
-        self.event_based.push(Box::new(func));
     }
 
     // Consumes the handler_map and cannot add more things with add_
@@ -149,6 +109,60 @@ impl<T> Handler<T> {
 
     pub(super) fn run_event_based(&self, index: usize, data: Data<T>) -> Option<IntermediateEvent> {
         self.event_based.get(index).map(|value| (*value)(data))
+    }
+}
+
+#[derive(Default, Debug)]
+pub(super) struct HandlerMap {
+    task: HashMap<String, usize>,
+    exclusive: HashMap<String, usize>,
+    inclusive: HashMap<String, usize>,
+    event_based: HashMap<String, usize>,
+}
+
+impl HandlerMap {
+    pub(super) fn task(&self) -> &HashMap<String, usize> {
+        &self.task
+    }
+
+    pub(super) fn exclusive(&self) -> &HashMap<String, usize> {
+        &self.exclusive
+    }
+
+    pub(super) fn inclusive(&self) -> &HashMap<String, usize> {
+        &self.inclusive
+    }
+
+    pub(super) fn event_based(&self) -> &HashMap<String, usize> {
+        &self.event_based
+    }
+
+    fn insert_task(&mut self, name: impl Into<String>, index: usize) {
+        let name = name.into();
+        if self.task.insert(name.clone(), index).is_some() {
+            warn(ActivityType::Task, name);
+        }
+    }
+
+    fn insert_exclusive(&mut self, name: impl Into<String>, index: usize) {
+        let name = name.into();
+        if self.exclusive.insert(name.clone(), index).is_some() {
+            warn(GatewayType::Exclusive, name);
+        }
+    }
+
+    fn insert_inclusive(&mut self, name: impl Into<String>, index: usize) {
+        let name = name.into();
+        if self.inclusive.insert(name.clone(), index).is_some() {
+            warn(GatewayType::Inclusive, name);
+        }
+    }
+
+    fn insert_event_based(&mut self, name: impl Into<String>, index: usize) {
+        let name = name.into();
+        if self.event_based.insert(name.clone(), index).is_some() {
+            warn(GatewayType::EventBased, name);
+        }
     }
 }
 

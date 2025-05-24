@@ -42,7 +42,7 @@ impl Diagram {
                     ..
                 } => {
                     let name_or_id: &str = name.as_deref().unwrap_or(id.bpmn());
-                    if let Some(id) = handler_map.task.get(name_or_id) {
+                    if let Some(id) = handler_map.task().get(name_or_id) {
                         func_idx.replace(*id);
                     } else {
                         missing.insert(format!("{}: {}", activity, name_or_id));
@@ -60,9 +60,9 @@ impl Diagram {
                     ..
                 }) if outputs.len() > 1 => {
                     let map = match gateway {
-                        GatewayType::Exclusive => &handler_map.exclusive,
-                        GatewayType::Inclusive => &handler_map.inclusive,
-                        GatewayType::EventBased => &handler_map.event_based,
+                        GatewayType::Exclusive => handler_map.exclusive(),
+                        GatewayType::Inclusive => handler_map.inclusive(),
+                        GatewayType::EventBased => handler_map.event_based(),
                         _ => continue,
                     };
 
