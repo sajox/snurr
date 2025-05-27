@@ -46,6 +46,7 @@ impl<T> Process<Build, T> {
         })
     }
 
+    /// Register a task function with name or bpmn id
     pub fn task<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
         F: Fn(Data<T>) -> TaskResult + 'static + Sync,
@@ -54,6 +55,7 @@ impl<T> Process<Build, T> {
         self
     }
 
+    /// Register an exclusive gateway function with name or bpmn id
     pub fn exclusive<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
         F: Fn(Data<T>) -> Option<&'static str> + 'static + Sync,
@@ -62,6 +64,7 @@ impl<T> Process<Build, T> {
         self
     }
 
+    /// Register an inclusive gateway function with name or bpmn id
     pub fn inclusive<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
         F: Fn(Data<T>) -> With + 'static + Sync,
@@ -70,6 +73,7 @@ impl<T> Process<Build, T> {
         self
     }
 
+    /// Register an event based gateway function with name or bpmn id
     pub fn event_based<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
         F: Fn(Data<T>) -> IntermediateEvent + 'static + Sync,
@@ -78,6 +82,8 @@ impl<T> Process<Build, T> {
         self
     }
 
+    /// Install and check that all required functions have been registered. You cannot run a process before `build` is called.
+    /// If `build` returns an error, it contains the missing functions.
     pub fn build(mut self) -> Result<Process<Run, T>, Error> {
         let result = self.diagram.install_and_check(self.handler.build()?);
         if result.is_empty() {
