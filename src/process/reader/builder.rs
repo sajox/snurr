@@ -94,8 +94,7 @@ impl DataBuilder {
 
         bpmn.set_local_id(self.data.len());
 
-        let id = bpmn.id()?.to_string();
-        self.update_data(&id, &mut data);
+        self.update_data(bpmn.id()?, &mut data);
         // Definitions collect all Processes
         // Processes collect all related sub processes
         if let Some(parent_data) = self.process_stack.last_mut() {

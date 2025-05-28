@@ -395,17 +395,14 @@ impl<T> Process<Run, T> {
             .get(activity_id)?
             .iter()
             .filter_map(|index| process_data.get(*index))
-            .find_map(|bpmn| {
-                // TODO rewrite with let chains when stable
-                if let Bpmn::Event {
-                    symbol, id, name, ..
-                } = bpmn
-                {
-                    if symbol.as_ref() == Some(search_symbol) && search_name == name.as_deref() {
-                        return Some(id.local());
-                    }
-                }
-                None
+            .find_map(|bpmn| match bpmn {
+                Bpmn::Event {
+                    symbol: Some(symbol),
+                    id,
+                    name,
+                    ..
+                } if symbol == search_symbol && search_name == name.as_deref() => Some(id.local()),
+                _ => None,
             })
     }
 
