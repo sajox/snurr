@@ -31,7 +31,7 @@ macro_rules! maybe_fork {
 }
 
 impl<T> Process<Run, T> {
-    pub(super) fn execute<'a>(&'a self, data: &ExecuteData<'a, T>) -> ExecuteResult<'a>
+    pub(super) fn execute<'a>(&'a self, data: ExecuteData<'a, T>) -> ExecuteResult<'a>
     where
         T: Send,
     {
@@ -52,7 +52,7 @@ impl<T> Process<Run, T> {
                         .map(|tokens| {
                             tokens
                                 .par_iter()
-                                .map(|token| self.flow(token, data))
+                                .map(|token| self.flow(token, &data))
                                 .collect()
                         })
                         .collect::<Vec<_>>();
@@ -61,7 +61,7 @@ impl<T> Process<Run, T> {
                 #[cfg(not(feature = "parallel"))]
                 all_tokens
                     .iter()
-                    .map(|tokens| tokens.iter().map(|token| self.flow(token, data)))
+                    .map(|tokens| tokens.iter().map(|token| self.flow(token, &data)))
             };
 
             for inner_iter in result_iter.rev() {
@@ -97,7 +97,7 @@ impl<T> Process<Run, T> {
                             }
                             // Handle Fork, the user code determine next token(s) to run.
                             GatewayType::Inclusive => {
-                                let value = match self.handle_inclusive_gateway(data, gw)? {
+                                let value = match self.handle_inclusive_gateway(&data, gw)? {
                                     ControlFlow::Continue(value) => Cow::Owned(vec![*value]),
                                     ControlFlow::Break(value) => value,
                                 };
@@ -219,7 +219,7 @@ impl<T> Process<Run, T> {
                                 symbol: Some(symbol),
                                 name,
                                 ..
-                            }) = self.execute(&data.update(id, sp_data))?
+                            }) = self.execute(ExecuteData::new(sp_data, id, data.user_data()))?
                             {
                                 self.boundary_lookup(
                                     bpmn_id,
@@ -351,30 +351,27 @@ impl<T> Process<Run, T> {
         }: &'a Gateway,
     ) -> Result<ControlFlow<Cow<'a, [usize]>, &'a usize>, Error> {
         let name_or_id = name.as_deref().unwrap_or(id.bpmn());
+        let find_flow = |value| {
+            output_by_name_or_id(value, outputs.ids(), data.process_data)
+                .ok_or_else(|| Error::MissingOutput(gateway.to_string(), name_or_id.to_string()))
+        };
+
         let value = match func_idx
             .and_then(|index| self.handler.run_inclusive(index, data.user_data()))
             .ok_or_else(|| {
                 Error::MissingImplementation(gateway.to_string(), name_or_id.to_string())
             })? {
-            With::Flow(value) => output_by_name_or_id(value, outputs.ids(), data.process_data)
-                .ok_or_else(|| Error::MissingOutput(gateway.to_string(), name_or_id.to_string()))?,
-
-            With::Fork(value) => match value.as_slice() {
+            With::Flow(value) => find_flow(value)?,
+            With::Fork(values) => match values.as_slice() {
                 [] => default_path(default, gateway, name_or_id)?,
-                [one] => output_by_name_or_id(one, outputs.ids(), data.process_data).ok_or_else(
-                    || Error::MissingOutput(gateway.to_string(), name_or_id.to_string()),
-                )?,
+                [value] => find_flow(value)?,
                 [..] => {
-                    let outputs = outputs.ids();
-                    return Ok(ControlFlow::Break(Cow::Owned(
-                        value
-                            .iter()
-                            .filter_map(|&response| {
-                                output_by_name_or_id(response, outputs, data.process_data)
-                            })
-                            .cloned()
-                            .collect(),
-                    )));
+                    let mut outputs = Vec::with_capacity(values.len());
+                    for &value in values.iter() {
+                        // Breaks on first error
+                        outputs.push(*find_flow(value)?);
+                    }
+                    return Ok(ControlFlow::Break(Cow::Owned(outputs)));
                 }
             },
             With::Default => default_path(default, gateway, name_or_id)?,
@@ -504,15 +501,6 @@ impl<'a, T> ExecuteData<'a, T> {
             process_data,
             process_id,
             user_data,
-        }
-    }
-
-    // When we change to a sub process we must change process id and data.
-    fn update(&self, process_id: &'a Id, process_data: &'a Vec<Bpmn>) -> Self {
-        Self {
-            process_data,
-            process_id,
-            user_data: self.user_data(),
         }
     }
 
