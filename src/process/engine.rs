@@ -1,4 +1,5 @@
 mod bpmn_queue;
+mod walker;
 
 use crate::{
     IntermediateEvent, Process, Symbol,
@@ -8,6 +9,7 @@ use crate::{
 use bpmn_queue::BpmnQueue;
 use log::info;
 use std::{borrow::Cow, ops::ControlFlow, sync::Arc};
+use walker::check_gateways;
 
 use super::{Run, handler::Data};
 
@@ -84,11 +86,15 @@ impl<T> Process<Run, T> {
                 // The gateway vector contains all the gateways involved. Right now we are using balanced diagram
                 // and do not need to investigate further.
                 if let Some(mut gateways) = queue.tokens_consumed() {
-                    if let Some(
-                        gw @ Gateway {
-                            gateway, outputs, ..
-                        },
-                    ) = gateways.pop()
+                    if gateways.len() > 1 {
+                        gateways = check_gateways(gateways, data.process_data)?;
+                        // All tokens consumed. But we need to sync the remaning tokens alive.
+                        queue.add_tokens(gateways.len());
+                    }
+
+                    for gw @ Gateway {
+                        gateway, outputs, ..
+                    } in gateways
                     {
                         // We cannot add new tokens until we have correlated all processed flows.
                         match gateway {

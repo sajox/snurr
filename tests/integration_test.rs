@@ -255,6 +255,28 @@ fn inclusive_join_fork_gateway_verify_sync() -> Result<()> {
 }
 
 #[test]
+fn inclusive_unbalanced() -> Result<()> {
+    let bpmn = Process::new("tests/files/inclusive_unbalanced.bpmn")?
+        .task(COUNT_1, func_cnt(1))
+        .inclusive("GW A", |_| vec!["A", "B", "C"].into())
+        .build()?;
+    let result = bpmn.run(Counter::default())?;
+    assert_eq!(result.count, 5);
+    Ok(())
+}
+
+#[test]
+fn inclusive_unbalanced2() -> Result<()> {
+    let bpmn = Process::new("tests/files/inclusive_unbalanced2.bpmn")?
+        .task(COUNT_1, func_cnt(1))
+        .inclusive("GW A", |_| vec!["A", "B", "C", "D"].into())
+        .build()?;
+    let result = bpmn.run(Counter::default())?;
+    assert_eq!(result.count, 7);
+    Ok(())
+}
+
+#[test]
 fn parallel_inclusive_join_fork() -> Result<()> {
     let bpmn = Process::new("tests/files/parallel_inclusive_join_fork.bpmn")?
         .task(COUNT_1, func_cnt(1))

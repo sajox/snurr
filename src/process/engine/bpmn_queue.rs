@@ -34,6 +34,10 @@ impl<'a> BpmnQueue<'a> {
         self.queue.push(item);
     }
 
+    pub(super) fn add_tokens(&mut self, items: usize) {
+        self.inclusive_handler.push(items);
+    }
+
     pub(super) fn add_pending(&mut self, item: Cow<'a, [usize]>) {
         self.uncommitted.push(item);
     }
@@ -109,7 +113,7 @@ impl<'a> InclusiveGatewayHandler<'a> {
         {
             if created.saturating_sub(*consumed) == 0 {
                 debug!("ALL CONSUMED expected: {}, consumed: {}", created, consumed);
-                return self.stack.pop().map(|data| data.joined);
+                return self.stack.pop().map(|data| data.joined).map(dedup);
             }
         }
         None
@@ -119,6 +123,12 @@ impl<'a> InclusiveGatewayHandler<'a> {
         debug!("NEW TOKENS {}", tokens);
         self.stack.push(TokenData::new(tokens));
     }
+}
+
+fn dedup(mut input: Vec<&Gateway>) -> Vec<&Gateway> {
+    let mut seen = std::collections::HashSet::new();
+    input.retain(|v| seen.insert(*v.id.local()));
+    input
 }
 
 // Keeps the state of the visited parallel gateways.
