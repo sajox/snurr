@@ -2,6 +2,7 @@
 name = "snurr"
 version = "0.10.2-wip"
 edition = "2024"
+rust-version = "1.85"
 authors = ["sajox"]
 description = "Read BPMN 2.0 files and run the process flow"
 repository = "https://github.com/sajox/snurr"
