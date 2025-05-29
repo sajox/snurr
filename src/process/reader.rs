@@ -109,7 +109,7 @@ fn collect_attributes<'a>(bs: &'a quick_xml::events::BytesStart<'_>) -> HashMap<
     bs.attributes()
         .filter_map(Result::ok)
         .filter_map(|attribute| {
-            str::from_utf8(&attribute.value)
+            std::str::from_utf8(&attribute.value)
                 .ok()
                 .filter(|value| !value.is_empty())
                 .map(|value| (attribute.key.local_name().into_inner(), value.into()))
