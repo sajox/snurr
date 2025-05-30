@@ -35,7 +35,7 @@ impl<'a> BpmnQueue<'a> {
     }
 
     pub(super) fn add_tokens(&mut self, items: usize) {
-        self.inclusive_handler.push(items);
+        self.token_handler.push(items);
     }
 
     pub(super) fn add_pending(&mut self, item: Cow<'a, [usize]>) {

@@ -2,18 +2,18 @@ use std::collections::HashSet;
 
 use crate::{
     Error,
-    model::{Bpmn, Gateway, GatewayType},
+    model::{Bpmn, Gateway},
 };
 
 pub fn check_gateways<'a>(
-    mut gateways: Vec<&'a Gateway>,
+    gateways: Vec<&'a Gateway>,
     data: &'a [Bpmn],
 ) -> Result<Vec<&'a Gateway>, Error> {
     let mut related = vec![];
     let mut not_related = vec![];
 
-    while let Some(gateway) = gateways.pop() {
-        let seen = walk(*gateway.id.local(), data)?;
+    for &gateway in gateways.iter() {
+        let seen = walk(gateway, data)?;
         if gateways
             .iter()
             .map(|v| *v.id.local())
@@ -24,6 +24,7 @@ pub fn check_gateways<'a>(
             not_related.push(gateway);
         }
     }
+
     Ok(if related.is_empty() {
         not_related
     } else {
@@ -31,22 +32,17 @@ pub fn check_gateways<'a>(
     })
 }
 
-pub fn walk(current_id: usize, data: &[Bpmn]) -> Result<HashSet<usize>, Error> {
+pub fn walk(gateway: &Gateway, data: &[Bpmn]) -> Result<HashSet<usize>, Error> {
     let mut walker = Walker::default();
-    walker.add(current_id);
+    walker.add_slice(gateway.outputs.ids());
     while let Some(value) = walker.pop() {
         match data
             .get(value)
-            .ok_or_else(|| Error::MisssingBpmnData(current_id.to_string()))?
+            .ok_or_else(|| Error::MisssingBpmnData(value.to_string()))?
         {
-            Bpmn::Event { outputs, .. } | Bpmn::Activity { outputs, .. } => {
-                walker.add_slice(outputs.ids());
-            }
-            Bpmn::Gateway(Gateway {
-                gateway: GatewayType::Inclusive,
-                outputs,
-                ..
-            }) => {
+            Bpmn::Gateway(Gateway { outputs, .. })
+            | Bpmn::Event { outputs, .. }
+            | Bpmn::Activity { outputs, .. } => {
                 walker.add_slice(outputs.ids());
             }
             Bpmn::SequenceFlow { target_ref, .. } => {
@@ -55,7 +51,7 @@ pub fn walk(current_id: usize, data: &[Bpmn]) -> Result<HashSet<usize>, Error> {
             _ => {}
         };
     }
-    Ok(walker.set())
+    Ok(walker.visited())
 }
 
 #[derive(Debug, Default)]
@@ -79,7 +75,7 @@ impl Walker {
         self.list.pop()
     }
 
-    fn set(self) -> HashSet<usize> {
+    fn visited(self) -> HashSet<usize> {
         self.visited
     }
 }
