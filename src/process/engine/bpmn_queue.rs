@@ -7,7 +7,7 @@ use std::{borrow::Cow, collections::HashMap};
 pub(super) struct BpmnQueue<'a> {
     queue: Vec<Cow<'a, [usize]>>,
     uncommitted: Vec<Cow<'a, [usize]>>,
-    inclusive_handler: InclusiveGatewayHandler<'a>,
+    token_handler: TokenHandler<'a>,
     parallel_handler: ParallelGatewayHandler,
 }
 
@@ -16,7 +16,7 @@ impl<'a> BpmnQueue<'a> {
         Self {
             queue: vec![item],
             uncommitted: Default::default(),
-            inclusive_handler: Default::default(),
+            token_handler: Default::default(),
             parallel_handler: Default::default(),
         }
     }
@@ -30,7 +30,7 @@ impl<'a> BpmnQueue<'a> {
     }
 
     pub(super) fn push_fork(&mut self, item: Cow<'a, [usize]>) {
-        self.inclusive_handler.push(item.len());
+        self.token_handler.push(item.len());
         self.queue.push(item);
     }
 
@@ -50,18 +50,19 @@ impl<'a> BpmnQueue<'a> {
                 if let Some(gw) = self.parallel_handler.consume(gateway) {
                     self.push_output(Cow::Borrowed(gw.outputs.ids()));
                 }
+                self.end_token();
             }
-            GatewayType::Inclusive => self.inclusive_handler.consume(Some(gateway)),
+            GatewayType::Inclusive => self.token_handler.consume(Some(gateway)),
             _ => {}
         }
     }
 
     pub(super) fn end_token(&mut self) {
-        self.inclusive_handler.consume(None);
+        self.token_handler.consume(None);
     }
 
     pub(super) fn tokens_consumed(&mut self) -> Option<Vec<&'a Gateway>> {
-        self.inclusive_handler.consumed()
+        self.token_handler.consumed()
     }
 }
 
@@ -82,12 +83,14 @@ impl TokenData<'_> {
     }
 }
 
+// Keep track of tokens alive. For both parallel and inclusive.
+// Only inclusive adds joined gateways due to different behavioral mechanisms.
 #[derive(Default, Debug)]
-struct InclusiveGatewayHandler<'a> {
+struct TokenHandler<'a> {
     stack: Vec<TokenData<'a>>,
 }
 
-impl<'a> InclusiveGatewayHandler<'a> {
+impl<'a> TokenHandler<'a> {
     fn consume(&mut self, join: Option<&'a Gateway>) {
         if let Some(TokenData {
             joined, consumed, ..
@@ -131,7 +134,6 @@ impl ParallelGatewayHandler {
     fn consume<'a>(&mut self, join: &'a Gateway) -> Option<&'a Gateway> {
         let consumed = self.state.entry(*join.id.local()).or_default();
         *consumed += 1;
-        debug!("TOKENS CONSUMED {}", consumed);
         if *consumed >= join.inputs.len() {
             debug!(
                 "ALL CONSUMED expected: {}, consumed: {}",

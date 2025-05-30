@@ -271,6 +271,17 @@ fn parallel_inclusive_join_fork() -> Result<()> {
 }
 
 #[test]
+fn inclusive_with_parallel() -> Result<()> {
+    let bpmn = Process::new("tests/files/inclusive_with_parallel.bpmn")?
+        .task(COUNT_1, func_cnt(1))
+        .inclusive("GW A", |_| vec!["A", "B"].into())
+        .build()?;
+    let result = bpmn.run(Counter::default())?;
+    assert_eq!(result.count, 5);
+    Ok(())
+}
+
+#[test]
 fn parallell_gateway() -> Result<()> {
     let bpmn = Process::new("tests/files/parallell_gateway.bpmn")?
         .task(COUNT_1, func_cnt(1))
