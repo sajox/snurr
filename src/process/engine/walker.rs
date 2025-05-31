@@ -16,6 +16,7 @@ pub fn check_gateways<'a>(
         let seen = walk(gateway, data)?;
         if gateways
             .iter()
+            .filter(|v| v.id.local() != gateway.id.local())
             .map(|v| *v.id.local())
             .any(|value| seen.contains(&value))
         {
