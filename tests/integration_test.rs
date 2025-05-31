@@ -164,7 +164,7 @@ fn inclusive_gateway_default_path() -> Result<()> {
         .inclusive("CHOOSE", |_| With::Default)
         .build()?;
     let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 4);
+    assert_eq!(result.count, 5);
     Ok(())
 }
 
@@ -177,7 +177,7 @@ fn inclusive_gateway() -> Result<()> {
         .inclusive("CHOOSE", |_| vec!["YES", "NO"].into())
         .build()?;
     let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 6);
+    assert_eq!(result.count, 7);
     Ok(())
 }
 
@@ -388,7 +388,7 @@ fn showcase() -> Result<()> {
         .exclusive("RUN DEFAULT", |_| Default::default())
         .build()?;
     let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 15);
+    assert_eq!(result.count, 16);
     Ok(())
 }
 

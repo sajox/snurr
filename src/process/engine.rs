@@ -7,7 +7,7 @@ use crate::{
 };
 use bpmn_queue::BpmnQueue;
 use log::info;
-use std::{borrow::Cow, ops::ControlFlow, sync::Arc};
+use std::{borrow::Cow, sync::Arc};
 
 use super::{Run, handler::Data};
 
@@ -97,11 +97,7 @@ impl<T> Process<Run, T> {
                             }
                             // Handle Fork, the user code determine next token(s) to run.
                             GatewayType::Inclusive => {
-                                let value = match self.handle_inclusive_gateway(&data, gw)? {
-                                    ControlFlow::Continue(value) => Cow::Owned(vec![*value]),
-                                    ControlFlow::Break(value) => value,
-                                };
-                                queue.add_pending(value);
+                                queue.add_pending(self.handle_inclusive_gateway(&data, gw)?);
                             }
                             _ => {}
                         }
@@ -291,10 +287,9 @@ impl<T> Process<Run, T> {
                         GatewayType::Parallel => {
                             return Ok(Return::Fork(Cow::Borrowed(outputs.ids())));
                         }
-                        GatewayType::Inclusive => match self.handle_inclusive_gateway(data, gw)? {
-                            ControlFlow::Continue(value) => value,
-                            ControlFlow::Break(value) => return Ok(Return::Fork(value)),
-                        },
+                        GatewayType::Inclusive => {
+                            return Ok(Return::Fork(self.handle_inclusive_gateway(data, gw)?));
+                        }
                         GatewayType::EventBased if outputs.len() == 1 => {
                             return Err(Error::BpmnRequirement(AT_LEAST_TWO_OUTGOING.into()));
                         }
@@ -349,7 +344,7 @@ impl<T> Process<Run, T> {
             outputs,
             ..
         }: &'a Gateway,
-    ) -> Result<ControlFlow<Cow<'a, [usize]>, &'a usize>, Error> {
+    ) -> Result<Cow<'a, [usize]>, Error> {
         let name_or_id = name.as_deref().unwrap_or(id.bpmn());
         let find_flow = |value| {
             output_by_name_or_id(value, outputs.ids(), data.process_data)
@@ -371,13 +366,12 @@ impl<T> Process<Run, T> {
                         // Breaks on first error
                         outputs.push(*find_flow(value)?);
                     }
-                    return Ok(ControlFlow::Break(Cow::Owned(outputs)));
+                    return Ok(Cow::Owned(outputs));
                 }
             },
             With::Default => default_path(default, gateway, name_or_id)?,
         };
-
-        Ok(ControlFlow::Continue(value))
+        Ok(Cow::Owned(vec![*value]))
     }
 
     fn boundary_lookup<'a>(
