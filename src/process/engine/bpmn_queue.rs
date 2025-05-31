@@ -73,13 +73,25 @@ struct TokenData<'a> {
     consumed: usize,
 }
 
-impl TokenData<'_> {
+impl<'a> TokenData<'a> {
     fn new(created: usize) -> Self {
         Self {
             created,
             joined: Default::default(),
             consumed: Default::default(),
         }
+    }
+
+    fn consume(&mut self, maybe_gateway: Option<&'a Gateway>) {
+        if let Some(gateway) = maybe_gateway {
+            self.joined.push(gateway)
+        }
+        self.consumed += 1;
+        debug!("TOKENS CONSUMED {}", self.consumed);
+    }
+
+    fn consumed(&mut self) -> bool {
+        self.created.saturating_sub(self.consumed) == 0
     }
 }
 
@@ -92,26 +104,19 @@ struct TokenHandler<'a> {
 
 impl<'a> TokenHandler<'a> {
     fn consume(&mut self, join: Option<&'a Gateway>) {
-        if let Some(TokenData {
-            joined, consumed, ..
-        }) = self.stack.last_mut()
-        {
-            if let Some(gateway) = join {
-                joined.push(gateway)
-            }
-            *consumed += 1;
-            debug!("TOKENS CONSUMED {}", consumed);
+        if let Some(token_data) = self.stack.last_mut() {
+            token_data.consume(join);
         }
     }
 
     // Once all tokens have been used up, return the gateways involved.
     fn consumed(&mut self) -> Option<Vec<&'a Gateway>> {
-        if let Some(TokenData {
-            created, consumed, ..
-        }) = self.stack.last_mut()
-        {
-            if created.saturating_sub(*consumed) == 0 {
-                debug!("ALL CONSUMED expected: {}, consumed: {}", created, consumed);
+        if let Some(token_data) = self.stack.last_mut() {
+            if token_data.consumed() {
+                debug!(
+                    "ALL CONSUMED created: {}, consumed: {}",
+                    token_data.created, token_data.consumed
+                );
                 return self.stack.pop().map(|data| data.joined);
             }
         }
@@ -134,13 +139,10 @@ impl ParallelGatewayHandler {
     fn consume<'a>(&mut self, join: &'a Gateway) -> Option<&'a Gateway> {
         let consumed = self.state.entry(*join.id.local()).or_default();
         *consumed += 1;
-        if *consumed >= join.inputs.len() {
-            debug!(
-                "ALL CONSUMED expected: {}, consumed: {}",
-                join.inputs.len(),
-                consumed
-            );
-            *consumed -= join.inputs.len();
+
+        let inputs = join.inputs.len();
+        if *consumed >= inputs {
+            *consumed -= inputs;
             return Some(join);
         }
         None
