@@ -11,7 +11,12 @@
 
 This is not a complete implementation of the BPMN 2.0 specification but intend to be a light weight subset of it.
 
-## Migration 
+## Migration
+
+### Version 0.10 -> 0.11
+
+- Removed support for unbalanced parallel gateway. Do not plan to support unbalanced inclusive gateway as it will be too expensive to use. Maintaining consistent behavior across forking gateways.
+- Added errors to the log when using unbalanced diagram. (Debug builds)
 
 ### Version 0.9 -> 0.10
 
@@ -59,14 +64,14 @@ Symbol::Message.into()
 
 ```toml
 [dependencies]
-snurr = "0.10"
+snurr = "0.11"
 ```
 
 With parallel feature enabled, new threads are spawned with parallel, inclusive, task and event forks.
 
 ```toml
 [dependencies]
-snurr = { version = "0.10", features = ["parallel"] }
+snurr = { version = "0.11", features = ["parallel"] }
 ```
 
 ## Process
@@ -292,6 +297,6 @@ RUST_LOG=info cargo run
 
 ![Conditional Sequence Flows](/tests/not_supported/conditional_sequence_flows.png)
 
-### Unbalanced Inclusive gateway
+### Unbalanced Inclusive and Parallel gateways
 
 ![Unbalanced Inclusive gateway](/tests/not_supported/inclusive_unbalanced.png)

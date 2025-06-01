@@ -1,14 +1,13 @@
 use log::debug;
 
-use crate::model::{Gateway, GatewayType};
-use std::{borrow::Cow, collections::HashMap};
+use crate::model::Gateway;
+use std::borrow::Cow;
 
 #[derive(Default, Debug)]
 pub(super) struct BpmnQueue<'a> {
     queue: Vec<Cow<'a, [usize]>>,
     uncommitted: Vec<Cow<'a, [usize]>>,
     token_handler: TokenHandler<'a>,
-    parallel_handler: ParallelGatewayHandler,
 }
 
 impl<'a> BpmnQueue<'a> {
@@ -17,7 +16,6 @@ impl<'a> BpmnQueue<'a> {
             queue: vec![item],
             uncommitted: Default::default(),
             token_handler: Default::default(),
-            parallel_handler: Default::default(),
         }
     }
 
@@ -29,32 +27,19 @@ impl<'a> BpmnQueue<'a> {
         self.queue.push(item);
     }
 
-    pub(super) fn push_fork(&mut self, item: Cow<'a, [usize]>) {
-        self.token_handler.push(item.len());
-        self.queue.push(item);
-    }
-
     pub(super) fn add_pending(&mut self, item: Cow<'a, [usize]>) {
         self.uncommitted.push(item);
     }
 
     pub(super) fn commit(&mut self) {
         for item in std::mem::take(&mut self.uncommitted) {
-            self.push_fork(item);
+            self.token_handler.push(item.len());
+            self.queue.push(item);
         }
     }
 
     pub(super) fn join_token(&mut self, gateway: &'a Gateway) {
-        match gateway.gateway {
-            GatewayType::Parallel => {
-                if let Some(gw) = self.parallel_handler.consume(gateway) {
-                    self.push_output(Cow::Borrowed(gw.outputs.ids()));
-                }
-                self.end_token();
-            }
-            GatewayType::Inclusive => self.token_handler.consume(Some(gateway)),
-            _ => {}
-        }
+        self.token_handler.consume(Some(gateway))
     }
 
     pub(super) fn end_token(&mut self) {
@@ -117,6 +102,10 @@ impl<'a> TokenHandler<'a> {
                     "ALL CONSUMED created: {}, consumed: {}",
                     token_data.created, token_data.consumed
                 );
+
+                #[cfg(debug_assertions)]
+                return self.stack.pop().map(|data| data.joined).map(dedup);
+                #[cfg(not(debug_assertions))]
                 return self.stack.pop().map(|data| data.joined);
             }
         }
@@ -129,22 +118,9 @@ impl<'a> TokenHandler<'a> {
     }
 }
 
-// Keeps the state of the visited parallel gateways.
-#[derive(Debug, Default)]
-struct ParallelGatewayHandler {
-    state: HashMap<usize, usize>,
-}
-
-impl ParallelGatewayHandler {
-    fn consume<'a>(&mut self, join: &'a Gateway) -> Option<&'a Gateway> {
-        let consumed = self.state.entry(*join.id.local()).or_default();
-        *consumed += 1;
-
-        let inputs = join.inputs.len();
-        if *consumed >= inputs {
-            *consumed -= inputs;
-            return Some(join);
-        }
-        None
-    }
+#[cfg(debug_assertions)]
+fn dedup(mut input: Vec<&Gateway>) -> Vec<&Gateway> {
+    let mut seen = std::collections::HashSet::new();
+    input.retain(|v| seen.insert(*v.id.local()));
+    input
 }

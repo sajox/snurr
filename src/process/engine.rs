@@ -84,6 +84,11 @@ impl<T> Process<Run, T> {
                 // The gateway vector contains all the gateways involved. Right now we are using balanced diagram
                 // and do not need to investigate further.
                 if let Some(mut gateways) = queue.tokens_consumed() {
+                    #[cfg(debug_assertions)]
+                    if gateways.len() > 1 {
+                        log::error!("Unbalanced diagram detected!");
+                    }
+
                     if let Some(
                         gw @ Gateway {
                             gateway, outputs, ..
@@ -92,8 +97,13 @@ impl<T> Process<Run, T> {
                     {
                         // We cannot add new tokens until we have correlated all processed flows.
                         match gateway {
-                            GatewayType::Inclusive if outputs.len() == 1 => {
+                            GatewayType::Parallel | GatewayType::Inclusive
+                                if outputs.len() == 1 =>
+                            {
                                 queue.push_output(Cow::Borrowed(outputs.ids()));
+                            }
+                            GatewayType::Parallel => {
+                                queue.add_pending(Cow::Borrowed(outputs.ids()));
                             }
                             // Handle Fork, the user code determine next token(s) to run.
                             GatewayType::Inclusive => {

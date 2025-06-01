@@ -483,26 +483,6 @@ fn parallel_parallel_join_fork() -> Result<()> {
 }
 
 #[test]
-fn parallel_unbalanced() -> Result<()> {
-    let bpmn = Process::new("tests/files/parallel_unbalanced.bpmn")?
-        .task(COUNT_1, func_cnt(1))
-        .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 5);
-    Ok(())
-}
-
-#[test]
-fn parallel_unbalanced2() -> Result<()> {
-    let bpmn = Process::new("tests/files/parallel_unbalanced2.bpmn")?
-        .task(COUNT_1, func_cnt(1))
-        .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 6);
-    Ok(())
-}
-
-#[test]
 fn parallel_one_in_and_out() -> Result<()> {
     let bpmn = Process::new("tests/files/parallel_one_in_and_out.bpmn")?
         .task(COUNT_1, func_cnt(1))
