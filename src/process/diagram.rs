@@ -64,7 +64,7 @@ impl Diagram {
                         | ActivityType::BusinessRuleTask),
                     ..
                 } => {
-                    let name_or_id: &str = name.as_deref().unwrap_or(id.bpmn());
+                    let name_or_id = name.as_deref().unwrap_or(id.bpmn());
                     if let Some(id) = handler_map.task().get(name_or_id) {
                         func_idx.replace(*id);
                     } else {
@@ -89,7 +89,7 @@ impl Diagram {
                         _ => continue,
                     };
 
-                    let name_or_id: &str = name.as_deref().unwrap_or(id.bpmn());
+                    let name_or_id = name.as_deref().unwrap_or(id.bpmn());
                     if let Some(id) = map.get(name_or_id) {
                         func_idx.replace(*id);
                     } else {

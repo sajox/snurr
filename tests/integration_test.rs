@@ -1,4 +1,4 @@
-use snurr::{Data, Error, Process, Result, Symbol, TaskResult, With};
+use snurr::{Data, Error, Process, Result, Symbol, TaskResult};
 
 const COUNT_1: &str = "Count 1";
 const COUNT_2: &str = "Count 2";
@@ -161,7 +161,7 @@ fn inclusive_gateway_default_path() -> Result<()> {
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
         // Empty vec run default path
-        .inclusive("CHOOSE", |_| With::Default)
+        .inclusive("CHOOSE", |_| Default::default())
         .build()?;
     let result = bpmn.run(Counter::default())?;
     assert_eq!(result.count, 5);
@@ -187,7 +187,7 @@ fn inclusive_gateway_split_end() -> Result<()> {
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
-        .inclusive("Gateway_0jgakfl", |_| With::Fork(vec!["YES", "NO"]))
+        .inclusive("Gateway_0jgakfl", |_| vec!["YES", "NO"].into())
         .build()?;
     let result = bpmn.run(Counter::default())?;
     assert_eq!(result.count, 6);
@@ -200,7 +200,7 @@ fn inclusive_gateway_no_output() -> Result<()> {
         .task("A", |_| None)
         .task("B", |_| None)
         // Empty vec run default path
-        .inclusive("Gateway_0qmfmmo", |_| With::Default)
+        .inclusive("Gateway_0qmfmmo", |_| Default::default())
         .build()?;
     if let Err(error) = bpmn.run(Counter::default()) {
         assert!(
@@ -231,7 +231,7 @@ fn inclusive_join_fork_gwb_one_flow() -> Result<()> {
     let bpmn = Process::new("tests/files/inclusive_join_fork.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .inclusive("GW A", |_| vec!["A", "B"].into())
-        .inclusive("GW B", |_| vec!["A"].into())
+        .inclusive("GW B", |_| "A".into())
         .build()?;
     let result = bpmn.run(Counter::default())?;
     assert_eq!(result.count, 4);
@@ -383,8 +383,8 @@ fn showcase() -> Result<()> {
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .task("Timeout 1", |_| Some(Symbol::Timer.into()))
-        .inclusive("RUN ALL", |_| With::Fork(vec!["A", "B"]))
-        .inclusive("RUN A", |_| With::Flow("A"))
+        .inclusive("RUN ALL", |_| vec!["A", "B"].into())
+        .inclusive("RUN A", |_| "A".into())
         .exclusive("RUN DEFAULT", |_| Default::default())
         .build()?;
     let result = bpmn.run(Counter::default())?;
@@ -424,7 +424,7 @@ fn process_end_with_symbol() -> Result<()> {
 fn inclusive_gateway_not_all_joined() -> Result<()> {
     let bpmn = Process::new("tests/files/inclusive_gateway_not_all_joined.bpmn")?
         .task(COUNT_1, func_cnt(1))
-        .inclusive("RUN ALL", |_| With::Fork(vec!["A", "B"]))
+        .inclusive("RUN ALL", |_| vec!["A", "B"].into())
         .exclusive("RUN C", |_| "C".into())
         .build()?;
     let result = bpmn.run(Counter::default())?;

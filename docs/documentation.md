@@ -179,13 +179,14 @@ Only branching/forking exclusive, event-based and inclusive gateways need to be 
 
 ![Exclusive gateway](/assets/images/exclusive-gateway.png)
 
-One flow is returned or default.
+One flow
 
 ```rust
 .exclusive("CHOOSE", |input| {
     "YES".into()
 })
 ```
+Default flow
 
 ```rust
 .exclusive("CHOOSE", |input| {
@@ -197,7 +198,7 @@ One flow is returned or default.
 
 ![Event-based gateway](/assets/images/event-based-gateway.png)
 
-One flow is returned.
+One flow
 
 ```rust
 .event_based("CHOOSE", |input| {
@@ -211,21 +212,25 @@ One flow is returned.
 
 One or more flows is returned and processed. Inclusive gateway should always have a default flow in the BPMN diagram.
 
-```rust
-.inclusive("CHOOSE", |input| {
-    With::Fork(vec!["YES", "NO"])
-})
-```
+One flow
 
 ```rust
 .inclusive("CHOOSE", |input| {
-    With::Flow("YES")
+    "YES".into()
 })
 ```
+Many flows
 
 ```rust
 .inclusive("CHOOSE", |input| {
-    With::Default
+    vec!["YES", "NO"].into()
+})
+```
+Default flow
+
+```rust
+.inclusive("CHOOSE", |input| {
+    Default::default()
 })
 ```
 
@@ -279,7 +284,7 @@ Collapsed, expanded sub-process or transaction can be used.
 
 ![Sub-process](/assets/images/subprocess.png)
 
-An end event symbol kan be used in a sub-process to use the boundary as an alternate flow.
+An end event symbol can be used in a sub-process to use the boundary as an alternate flow.
 
 ![End events](/assets/images/subprocess-message.png)
 
