@@ -542,3 +542,29 @@ fn single_flow() -> Result<()> {
     assert_eq!(result.count, 18);
     Ok(())
 }
+
+#[test]
+fn terminate_event() -> Result<()> {
+    let bpmn = Process::new("tests/files/terminate_event.bpmn")?
+        .task(COUNT_1, func_cnt(1))
+        .exclusive("Terminate?", |_| "YES".into())
+        .build()?;
+    let result = bpmn.run(Counter::default())?;
+
+    // NOTE 2 or 3 is OK result. The order in concurrent scenarios might differ.
+    assert!(matches!(result.count, 2 | 3));
+    Ok(())
+}
+
+#[test]
+fn terminate_event_sub_process() -> Result<()> {
+    let bpmn = Process::new("tests/files/terminate_event_sub_process.bpmn")?
+        .task(COUNT_1, func_cnt(1))
+        .exclusive("Terminate?", |_| "YES".into())
+        .build()?;
+    let result = bpmn.run(Counter::default())?;
+
+    // NOTE 4 or 5 is OK result. The order in concurrent scenarios might differ.
+    assert!(matches!(result.count, 4 | 5));
+    Ok(())
+}

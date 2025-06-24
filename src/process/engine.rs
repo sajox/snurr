@@ -73,6 +73,17 @@ impl<T> Process<Run, T> {
                             if value.is_some_and(|symbol| bpmn_end.replace(symbol).is_some()) {
                                 return Err(Error::BpmnRequirement(TOO_MANY_END_SYMBOLS.into()));
                             }
+
+                            // Terminate End Event. Exit this process.
+                            if let Some(Bpmn::Event {
+                                event: EventType::End,
+                                symbol: Some(Symbol::Terminate),
+                                ..
+                            }) = bpmn_end
+                            {
+                                return Ok(bpmn_end);
+                            }
+
                             queue.end_token();
                         }
                         Ok(Return::Fork(item)) => queue.add_pending(item),
@@ -222,7 +233,17 @@ impl<T> Process<Run, T> {
 
                             if let Some(Bpmn::Event {
                                 event: EventType::End,
-                                symbol: Some(symbol),
+                                symbol:
+                                    Some(
+                                        symbol @ (Symbol::Cancel
+                                        | Symbol::Compensation
+                                        | Symbol::Conditional
+                                        | Symbol::Error
+                                        | Symbol::Escalation
+                                        | Symbol::Message
+                                        | Symbol::Signal
+                                        | Symbol::Timer),
+                                    ),
                                 name,
                                 ..
                             }) = self.execute(ExecuteData::new(sp_data, id, data.user_data()))?
