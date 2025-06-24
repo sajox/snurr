@@ -1,6 +1,6 @@
 [package]
 name = "snurr"
-version = "0.11.1-wip"
+version = "0.12.0-wip"
 edition = "2024"
 rust-version = "1.85"
 authors = ["sajox"]

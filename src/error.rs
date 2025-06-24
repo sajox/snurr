@@ -51,6 +51,9 @@ pub enum Error {
     #[error("missing intermediate catch event symbol {0} with name {1}")]
     MissingIntermediateCatchEvent(String, String),
 
+    #[error("missing end event. (malformed bpmn process?)")]
+    MissingEndEvent,
+
     #[error("couldn't extract process result")]
     NoProcessResult,
 
@@ -77,6 +80,5 @@ pub enum Error {
 }
 
 // BpmnRequirement
-pub const AT_LEAST_TWO_OUTGOING: &str =
+pub(crate) const AT_LEAST_TWO_OUTGOING: &str =
     "Event gateway must have at least two outgoing sequence flows";
-pub const TOO_MANY_END_SYMBOLS: &str = "Too many end with a symbol";

@@ -52,8 +52,8 @@ impl Diagram {
                     id,
                     name,
                     func_idx,
-                    activity:
-                        activity @ (ActivityType::Task
+                    activity_type:
+                        activity_type @ (ActivityType::Task
                         | ActivityType::ScriptTask
                         | ActivityType::UserTask
                         | ActivityType::ServiceTask
@@ -68,12 +68,12 @@ impl Diagram {
                     if let Some(id) = handler_map.task().get(name_or_id) {
                         func_idx.replace(*id);
                     } else {
-                        missing.insert(format!("{}: {}", activity, name_or_id));
+                        missing.insert(format!("{}: {}", activity_type, name_or_id));
                     }
                 }
                 Bpmn::Gateway(Gateway {
-                    gateway:
-                        gateway @ (GatewayType::EventBased
+                    gateway_type:
+                        gateway_type @ (GatewayType::EventBased
                         | GatewayType::Exclusive
                         | GatewayType::Inclusive),
                     name,
@@ -82,7 +82,7 @@ impl Diagram {
                     outputs,
                     ..
                 }) if outputs.len() > 1 => {
-                    let map = match gateway {
+                    let map = match gateway_type {
                         GatewayType::Exclusive => handler_map.exclusive(),
                         GatewayType::Inclusive => handler_map.inclusive(),
                         GatewayType::EventBased => handler_map.event_based(),
@@ -93,7 +93,7 @@ impl Diagram {
                     if let Some(id) = map.get(name_or_id) {
                         func_idx.replace(*id);
                     } else {
-                        missing.insert(format!("{}: {}", gateway, name_or_id));
+                        missing.insert(format!("{}: {}", gateway_type, name_or_id));
                     }
                 }
                 _ => {}

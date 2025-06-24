@@ -2,8 +2,8 @@ mod bpmn_queue;
 
 use crate::{
     IntermediateEvent, Process, Symbol,
-    error::{AT_LEAST_TWO_OUTGOING, Error, TOO_MANY_END_SYMBOLS},
-    model::{ActivityType, Bpmn, EventType, Gateway, GatewayType, Id, With},
+    error::{AT_LEAST_TWO_OUTGOING, Error},
+    model::{ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Id, With},
 };
 use bpmn_queue::BpmnQueue;
 use log::info;
@@ -15,7 +15,7 @@ use super::{Run, handler::Data};
 enum Return<'a> {
     Fork(Cow<'a, [usize]>),
     Join(&'a Gateway),
-    End(Option<&'a Bpmn>),
+    End(&'a Event),
 }
 
 macro_rules! maybe_fork {
@@ -35,12 +35,12 @@ impl<T> Process<Run, T> {
     where
         T: Send,
     {
-        let mut bpmn_end = None;
+        let mut end_event = None;
         let mut queue = BpmnQueue::new(Cow::from(&[0]));
         loop {
             let all_tokens = queue.take();
             if all_tokens.is_empty() {
-                return Ok(bpmn_end);
+                return end_event.ok_or(Error::MissingEndEvent);
             }
 
             let result_iter = {
@@ -69,21 +69,17 @@ impl<T> Process<Run, T> {
                 for result in inner_iter {
                     match result {
                         Ok(Return::Join(gateway)) => queue.join_token(gateway),
-                        Ok(Return::End(value)) => {
-                            if value.is_some_and(|symbol| bpmn_end.replace(symbol).is_some()) {
-                                return Err(Error::BpmnRequirement(TOO_MANY_END_SYMBOLS.into()));
+                        Ok(Return::End(event)) => {
+                            match event {
+                                Event {
+                                    event_type: EventType::End,
+                                    symbol: Some(Symbol::Terminate),
+                                    ..
+                                } => return Ok(event),
+                                _ => {
+                                    end_event.replace(event);
+                                }
                             }
-
-                            // Terminate End Event. Exit this process.
-                            if let Some(Bpmn::Event {
-                                event: EventType::End,
-                                symbol: Some(Symbol::Terminate),
-                                ..
-                            }) = bpmn_end
-                            {
-                                return Ok(bpmn_end);
-                            }
-
                             queue.end_token();
                         }
                         Ok(Return::Fork(item)) => queue.add_pending(item),
@@ -101,13 +97,15 @@ impl<T> Process<Run, T> {
                     }
 
                     if let Some(
-                        gw @ Gateway {
-                            gateway, outputs, ..
+                        gateway @ Gateway {
+                            gateway_type,
+                            outputs,
+                            ..
                         },
                     ) = gateways.pop()
                     {
                         // We cannot add new tokens until we have correlated all processed flows.
-                        match gateway {
+                        match gateway_type {
                             GatewayType::Parallel | GatewayType::Inclusive
                                 if outputs.len() == 1 =>
                             {
@@ -118,7 +116,7 @@ impl<T> Process<Run, T> {
                             }
                             // Handle Fork, the user code determine next token(s) to run.
                             GatewayType::Inclusive => {
-                                queue.add_pending(self.handle_inclusive_gateway(&data, gw)?);
+                                queue.add_pending(self.handle_inclusive_gateway(&data, gateway)?);
                             }
                             _ => {}
                         }
@@ -145,19 +143,21 @@ impl<T> Process<Run, T> {
                 .get(*current_id)
                 .ok_or_else(|| Error::MisssingBpmnData(current_id.to_string()))?
             {
-                bpmn @ Bpmn::Event {
-                    event,
-                    symbol,
-                    id,
-                    name,
-                    outputs,
-                    ..
-                } => {
+                Bpmn::Event(
+                    event @ Event {
+                        event_type,
+                        symbol,
+                        id,
+                        name,
+                        outputs,
+                        ..
+                    },
+                ) => {
                     let name_or_id = name.as_deref().unwrap_or(id.bpmn());
-                    info!("{}: {}", event, name_or_id);
-                    match event {
+                    info!("{}: {}", event_type, name_or_id);
+                    match event_type {
                         EventType::Start | EventType::IntermediateCatch | EventType::Boundary => {
-                            maybe_fork!(self, outputs, data, event, name_or_id)
+                            maybe_fork!(self, outputs, data, event_type, name_or_id)
                         }
                         EventType::IntermediateThrow => {
                             match (name.as_ref(), symbol.as_ref()) {
@@ -166,7 +166,7 @@ impl<T> Process<Run, T> {
                                 }
                                 // Follow outputs for other throw events
                                 (Some(_), _) => {
-                                    maybe_fork!(self, outputs, data, event, name_or_id)
+                                    maybe_fork!(self, outputs, data, event_type, name_or_id)
                                 }
                                 _ => {
                                     Err(Error::MissingIntermediateThrowEventName(id.bpmn().into()))?
@@ -174,15 +174,12 @@ impl<T> Process<Run, T> {
                             }
                         }
                         EventType::End => {
-                            if symbol.is_some() {
-                                return Ok(Return::End(Some(bpmn)));
-                            }
-                            break;
+                            return Ok(Return::End(event));
                         }
                     }
                 }
                 Bpmn::Activity {
-                    activity,
+                    activity_type: activity,
                     id: id @ Id { bpmn_id, local_id },
                     func_idx,
                     name,
@@ -231,8 +228,8 @@ impl<T> Process<Run, T> {
                                 .get_process(*local_id)
                                 .ok_or_else(|| Error::MissingProcessData(bpmn_id.into()))?;
 
-                            if let Some(Bpmn::Event {
-                                event: EventType::End,
+                            if let Event {
+                                event_type: EventType::End,
                                 symbol:
                                     Some(
                                         symbol @ (Symbol::Cancel
@@ -246,7 +243,7 @@ impl<T> Process<Run, T> {
                                     ),
                                 name,
                                 ..
-                            }) = self.execute(ExecuteData::new(sp_data, id, data.user_data()))?
+                            } = self.execute(ExecuteData::new(sp_data, id, data.user_data()))?
                             {
                                 self.boundary_lookup(
                                     bpmn_id,
@@ -266,8 +263,8 @@ impl<T> Process<Run, T> {
                 }
 
                 Bpmn::Gateway(
-                    gw @ Gateway {
-                        gateway,
+                    gateway @ Gateway {
+                        gateway_type,
                         id,
                         func_idx,
                         name,
@@ -277,11 +274,11 @@ impl<T> Process<Run, T> {
                     },
                 ) => {
                     let name_or_id = name.as_deref().unwrap_or(id.bpmn());
-                    info!("{}: {}", gateway, name_or_id);
-                    match gateway {
+                    info!("{}: {}", gateway_type, name_or_id);
+                    match gateway_type {
                         _ if outputs.len() == 0 => {
                             return Err(Error::MissingOutput(
-                                gateway.to_string(),
+                                gateway_type.to_string(),
                                 name_or_id.to_string(),
                             ));
                         }
@@ -295,7 +292,7 @@ impl<T> Process<Run, T> {
                                 })
                                 .ok_or_else(|| {
                                     Error::MissingImplementation(
-                                        gateway.to_string(),
+                                        gateway_type.to_string(),
                                         name_or_id.to_string(),
                                     )
                                 })? {
@@ -303,23 +300,23 @@ impl<T> Process<Run, T> {
                                     output_by_name_or_id(value, outputs.ids(), data.process_data)
                                         .ok_or_else(|| {
                                             Error::MissingOutput(
-                                                gateway.to_string(),
+                                                gateway_type.to_string(),
                                                 name_or_id.to_string(),
                                             )
                                         })?
                                 }
-                                None => default_path(default, gateway, name_or_id)?,
+                                None => default_path(default, gateway_type, name_or_id)?,
                             }
                         }
                         // Handle a regular Join or a JoinFork. In both cases, we need to wait for all tokens.
                         GatewayType::Parallel | GatewayType::Inclusive if inputs.len() > 1 => {
-                            return Ok(Return::Join(gw));
+                            return Ok(Return::Join(gateway));
                         }
                         GatewayType::Parallel => {
                             return Ok(Return::Fork(Cow::Borrowed(outputs.ids())));
                         }
                         GatewayType::Inclusive => {
-                            return Ok(Return::Fork(self.handle_inclusive_gateway(data, gw)?));
+                            return Ok(Return::Fork(self.handle_inclusive_gateway(data, gateway)?));
                         }
                         GatewayType::EventBased if outputs.len() == 1 => {
                             return Err(Error::BpmnRequirement(AT_LEAST_TWO_OUTGOING.into()));
@@ -331,7 +328,7 @@ impl<T> Process<Run, T> {
                                 })
                                 .ok_or_else(|| {
                                     Error::MissingImplementation(
-                                        gateway.to_string(),
+                                        gateway_type.to_string(),
                                         name_or_id.to_string(),
                                     )
                                 })?;
@@ -339,7 +336,7 @@ impl<T> Process<Run, T> {
                             output_by_symbol(&value, outputs.ids(), data.process_data).ok_or_else(
                                 || {
                                     Error::MissingIntermediateEvent(
-                                        gateway.to_string(),
+                                        gateway_type.to_string(),
                                         name_or_id.to_string(),
                                         value.to_string(),
                                     )
@@ -360,14 +357,13 @@ impl<T> Process<Run, T> {
                 bpmn => return Err(Error::TypeNotImplemented(format!("{bpmn:?}"))),
             };
         }
-        Ok(Return::End(None))
     }
 
     fn handle_inclusive_gateway<'a>(
         &'a self,
         data: &ExecuteData<'a, T>,
         Gateway {
-            gateway,
+            gateway_type,
             id,
             func_idx,
             name,
@@ -378,18 +374,19 @@ impl<T> Process<Run, T> {
     ) -> Result<Cow<'a, [usize]>, Error> {
         let name_or_id = name.as_deref().unwrap_or(id.bpmn());
         let find_flow = |value| {
-            output_by_name_or_id(value, outputs.ids(), data.process_data)
-                .ok_or_else(|| Error::MissingOutput(gateway.to_string(), name_or_id.to_string()))
+            output_by_name_or_id(value, outputs.ids(), data.process_data).ok_or_else(|| {
+                Error::MissingOutput(gateway_type.to_string(), name_or_id.to_string())
+            })
         };
 
         let value = match func_idx
             .and_then(|index| self.handler.run_inclusive(index, data.user_data()))
             .ok_or_else(|| {
-                Error::MissingImplementation(gateway.to_string(), name_or_id.to_string())
+                Error::MissingImplementation(gateway_type.to_string(), name_or_id.to_string())
             })? {
             With::Flow(value) => find_flow(value)?,
             With::Fork(values) => match values.as_slice() {
-                [] => default_path(default, gateway, name_or_id)?,
+                [] => default_path(default, gateway_type, name_or_id)?,
                 [value] => find_flow(value)?,
                 [..] => {
                     let mut outputs = Vec::with_capacity(values.len());
@@ -400,7 +397,7 @@ impl<T> Process<Run, T> {
                     return Ok(Cow::Owned(outputs));
                 }
             },
-            With::Default => default_path(default, gateway, name_or_id)?,
+            With::Default => default_path(default, gateway_type, name_or_id)?,
         };
         Ok(Cow::Owned(vec![*value]))
     }
@@ -418,12 +415,12 @@ impl<T> Process<Run, T> {
             .iter()
             .filter_map(|index| process_data.get(*index))
             .find_map(|bpmn| match bpmn {
-                Bpmn::Event {
+                Bpmn::Event(Event {
                     symbol: Some(symbol),
                     id,
                     name,
                     ..
-                } if symbol == search_symbol && search_name == name.as_deref() => Some(id.local()),
+                }) if symbol == search_symbol && search_name == name.as_deref() => Some(id.local()),
                 _ => None,
             })
     }
@@ -473,15 +470,11 @@ fn output_by_symbol<'a>(
             .is_some_and(|bpmn| match bpmn {
                 // We can target both ReceiveTask or Events.
                 Bpmn::Activity {
-                    activity,
+                    activity_type: ActivityType::ReceiveTask,
                     name: Some(name),
                     ..
-                } => {
-                    *activity == ActivityType::ReceiveTask
-                        && search.1 == Symbol::Message
-                        && name.as_str() == search.0
-                }
-                Bpmn::Event {
+                } => search.1 == Symbol::Message && name.as_str() == search.0,
+                Bpmn::Event(Event {
                     symbol:
                         Some(
                             symbol @ (Symbol::Message
@@ -491,7 +484,7 @@ fn output_by_symbol<'a>(
                         ),
                     name: Some(name),
                     ..
-                } => *symbol == search.1 && name.as_str() == search.0,
+                }) => *symbol == search.1 && name.as_str() == search.0,
                 _ => false,
             })
     })
@@ -511,7 +504,7 @@ fn output_by_name_or_id<'a>(
     })
 }
 
-pub(super) type ExecuteResult<'a> = Result<Option<&'a Bpmn>, Error>;
+pub(super) type ExecuteResult<'a> = Result<&'a Event, Error>;
 
 // Data for the execution engine.
 pub(super) struct ExecuteData<'a, T> {

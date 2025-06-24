@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     error::Error,
-    model::{Gateway, *},
+    model::{Event, Gateway, *},
     process::Diagram,
 };
 
@@ -53,7 +53,7 @@ impl DataBuilder {
     }
 
     pub(super) fn update_symbol(&mut self, bpmn_type: &[u8]) {
-        if let Some(Bpmn::Event { symbol, .. }) = self.stack.last_mut() {
+        if let Some(Bpmn::Event(Event { symbol, .. })) = self.stack.last_mut() {
             *symbol = bpmn_type.try_into().ok();
         }
     }
@@ -115,15 +115,15 @@ impl DataBuilder {
 
         data.iter_mut().for_each(|bpmn| match bpmn {
             Bpmn::Activity { outputs, .. } => outputs.update_local_ids(&bpmn_index),
-            Bpmn::Event {
-                event,
+            Bpmn::Event(Event {
+                event_type,
                 id,
                 outputs,
                 attached_to_ref,
                 symbol,
                 name,
                 ..
-            } => {
+            }) => {
                 outputs.update_local_ids(&bpmn_index);
                 if let Some(attached_to_ref) = attached_to_ref {
                     update_local_id(attached_to_ref, &bpmn_index);
@@ -135,7 +135,7 @@ impl DataBuilder {
                         .push(*id.local());
                 }
 
-                if *event == EventType::IntermediateCatch
+                if *event_type == EventType::IntermediateCatch
                     && *symbol == Some(Symbol::Link)
                     && name.is_some()
                 {

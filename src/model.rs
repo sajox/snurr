@@ -328,7 +328,7 @@ impl TryFrom<&[u8]> for Symbol {
 
 #[derive(Debug)]
 pub(crate) struct Gateway {
-    pub(crate) gateway: GatewayType,
+    pub(crate) gateway_type: GatewayType,
     pub(crate) id: Id,
     pub(crate) func_idx: Option<usize>,
     pub(crate) name: Option<String>,
@@ -338,9 +338,20 @@ pub(crate) struct Gateway {
 }
 
 #[derive(Debug)]
+pub(crate) struct Event {
+    pub(crate) event_type: EventType,
+    pub(crate) symbol: Option<Symbol>,
+    pub(crate) id: Id,
+    pub(crate) name: Option<String>,
+    pub(crate) attached_to_ref: Option<Id>,
+    pub(crate) _cancel_activity: Option<String>,
+    pub(crate) outputs: Outputs,
+}
+
+#[derive(Debug)]
 pub(crate) enum Bpmn {
     Activity {
-        activity: ActivityType,
+        activity_type: ActivityType,
         id: Id,
         func_idx: Option<usize>,
         name: Option<String>,
@@ -350,18 +361,10 @@ pub(crate) enum Bpmn {
         id: Id,
     },
     Direction {
-        direction: DirectionType,
+        direction_type: DirectionType,
         text: Option<String>,
     },
-    Event {
-        event: EventType,
-        symbol: Option<Symbol>,
-        id: Id,
-        name: Option<String>,
-        attached_to_ref: Option<Id>,
-        _cancel_activity: Option<String>,
-        outputs: Outputs,
-    },
+    Event(Event),
     Gateway(Gateway),
     Process {
         id: Id,
@@ -378,19 +381,21 @@ pub(crate) enum Bpmn {
 impl Bpmn {
     pub(crate) fn id(&self) -> Result<&str, Error> {
         match self {
-            Bpmn::Event { id, .. }
+            Bpmn::Event(Event { id, .. })
             | Bpmn::SequenceFlow { id, .. }
             | Bpmn::Activity { id, .. }
             | Bpmn::Definitions { id, .. }
             | Bpmn::Gateway(Gateway { id, .. })
             | Bpmn::Process { id, .. } => Ok(id.bpmn()),
-            Bpmn::Direction { direction, .. } => Err(Error::MissingId(direction.to_string())),
+            Bpmn::Direction { direction_type, .. } => {
+                Err(Error::MissingId(direction_type.to_string()))
+            }
         }
     }
 
     pub(crate) fn set_local_id(&mut self, value: usize) {
         match self {
-            Bpmn::Event { id, .. }
+            Bpmn::Event(Event { id, .. })
             | Bpmn::SequenceFlow { id, .. }
             | Bpmn::Activity { id, .. }
             | Bpmn::Definitions { id, .. }
@@ -402,7 +407,7 @@ impl Bpmn {
 
     pub(crate) fn add_output(&mut self, text: String) {
         match self {
-            Bpmn::Event { outputs, .. }
+            Bpmn::Event(Event { outputs, .. })
             | Bpmn::Gateway(Gateway { outputs, .. })
             | Bpmn::Activity { outputs, .. } => outputs.add(text),
             _ => {}
@@ -444,8 +449,8 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
             | END_EVENT
             | BOUNDARY_EVENT
             | INTERMEDIATE_CATCH_EVENT
-            | INTERMEDIATE_THROW_EVENT => Bpmn::Event {
-                event: bpmn_type.try_into()?,
+            | INTERMEDIATE_THROW_EVENT => Bpmn::Event(Event {
+                event_type: bpmn_type.try_into()?,
                 symbol: None,
                 id: attributes
                     .remove(ATTRIB_ID)
@@ -455,11 +460,11 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                 attached_to_ref: attributes.remove(ATTRIB_ATTACHED_TO_REF).map(Into::into),
                 _cancel_activity: attributes.remove(ATTRIB_CANCEL_ACTIVITY),
                 outputs: Default::default(),
-            },
+            }),
             TASK | SCRIPT_TASK | USER_TASK | SERVICE_TASK | CALL_ACTIVITY | RECEIVE_TASK
             | SEND_TASK | MANUAL_TASK | BUSINESS_RULE_TASK | SUB_PROCESS | TRANSACTION => {
                 Bpmn::Activity {
-                    activity: bpmn_type.try_into()?,
+                    activity_type: bpmn_type.try_into()?,
                     id: attributes
                         .remove(ATTRIB_ID)
                         .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
@@ -471,7 +476,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
             }
             EXCLUSIVE_GATEWAY | PARALLEL_GATEWAY | INCLUSIVE_GATEWAY | EVENT_BASED_GATEWAY => {
                 Bpmn::Gateway(Gateway {
-                    gateway: bpmn_type.try_into()?,
+                    gateway_type: bpmn_type.try_into()?,
                     id: attributes
                         .remove(ATTRIB_ID)
                         .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
@@ -498,7 +503,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     .into(),
             },
             INCOMING | OUTGOING => Bpmn::Direction {
-                direction: bpmn_type.try_into()?,
+                direction_type: bpmn_type.try_into()?,
                 text: None,
             },
             _ => return Err(Error::TypeNotImplemented(bpmn_type_str.into())),

@@ -1,9 +1,7 @@
 use std::{collections::HashSet, io::Write, path::Path};
 
 use crate::{
-    Process,
-    error::Error,
-    model::{ActivityType, Bpmn, Gateway, GatewayType, Symbol},
+    error::Error, model::{ActivityType, Bpmn, Event, Gateway, GatewayType, Symbol}, Process
 };
 
 use super::Build;
@@ -25,7 +23,7 @@ impl<T> Process<Build, T> {
         self.diagram.data().iter().for_each(|process: &Vec<Bpmn>| {
             process.iter().for_each(|bpmn| {
                 if let Bpmn::Activity {
-                    activity: ActivityType::Task,
+                    activity_type: ActivityType::Task,
                     id,
                     ..
                 } = bpmn
@@ -36,11 +34,11 @@ impl<T> Process<Build, T> {
                             .iter()
                             .filter_map(|index| process.get(*index))
                             .filter_map(|bpmn| {
-                                if let Bpmn::Event {
+                                if let Bpmn::Event(Event {
                                     symbol: Some(symbol),
                                     name,
                                     ..
-                                } = bpmn
+                                }) = bpmn
                                 {
                                     Some((name, symbol))
                                 } else {
@@ -54,8 +52,8 @@ impl<T> Process<Build, T> {
                     scaffold.add_task(bpmn, symbols);
                 }
 
-                if let Bpmn::Gateway(Gateway {
-                    gateway:
+                if let Bpmn::Gateway(gateway @ Gateway {
+                    gateway_type:
                         GatewayType::Exclusive | GatewayType::Inclusive | GatewayType::EventBased,
                     outputs,
                     ..
@@ -73,7 +71,7 @@ impl<T> Process<Build, T> {
                                 None
                             })
                             .collect();
-                        scaffold.add_gateway(bpmn, names);
+                        scaffold.add_gateway(gateway, names);
                     }
                 }
             });
@@ -85,7 +83,7 @@ impl<T> Process<Build, T> {
 
 #[derive(Debug)]
 struct GatewayInner<'a> {
-    bpmn: &'a Bpmn,
+    gateway: &'a Gateway,
     names: Vec<&'a String>,
 }
 
@@ -106,8 +104,8 @@ impl<'a> Scaffold<'a> {
         self.tasks.push(Task { bpmn, symbols });
     }
 
-    fn add_gateway(&mut self, bpmn: &'a Bpmn, names: Vec<&'a String>) {
-        self.gateways.push(GatewayInner { bpmn, names });
+    fn add_gateway(&mut self, gateway: &'a Gateway, names: Vec<&'a String>) {
+        self.gateways.push(GatewayInner { gateway, names });
     }
 
     // Generate code from all the task and gateways to the given file path.
@@ -147,27 +145,23 @@ impl<'a> Scaffold<'a> {
         }
 
         // Second all gateways
-        for gateway in self.gateways.iter() {
-            let GatewayInner {
-                bpmn:
-                    Bpmn::Gateway(Gateway {
-                        gateway,
-                        id,
-                        name,
-                        outputs,
-                        ..
-                    }),
-                names,
-            } = gateway
-            else {
-                continue;
-            };
-
+        for GatewayInner {
+            gateway:
+                Gateway {
+                    gateway_type,
+                    id,
+                    name,
+                    outputs,
+                    ..
+                },
+            names,
+        } in self.gateways.iter()
+        {
             let name_or_id = name.as_deref().unwrap_or(id.bpmn());
             if seen_gateways.insert(name_or_id) {
                 content.push(format!(
                     r#"    // {} gateway. Names: {}. Flows: {}."#,
-                    gateway,
+                    gateway_type,
                     names
                         .iter()
                         .map(|value| value.to_string())
@@ -176,7 +170,7 @@ impl<'a> Scaffold<'a> {
                     outputs
                 ));
 
-                match gateway {
+                match gateway_type {
                     GatewayType::Exclusive => content.push(format!(
                         r#"    .exclusive("{}", |input| Default::default())"#,
                         name_or_id,
