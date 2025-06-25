@@ -51,7 +51,7 @@ pub enum Error {
     #[error("missing intermediate catch event symbol {0} with name {1}")]
     MissingIntermediateCatchEvent(String, String),
 
-    #[error("missing end event. (malformed bpmn process?)")]
+    #[error("missing end event.")]
     MissingEndEvent,
 
     #[error("couldn't extract process result")]
