@@ -81,7 +81,6 @@ impl<'a> TokenData<'a> {
 }
 
 // Keep track of tokens alive. For both parallel and inclusive.
-// Only inclusive adds joined gateways due to different behavioral mechanisms.
 #[derive(Default, Debug)]
 struct TokenHandler<'a> {
     stack: Vec<TokenData<'a>>,
