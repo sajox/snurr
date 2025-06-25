@@ -1,11 +1,11 @@
-mod bpmn_queue;
+mod execute_handler;
 
 use crate::{
     IntermediateEvent, Process, Symbol,
     error::{AT_LEAST_TWO_OUTGOING, Error},
     model::{ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Id, With},
 };
-use bpmn_queue::BpmnQueue;
+use execute_handler::ExecuteHandler;
 use log::info;
 use std::{borrow::Cow, sync::Arc};
 
@@ -36,9 +36,9 @@ impl<T> Process<Run, T> {
         T: Send,
     {
         let mut end_event = None;
-        let mut queue = BpmnQueue::new(Cow::from(&[0]));
+        let mut handler = ExecuteHandler::new(Cow::from(&[0]));
         loop {
-            let all_tokens = queue.take();
+            let all_tokens = handler.take();
             if all_tokens.is_empty() {
                 return end_event.ok_or(Error::MissingEndEvent);
             }
@@ -68,7 +68,7 @@ impl<T> Process<Run, T> {
                 // Correlate tokens that have arrived
                 for result in inner_iter {
                     match result {
-                        Ok(Return::Join(gateway)) => queue.join_token(gateway),
+                        Ok(Return::Join(gateway)) => handler.consume_token(Some(gateway)),
                         Ok(Return::End(event)) => {
                             match event {
                                 Event {
@@ -80,9 +80,9 @@ impl<T> Process<Run, T> {
                                     end_event.replace(event);
                                 }
                             }
-                            queue.end_token();
+                            handler.consume_token(None);
                         }
-                        Ok(Return::Fork(item)) => queue.add_pending(item),
+                        Ok(Return::Fork(item)) => handler.add_pending(item),
                         Err(value) => return Err(value),
                     }
                 }
@@ -90,7 +90,7 @@ impl<T> Process<Run, T> {
                 // Once all inputs have been merged for a gateway, then proceed with its outputs.
                 // The gateway vector contains all the gateways involved. Right now we are using balanced diagram
                 // and do not need to investigate further.
-                if let Some(mut gateways) = queue.tokens_consumed() {
+                if let Some(mut gateways) = handler.tokens_consumed() {
                     #[cfg(debug_assertions)]
                     if gateways.len() > 1 {
                         log::error!("Unbalanced diagram detected!");
@@ -109,14 +109,14 @@ impl<T> Process<Run, T> {
                             GatewayType::Parallel | GatewayType::Inclusive
                                 if outputs.len() == 1 =>
                             {
-                                queue.push_output(Cow::Borrowed(outputs.ids()));
+                                handler.immediate(Cow::Borrowed(outputs.ids()));
                             }
                             GatewayType::Parallel => {
-                                queue.add_pending(Cow::Borrowed(outputs.ids()));
+                                handler.add_pending(Cow::Borrowed(outputs.ids()));
                             }
                             // Handle Fork, the user code determine next token(s) to run.
                             GatewayType::Inclusive => {
-                                queue.add_pending(self.handle_inclusive_gateway(&data, gateway)?);
+                                handler.add_pending(self.handle_inclusive_gateway(&data, gateway)?);
                             }
                             _ => {}
                         }
@@ -124,7 +124,7 @@ impl<T> Process<Run, T> {
                 }
             }
             // Commit pending forks
-            queue.commit();
+            handler.commit();
         }
     }
 
