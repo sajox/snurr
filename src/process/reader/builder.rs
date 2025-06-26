@@ -92,8 +92,13 @@ impl DataBuilder {
             return Err(Error::Builder(BUILD_PROCESS_ERROR_MSG.into()));
         };
 
-        bpmn.set_local_id(self.data.len());
+        // Definitions only contain processes. Skip it.
+        if !self.process_stack.is_empty() {
+            find_and_swap_startevent(&mut data)?;
+        }
 
+        // Process or sub process use local id to point to data index. Do NOT overwrite.
+        bpmn.set_local_id(self.data.len());
         self.update_data(bpmn.id()?, &mut data);
         // Definitions collect all Processes
         // Processes collect all related sub processes
@@ -181,4 +186,38 @@ fn check_unsupported(bpmn: &Bpmn) -> Result<(), Error> {
         )),
         _ => return Ok(()),
     })
+}
+
+fn find_and_swap_startevent(data: &mut [Bpmn]) -> Result<(), Error> {
+    let index = data
+        .iter()
+        .position(|bpmn| {
+            matches!(
+                bpmn,
+                Bpmn::Event(Event {
+                    event_type: EventType::Start,
+                    symbol: None,
+                    ..
+                })
+            )
+        })
+        .ok_or(Error::MissingStartEvent)?;
+
+    if index > 0 {
+        data.swap(0, index);
+        data[0].set_local_id(0);
+
+        // Sub process use local id to point to data. Do NOT overwrite.
+        let bpmn = &mut data[index];
+        if !matches!(
+            bpmn,
+            Bpmn::Activity {
+                activity_type: ActivityType::SubProcess,
+                ..
+            }
+        ) {
+            bpmn.set_local_id(index);
+        }
+    }
+    Ok(())
 }

@@ -54,6 +54,9 @@ pub enum Error {
     #[error("missing end event.")]
     MissingEndEvent,
 
+    #[error("missing start event.")]
+    MissingStartEvent,
+
     #[error("couldn't extract process result")]
     NoProcessResult,
 
