@@ -568,3 +568,14 @@ fn terminate_event_sub_process() -> Result<()> {
     assert!(matches!(result.count, 4 | 5));
     Ok(())
 }
+
+#[test]
+fn startevent_not_first() -> Result<()> {
+    // StartEvent out of order in XML file
+    let bpmn = Process::new("tests/files/startevent_not_first.bpmn")?
+        .task(COUNT_1, func_cnt(1))
+        .build()?;
+    let result = bpmn.run(Counter::default())?;
+    assert_eq!(result.count, 4);
+    Ok(())
+}
