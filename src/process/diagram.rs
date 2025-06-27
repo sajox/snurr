@@ -68,7 +68,7 @@ impl Diagram {
                     if let Some(id) = handler_map.task().get(name_or_id) {
                         func_idx.replace(*id);
                     } else {
-                        missing.insert(format!("{}: {}", activity_type, name_or_id));
+                        missing.insert(format!("{activity_type}: {name_or_id}"));
                     }
                 }
                 Bpmn::Gateway(Gateway {
@@ -93,7 +93,7 @@ impl Diagram {
                     if let Some(id) = map.get(name_or_id) {
                         func_idx.replace(*id);
                     } else {
-                        missing.insert(format!("{}: {}", gateway_type, name_or_id));
+                        missing.insert(format!("{gateway_type}: {name_or_id}"));
                     }
                 }
                 _ => {}

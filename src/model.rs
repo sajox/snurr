@@ -1,4 +1,5 @@
 use crate::error::Error;
+use core::fmt;
 use std::{collections::HashMap, fmt::Display};
 
 pub(crate) const DEFINITIONS: &[u8] = b"definitions";
@@ -120,8 +121,8 @@ impl From<Symbol> for Boundary {
 impl Display for Boundary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Boundary::Symbol(symbol) => write!(f, "{}", symbol),
-            Boundary::NameSymbol(name, symbol) => write!(f, "({}, {})", name, symbol),
+            Boundary::Symbol(symbol) => write!(f, "{symbol}"),
+            Boundary::NameSymbol(name, symbol) => write!(f, "({name}, {symbol})"),
         }
     }
 }
@@ -172,7 +173,7 @@ impl TryFrom<&[u8]> for EventType {
 
 impl Display for EventType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        fmt::Debug::fmt(&self, f)
     }
 }
 
@@ -216,7 +217,7 @@ impl TryFrom<&[u8]> for ActivityType {
 
 impl Display for ActivityType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        fmt::Debug::fmt(&self, f)
     }
 }
 
@@ -248,7 +249,7 @@ impl TryFrom<&[u8]> for GatewayType {
 
 impl Display for GatewayType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        fmt::Debug::fmt(&self, f)
     }
 }
 
@@ -276,7 +277,7 @@ impl TryFrom<&[u8]> for DirectionType {
 
 impl Display for DirectionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        fmt::Debug::fmt(&self, f)
     }
 }
 
@@ -297,7 +298,7 @@ pub enum Symbol {
 
 impl Display for Symbol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        fmt::Debug::fmt(&self, f)
     }
 }
 

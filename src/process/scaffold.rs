@@ -1,7 +1,9 @@
 use std::{collections::HashSet, io::Write, path::Path};
 
 use crate::{
-    error::Error, model::{ActivityType, Bpmn, Event, Gateway, GatewayType, Symbol}, Process
+    Process,
+    error::Error,
+    model::{ActivityType, Bpmn, Event, Gateway, GatewayType, Symbol},
 };
 
 use super::Build;
@@ -134,12 +136,11 @@ impl<'a> Scaffold<'a> {
             if seen_tasks.insert(name_or_id) {
                 if !symbols.is_empty() {
                     content.push(format!(
-                        r#"    // "{}" boundary symbols: {:?}"#,
-                        name_or_id, symbols
+                        r#"    // "{name_or_id}" boundary symbols: {symbols:?}"#
                     ));
                 }
 
-                content.push(format!(r#"    .task("{}", |input| None)"#, name_or_id,));
+                content.push(format!(r#"    .task("{name_or_id}", |input| None)"#));
                 content.push("".into());
             }
         }
@@ -172,16 +173,13 @@ impl<'a> Scaffold<'a> {
 
                 match gateway_type {
                     GatewayType::Exclusive => content.push(format!(
-                        r#"    .exclusive("{}", |input| Default::default())"#,
-                        name_or_id,
+                        r#"    .exclusive("{name_or_id}", |input| Default::default())"#,
                     )),
                     GatewayType::Inclusive => content.push(format!(
-                        r#"    .inclusive("{}", |input| Default::default())"#,
-                        name_or_id,
+                        r#"    .inclusive("{name_or_id}", |input| Default::default())"#,
                     )),
                     GatewayType::EventBased => content.push(format!(
-                        r#"    .event_based("{}", |input| // Implement)"#,
-                        name_or_id,
+                        r#"    .event_based("{name_or_id}", |input| // Implement)"#,
                     )),
                     _ => {}
                 }

@@ -154,7 +154,7 @@ impl<T> Process<Run, T> {
                     },
                 ) => {
                     let name_or_id = name.as_deref().unwrap_or(id.bpmn());
-                    info!("{}: {}", event_type, name_or_id);
+                    info!("{event_type}: {name_or_id}");
                     match event_type {
                         EventType::Start | EventType::IntermediateCatch | EventType::Boundary => {
                             maybe_fork!(self, outputs, data, event_type, name_or_id)
@@ -179,7 +179,7 @@ impl<T> Process<Run, T> {
                     }
                 }
                 Bpmn::Activity {
-                    activity_type: activity,
+                    activity_type,
                     id: id @ Id { bpmn_id, local_id },
                     func_idx,
                     name,
@@ -187,8 +187,8 @@ impl<T> Process<Run, T> {
                     ..
                 } => {
                     let name_or_id = name.as_ref().unwrap_or(bpmn_id);
-                    info!("{}: {}", activity, name_or_id);
-                    match activity {
+                    info!("{activity_type}: {name_or_id}");
+                    match activity_type {
                         ActivityType::Task
                         | ActivityType::ScriptTask
                         | ActivityType::UserTask
@@ -202,7 +202,7 @@ impl<T> Process<Run, T> {
                                 .and_then(|index| self.handler.run_task(index, data.user_data()))
                                 .ok_or_else(|| {
                                     Error::MissingImplementation(
-                                        activity.to_string(),
+                                        activity_type.to_string(),
                                         name_or_id.to_string(),
                                     )
                                 })? {
@@ -215,11 +215,11 @@ impl<T> Process<Run, T> {
                                     )
                                     .ok_or_else(|| {
                                         Error::MissingBoundary(
-                                            format!("{}", boundary),
+                                            boundary.to_string(),
                                             name_or_id.into(),
                                         )
                                     })?,
-                                None => maybe_fork!(self, outputs, data, activity, name_or_id),
+                                None => maybe_fork!(self, outputs, data, activity_type, name_or_id),
                             }
                         }
                         ActivityType::SubProcess => {
@@ -256,7 +256,7 @@ impl<T> Process<Run, T> {
                                 })?
                             } else {
                                 // Continue from subprocess
-                                maybe_fork!(self, outputs, data, activity, name_or_id)
+                                maybe_fork!(self, outputs, data, activity_type, name_or_id)
                             }
                         }
                     }
@@ -274,7 +274,7 @@ impl<T> Process<Run, T> {
                     },
                 ) => {
                     let name_or_id = name.as_deref().unwrap_or(id.bpmn());
-                    info!("{}: {}", gateway_type, name_or_id);
+                    info!("{gateway_type}: {name_or_id}");
                     match gateway_type {
                         _ if outputs.len() == 0 => {
                             return Err(Error::MissingOutput(
