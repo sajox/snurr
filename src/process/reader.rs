@@ -94,7 +94,7 @@ pub(super) fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, Er
                 _ => {}
             },
             Ok(Event::Text(bt)) => {
-                builder.add_text(bt.unescape()?.into_owned());
+                builder.add_text(bt.decode().map_err(quick_xml::Error::from)?.into_owned());
             }
 
             // Ignore other XML events
