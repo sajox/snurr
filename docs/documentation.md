@@ -13,6 +13,11 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
 
 ## Migration
 
+### Version 0.11 -> 0.12
+
+- Added support for termination event
+- Added errors
+
 ### Version 0.10 -> 0.11
 
 - Removed support for unbalanced parallel gateway. Do not plan to support unbalanced inclusive gateway as it will be too expensive to use. Maintaining consistent behavior across forking gateways.
@@ -64,14 +69,14 @@ Symbol::Message.into()
 
 ```toml
 [dependencies]
-snurr = "0.11"
+snurr = "0.12"
 ```
 
 With parallel feature enabled, new threads are spawned with parallel, inclusive, task and event forks.
 
 ```toml
 [dependencies]
-snurr = { version = "0.11", features = ["parallel"] }
+snurr = { version = "0.12", features = ["parallel"] }
 ```
 
 ## Process
