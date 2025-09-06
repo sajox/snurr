@@ -31,7 +31,7 @@ impl<'a> ExecuteHandler<'a> {
     }
 
     // New tokens cannot be added immediately until all processed tokens have been correlated.
-    pub(super) fn add_pending(&mut self, item: Cow<'a, [usize]>) {
+    pub(super) fn pending(&mut self, item: Cow<'a, [usize]>) {
         self.uncommitted.push(item);
     }
 
@@ -53,18 +53,18 @@ impl<'a> ExecuteHandler<'a> {
 
     // Once all tokens have been consumed, return the gateways involved.
     pub(super) fn tokens_consumed(&mut self) -> Option<Vec<&'a Gateway>> {
-        if let Some(token_data) = self.token_stack.last_mut() {
-            if token_data.consumed() {
-                debug!(
-                    "ALL CONSUMED created: {}, consumed: {}",
-                    token_data.created, token_data.consumed
-                );
+        if let Some(token_data) = self.token_stack.last_mut()
+            && token_data.consumed()
+        {
+            debug!(
+                "ALL CONSUMED created: {}, consumed: {}",
+                token_data.created, token_data.consumed
+            );
 
-                #[cfg(debug_assertions)]
-                return self.token_stack.pop().map(|data| data.joined).map(dedup);
-                #[cfg(not(debug_assertions))]
-                return self.token_stack.pop().map(|data| data.joined);
-            }
+            #[cfg(debug_assertions)]
+            return self.token_stack.pop().map(|data| data.joined).map(dedup);
+            #[cfg(not(debug_assertions))]
+            return self.token_stack.pop().map(|data| data.joined);
         }
         None
     }
@@ -103,5 +103,10 @@ impl<'a> TokenData<'a> {
 fn dedup(mut input: Vec<&Gateway>) -> Vec<&Gateway> {
     let mut seen = std::collections::HashSet::new();
     input.retain(|v| seen.insert(*v.id.local()));
+
+    // If many different gateways are visited, we have an unbalanced graph
+    if input.len() > 1 {
+        log::error!("Unbalanced diagram detected!");
+    }
     input
 }

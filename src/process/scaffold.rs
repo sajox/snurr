@@ -59,9 +59,7 @@ impl<T> Process<Build, T> {
                         GatewayType::Exclusive | GatewayType::Inclusive | GatewayType::EventBased,
                     outputs,
                     ..
-                }) = bpmn
-                {
-                    if outputs.len() > 1 {
+                }) = bpmn && outputs.len() > 1 {
                         let names = outputs
                             .ids()
                             .iter()
@@ -75,10 +73,8 @@ impl<T> Process<Build, T> {
                             .collect();
                         scaffold.add_gateway(gateway, names);
                     }
-                }
             });
         });
-
         scaffold.create(path)
     }
 }

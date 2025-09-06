@@ -82,7 +82,7 @@ impl<T> Process<Run, T> {
                             }
                             handler.consume_token(None);
                         }
-                        Ok(Return::Fork(item)) => handler.add_pending(item),
+                        Ok(Return::Fork(item)) => handler.pending(item),
                         Err(value) => return Err(value),
                     }
                 }
@@ -90,36 +90,28 @@ impl<T> Process<Run, T> {
                 // Once all inputs have been merged for a gateway, then proceed with its outputs.
                 // The gateway vector contains all the gateways involved. Right now we are using balanced diagram
                 // and do not need to investigate further.
-                if let Some(mut gateways) = handler.tokens_consumed() {
-                    #[cfg(debug_assertions)]
-                    if gateways.len() > 1 {
-                        log::error!("Unbalanced diagram detected!");
-                    }
-
-                    if let Some(
+                if let Some(mut gateways) = handler.tokens_consumed()
+                    && let Some(
                         gateway @ Gateway {
                             gateway_type,
                             outputs,
                             ..
                         },
                     ) = gateways.pop()
-                    {
-                        // We cannot add new tokens until we have correlated all processed flows.
-                        match gateway_type {
-                            GatewayType::Parallel | GatewayType::Inclusive
-                                if outputs.len() == 1 =>
-                            {
-                                handler.immediate(Cow::Borrowed(outputs.ids()));
-                            }
-                            GatewayType::Parallel => {
-                                handler.add_pending(Cow::Borrowed(outputs.ids()));
-                            }
-                            // Handle Fork, the user code determine next token(s) to run.
-                            GatewayType::Inclusive => {
-                                handler.add_pending(self.handle_inclusive_gateway(&data, gateway)?);
-                            }
-                            _ => {}
+                {
+                    // We cannot add new tokens until we have correlated all processed flows.
+                    match gateway_type {
+                        GatewayType::Parallel | GatewayType::Inclusive if outputs.len() == 1 => {
+                            handler.immediate(Cow::Borrowed(outputs.ids()));
                         }
+                        GatewayType::Parallel => {
+                            handler.pending(Cow::Borrowed(outputs.ids()));
+                        }
+                        // Handle Fork, the user code determine next token(s) to run.
+                        GatewayType::Inclusive => {
+                            handler.pending(self.handle_inclusive_gateway(&data, gateway)?);
+                        }
+                        _ => {}
                     }
                 }
             }

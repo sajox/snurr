@@ -140,14 +140,14 @@ impl DataBuilder {
                         .push(*id.local());
                 }
 
-                if *event_type == EventType::IntermediateCatch
-                    && *symbol == Some(Symbol::Link)
-                    && name.is_some()
+                if let Some(name) = name
+                    && let Some(Symbol::Link) = symbol
+                    && EventType::IntermediateCatch == *event_type
                 {
                     self.catch_event_links
                         .entry(process_id.to_string())
                         .or_default()
-                        .insert(name.clone().unwrap(), *id.local());
+                        .insert(name.clone(), *id.local());
                 }
             }
             Bpmn::Gateway(Gateway {
