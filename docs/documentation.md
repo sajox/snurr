@@ -13,21 +13,21 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
 
 ## Migration
 
-### Version 0.11 -> 0.12
+### Version 0.12
 
 - Added support for termination event
 - Added errors
 
-### Version 0.10 -> 0.11
+### Version 0.11
 
 - Removed support for unbalanced parallel gateway. Do not plan to support unbalanced inclusive gateway as it will be too expensive to use. Maintaining consistent behavior across forking gateways.
 - Added errors to the log when using unbalanced diagram. (Debug builds)
 
-### Version 0.9 -> 0.10
+### Version 0.10
 
 - Changed API from AsRef to Into when installing Task or Gateways
 
-### Version 0.8 -> 0.9
+### Version 0.9
 
 - Added builder pattern on Process to register task and gateways.
 - Added validation on `.build()` that requires all Tasks and Gateways to have a registered function.
@@ -244,6 +244,14 @@ Default flow
 ![Parallel gateway](/assets/images/parallel-gateway.png)
 
 **Parallel gateways** run **all** available flows. No need to add gateway. (And you can't)
+
+## End event
+
+![End events](/assets/images/end-events.png)
+
+- **None**
+- **Terminate** ends the process. In a subprocess, only the subprocess ends and continues with the parent process.
+- **Other symbols** can be used in a subprocess to select a subprocess boundary event.
 
 ## Intermediate event
 
