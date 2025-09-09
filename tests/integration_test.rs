@@ -182,6 +182,19 @@ fn inclusive_gateway() -> Result<()> {
 }
 
 #[test]
+fn inclusive_gateway_same_flow_used_multiple_times() -> Result<()> {
+    let bpmn = Process::new("tests/files/inclusive_gateway.bpmn")?
+        .task(COUNT_1, func_cnt(1))
+        .task(COUNT_2, func_cnt(2))
+        .task(COUNT_3, func_cnt(3))
+        .inclusive("CHOOSE", |_| vec!["YES", "YES", "NO", "NO"].into())
+        .build()?;
+    let result = bpmn.run(Counter::default())?;
+    assert_eq!(result.count, 7);
+    Ok(())
+}
+
+#[test]
 fn inclusive_gateway_split_end() -> Result<()> {
     let bpmn = Process::new("tests/files/inclusive_gateway_split_end.bpmn")?
         .task(COUNT_1, func_cnt(1))
@@ -369,8 +382,10 @@ fn two_process_pools() -> Result<()> {
 fn subprocess_external_link_fail() -> snurr::Result<()> {
     let bpmn = Process::new("tests/files/subprocess_external_link_fail.bpmn")?.build()?;
     if let Err(error) = bpmn.run(Counter::default()) {
-        let result = matches!(error, Error::MissingIntermediateCatchEvent(symbol, name) if symbol == "Link" && name == "Link 2");
-        assert!(result, "Expected Link Symbol with name Link 2");
+        assert!(
+            matches!(error, Error::MissingIntermediateCatchEvent(symbol, name) if symbol == "Link" && name == "Link 2"),
+            "Expected Link Symbol with name Link 2"
+        );
     } else {
         panic!("Expected an error");
     }

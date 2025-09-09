@@ -6,8 +6,8 @@ use crate::{
     model::{ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Id, With},
 };
 use execute_handler::ExecuteHandler;
-use log::info;
-use std::{borrow::Cow, sync::Arc};
+use log::{error, info};
+use std::{borrow::Cow, collections::HashSet, sync::Arc};
 
 use super::{Run, handler::Data};
 
@@ -381,12 +381,17 @@ impl<T> Process<Run, T> {
                 [] => default_path(default, gateway_type, name_or_id)?,
                 [value] => find_flow(value)?,
                 [..] => {
-                    let mut outputs = Vec::with_capacity(values.len());
+                    let mut outputs = HashSet::with_capacity(values.len());
                     for &value in values.iter() {
                         // Breaks on first error
-                        outputs.push(*find_flow(value)?);
+                        if !outputs.insert(*find_flow(value)?) {
+                            // The flow has already been used, we just log an error and continue.
+                            error!(
+                                "Inclusive Gateway {name_or_id} used flow {value} multiple times. Discarded the duplicates."
+                            );
+                        }
                     }
-                    return Ok(Cow::Owned(outputs));
+                    return Ok(Cow::Owned(outputs.into_iter().collect()));
                 }
             },
             With::Default => default_path(default, gateway_type, name_or_id)?,
