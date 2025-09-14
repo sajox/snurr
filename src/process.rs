@@ -16,7 +16,10 @@ use std::{
 };
 
 /// Process that contains information from the BPMN file
-pub struct Process<S, T> {
+pub struct Process<S, T>
+where
+    Self: Sync + Send,
+{
     diagram: Diagram,
     handler: Handler<T>,
     _marker: PhantomData<S>,
@@ -49,7 +52,7 @@ impl<T> Process<Build, T> {
     /// Register a task function with name or bpmn id
     pub fn task<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
-        F: Fn(Data<T>) -> TaskResult + 'static + Sync,
+        F: Fn(Data<T>) -> TaskResult + 'static + Sync + Send,
     {
         self.handler.add_task(name, func);
         self
@@ -58,7 +61,7 @@ impl<T> Process<Build, T> {
     /// Register an exclusive gateway function with name or bpmn id
     pub fn exclusive<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
-        F: Fn(Data<T>) -> Option<&'static str> + 'static + Sync,
+        F: Fn(Data<T>) -> Option<&'static str> + 'static + Sync + Send,
     {
         self.handler.add_exclusive(name, func);
         self
@@ -67,7 +70,7 @@ impl<T> Process<Build, T> {
     /// Register an inclusive gateway function with name or bpmn id
     pub fn inclusive<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
-        F: Fn(Data<T>) -> With + 'static + Sync,
+        F: Fn(Data<T>) -> With + 'static + Sync + Send,
     {
         self.handler.add_inclusive(name, func);
         self
@@ -76,7 +79,7 @@ impl<T> Process<Build, T> {
     /// Register an event based gateway function with name or bpmn id
     pub fn event_based<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
-        F: Fn(Data<T>) -> IntermediateEvent + 'static + Sync,
+        F: Fn(Data<T>) -> IntermediateEvent + 'static + Sync + Send,
     {
         self.handler.add_event_based(name, func);
         self

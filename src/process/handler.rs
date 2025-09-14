@@ -16,10 +16,10 @@ pub type Data<T> = Arc<Mutex<T>>;
 /// Task result type
 pub type TaskResult = Option<Boundary>;
 
-type TaskCallback<T> = Box<dyn Fn(Data<T>) -> TaskResult + Sync>;
-type ExclusiveCallback<T> = Box<dyn Fn(Data<T>) -> Option<&'static str> + Sync>;
-type InclusiveCallback<T> = Box<dyn Fn(Data<T>) -> With + Sync>;
-type EventBasedCallback<T> = Box<dyn Fn(Data<T>) -> IntermediateEvent + Sync>;
+type TaskCallback<T> = Box<dyn Fn(Data<T>) -> TaskResult + Sync + Send>;
+type ExclusiveCallback<T> = Box<dyn Fn(Data<T>) -> Option<&'static str> + Sync + Send>;
+type InclusiveCallback<T> = Box<dyn Fn(Data<T>) -> With + Sync + Send>;
+type EventBasedCallback<T> = Box<dyn Fn(Data<T>) -> IntermediateEvent + Sync + Send>;
 
 pub(super) struct Handler<T> {
     task: Vec<TaskCallback<T>>,
@@ -46,7 +46,7 @@ impl<T> Default for Handler<T> {
 impl<T> Handler<T> {
     pub(super) fn add_task<F>(&mut self, name: impl Into<String>, func: F)
     where
-        F: Fn(Data<T>) -> TaskResult + 'static + Sync,
+        F: Fn(Data<T>) -> TaskResult + 'static + Sync + Send,
     {
         if let Some(hm) = &mut self.handler_map {
             hm.insert_task(name, self.task.len());
@@ -56,7 +56,7 @@ impl<T> Handler<T> {
 
     pub(super) fn add_exclusive<F>(&mut self, name: impl Into<String>, func: F)
     where
-        F: Fn(Data<T>) -> Option<&'static str> + 'static + Sync,
+        F: Fn(Data<T>) -> Option<&'static str> + 'static + Sync + Send,
     {
         if let Some(hm) = &mut self.handler_map {
             hm.insert_exclusive(name, self.exclusive.len());
@@ -66,7 +66,7 @@ impl<T> Handler<T> {
 
     pub(super) fn add_inclusive<F>(&mut self, name: impl Into<String>, func: F)
     where
-        F: Fn(Data<T>) -> With + 'static + Sync,
+        F: Fn(Data<T>) -> With + 'static + Sync + Send,
     {
         if let Some(hm) = &mut self.handler_map {
             hm.insert_inclusive(name, self.inclusive.len());
@@ -76,7 +76,7 @@ impl<T> Handler<T> {
 
     pub(super) fn add_event_based<F>(&mut self, name: impl Into<String>, func: F)
     where
-        F: Fn(Data<T>) -> IntermediateEvent + 'static + Sync,
+        F: Fn(Data<T>) -> IntermediateEvent + 'static + Sync + Send,
     {
         if let Some(hm) = &mut self.handler_map {
             hm.insert_event_based(name, self.event_based.len());
