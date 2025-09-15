@@ -121,7 +121,7 @@ let result = bpmn.run(Counter::default())?;
 Generate code from all the task and gateways to the given file path with scaffold. Remove scaffold method after file is created.
 
 ```rust
-let bpmn = Process::new("example.bpmn")?;
+let bpmn = Process::<_, Counter>::new("example.bpmn")?;
 bpmn.scaffold("scaffold.rs")?;
 ```
 
