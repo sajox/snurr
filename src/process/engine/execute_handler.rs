@@ -37,7 +37,7 @@ impl<'a> ExecuteHandler<'a> {
 
     // Commit all new tokens.
     pub(super) fn commit(&mut self) {
-        for item in std::mem::take(&mut self.uncommitted) {
+        for item in self.uncommitted.drain(..) {
             debug!("NEW TOKENS {}", item.len());
             self.token_stack.push(TokenData::new(item.len()));
             self.data.push(item);
@@ -53,7 +53,7 @@ impl<'a> ExecuteHandler<'a> {
 
     // Once all tokens have been consumed, return the gateways involved.
     pub(super) fn tokens_consumed(&mut self) -> Option<Vec<&'a Gateway>> {
-        if let Some(token_data) = self.token_stack.last_mut()
+        if let Some(token_data) = self.token_stack.last()
             && token_data.consumed()
         {
             debug!(
@@ -94,7 +94,7 @@ impl<'a> TokenData<'a> {
         debug!("TOKENS CONSUMED {}", self.consumed);
     }
 
-    fn consumed(&mut self) -> bool {
+    fn consumed(&self) -> bool {
         self.created.saturating_sub(self.consumed) == 0
     }
 }
