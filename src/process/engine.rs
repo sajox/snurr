@@ -6,7 +6,7 @@ use crate::{
     model::{ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Id, With},
 };
 use execute_handler::ExecuteHandler;
-use log::{error, info};
+use log::{info, warn};
 use std::{borrow::Cow, collections::HashSet, sync::Arc};
 
 use super::{Run, handler::Data};
@@ -385,8 +385,8 @@ impl<T> Process<Run, T> {
                     for &value in values.iter() {
                         // Breaks on first error
                         if !outputs.insert(*find_flow(value)?) {
-                            // The flow has already been used, we just log an error and continue.
-                            error!(
+                            // The flow has already been used, we just log an warning and continue.
+                            warn!(
                                 "Inclusive Gateway {name_or_id} used flow {value} multiple times. Discarded the duplicates."
                             );
                         }
