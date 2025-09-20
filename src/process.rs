@@ -16,7 +16,7 @@ use std::{
 };
 
 /// Process that contains information from the BPMN file
-pub struct Process<S, T>
+pub struct Process<T, S = Build>
 where
     Self: Sync + Send,
 {
@@ -31,13 +31,13 @@ pub struct Build;
 /// Process Run state
 pub struct Run;
 
-impl<T> Process<Build, T> {
+impl<T> Process<T> {
     /// Create new process and initialize it from the BPMN file path.
     /// ```
     /// use snurr::{Build, Process};
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let bpmn: Process<_, ()> = Process::new("examples/example.bpmn")?;
+    ///     let bpmn: Process<()> = Process::new("examples/example.bpmn")?;
     ///     Ok(())
     /// }
     /// ```
@@ -87,7 +87,7 @@ impl<T> Process<Build, T> {
 
     /// Install and check that all required functions have been registered. You cannot run a process before `build` is called.
     /// If `build` returns an error, it contains the missing functions.
-    pub fn build(mut self) -> Result<Process<Run, T>, Error> {
+    pub fn build(mut self) -> Result<Process<T, Run>, Error> {
         let result = self.diagram.install_and_check(self.handler.build()?);
         if result.is_empty() {
             Ok(Process {
@@ -103,7 +103,7 @@ impl<T> Process<Build, T> {
     }
 }
 
-impl<T> FromStr for Process<Build, T> {
+impl<T> FromStr for Process<T> {
     type Err = Error;
 
     /// Create new process and initialize it from a BPMN `&str`.
@@ -113,7 +113,7 @@ impl<T> FromStr for Process<Build, T> {
     /// static BPMN_DATA: &str = include_str!("../examples/example.bpmn");
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let bpmn: Process<_, ()> = BPMN_DATA.parse()?;
+    ///     let bpmn: Process<()> = BPMN_DATA.parse()?;
     ///     Ok(())
     /// }
     /// ```
@@ -126,7 +126,7 @@ impl<T> FromStr for Process<Build, T> {
     }
 }
 
-impl<T> Process<Run, T> {
+impl<T> Process<T, Run> {
     /// Run the process and return the `T` or an `Error`.
     /// ```
     /// use snurr::Process;
@@ -140,16 +140,15 @@ impl<T> Process<Run, T> {
     ///     pretty_env_logger::init();
     ///
     ///     // Create process from BPMN file
-    ///     let bpmn = Process::<_, Counter>::new("examples/example.bpmn")?
+    ///     let bpmn = Process::<Counter>::new("examples/example.bpmn")?
     ///         .task("Count 1", |input| {
     ///             input.lock().unwrap().count += 1;
     ///             None
     ///         })
     ///         .exclusive("equal to 3", |input| {
-    ///             if input.lock().unwrap().count == 3 {
-    ///                 "YES"
-    ///             } else {
-    ///                 "NO"
+    ///             match input.lock().unwrap().count {
+    ///                 3 => "YES",
+    ///                 _ => "NO",
     ///             }
     ///             .into()
     ///         })

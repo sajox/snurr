@@ -30,7 +30,7 @@ macro_rules! maybe_fork {
     };
 }
 
-impl<T> Process<Run, T> {
+impl<T> Process<T, Run> {
     pub(super) fn execute<'a>(&'a self, data: ExecuteData<'a, T>) -> ExecuteResult<'a>
     where
         T: Send,

@@ -16,7 +16,7 @@
 //! ### Cargo.toml
 //! ```toml
 //! [dependencies]
-//! snurr = "0.12"
+//! snurr = "0.13"
 //! log = "0.4"
 //! pretty_env_logger = "0.5"
 //! ```
@@ -36,16 +36,15 @@
 //!     pretty_env_logger::init();
 //!
 //!     // Create process from BPMN file
-//!     let bpmn = Process::<_, Counter>::new("examples/example.bpmn")?
+//!     let bpmn = Process::<Counter>::new("examples/example.bpmn")?
 //!         .task("Count 1", |input| {
 //!             input.lock().unwrap().count += 1;
 //!             None
 //!         })
 //!         .exclusive("equal to 3", |input| {
-//!             if input.lock().unwrap().count == 3 {
-//!                 "YES"
-//!             } else {
-//!                 "NO"
+//!             match input.lock().unwrap().count {
+//!                 3 => "YES",
+//!                 _ => "NO",
 //!             }
 //!             .into()
 //!         })

@@ -509,7 +509,7 @@ fn parallel_one_in_and_out() -> Result<()> {
 
 #[test]
 fn conditional_sequence_flows() -> Result<()> {
-    let failed = Process::<_, Counter>::new("tests/files/conditional_sequence_flows.bpmn").is_err();
+    let failed = Process::<Counter>::new("tests/files/conditional_sequence_flows.bpmn").is_err();
     assert!(failed, "Expected an error");
     Ok(())
 }

@@ -6,16 +6,14 @@ use crate::{
     model::{ActivityType, Bpmn, Event, Gateway, GatewayType, Symbol},
 };
 
-use super::Build;
-
-impl<T> Process<Build, T> {
+impl<T> Process<T> {
     /// Generate code from all the task and gateways to the given file path.
     /// No file with same name is allowed to exist at the target location.
     /// ```
     /// use snurr::Process;
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let bpmn: Process<_, ()> = Process::new("examples/example.bpmn")?;
+    ///     let bpmn: Process<()> = Process::new("examples/example.bpmn")?;
     ///     bpmn.scaffold("examples/scaffold.rs")?;
     ///     Ok(())
     /// }
@@ -109,10 +107,12 @@ impl<'a> Scaffold<'a> {
     // Generate code from all the task and gateways to the given file path.
     // No file is allowed to exist at the target location.
     fn create(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
-        let mut content = vec![];
-        content
-            .push("fn add_and_build<T>(process: snurr::Process<snurr::Build, T>) -> Result<snurr::Process<snurr::Run, T>, snurr::Error> {".into());
-        content.push("    process".into());
+        let mut content = vec![
+            "use snurr::{Error, Process, Run};\n".into(),
+            "// Replace () with your type".into(),
+            "pub fn build(process: Process<()>) -> Result<Process<(), Run>, Error> {".into(),
+            r#"  process"#.into(),
+        ];
 
         // Do not generate duplicates
         let mut seen_tasks: HashSet<&str> = HashSet::new();
