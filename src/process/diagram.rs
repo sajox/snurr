@@ -1,5 +1,8 @@
 use super::handler::HandlerMap;
-use crate::model::{ActivityType, Bpmn, Gateway, GatewayType};
+use crate::{
+    Error, Symbol,
+    model::{ActivityType, Bpmn, Event, Gateway, GatewayType, Id},
+};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
@@ -36,12 +39,8 @@ impl Diagram {
         self.data.as_slice()
     }
 
-    pub(super) fn boundaries(&self) -> &HashMap<String, Vec<usize>> {
-        &self.boundaries
-    }
-
-    pub(super) fn catch_event_links(&self) -> &HashMap<String, HashMap<String, usize>> {
-        &self.catch_event_links
+    pub(super) fn activity_boundaries(&self, id: &Id) -> Option<&Vec<usize>> {
+        self.boundaries.get(id.bpmn())
     }
 
     pub(super) fn install_and_check(&mut self, handler_map: HandlerMap) -> HashSet<String> {
@@ -100,5 +99,40 @@ impl Diagram {
             }
         }
         missing
+    }
+
+    pub(super) fn find_boundary<'a>(
+        &'a self,
+        activity_id: &Id,
+        search_name: Option<&str>,
+        search_symbol: &Symbol,
+        process_data: &'a [Bpmn],
+    ) -> Option<&'a usize> {
+        self.activity_boundaries(activity_id)?
+            .iter()
+            .filter_map(|index| process_data.get(*index))
+            .find_map(|bpmn| match bpmn {
+                Bpmn::Event(Event {
+                    symbol: Some(symbol),
+                    id,
+                    name,
+                    ..
+                }) if symbol == search_symbol && search_name == name.as_deref() => Some(id.local()),
+                _ => None,
+            })
+    }
+
+    pub(super) fn find_catch_link(
+        &self,
+        throw_event_name: &str,
+        symbol: &Symbol,
+        process_id: &Id,
+    ) -> Result<&usize, Error> {
+        self.catch_event_links
+            .get(process_id.bpmn())
+            .and_then(|links| links.get(throw_event_name))
+            .ok_or_else(|| {
+                Error::MissingIntermediateCatchEvent(symbol.to_string(), throw_event_name.into())
+            })
     }
 }

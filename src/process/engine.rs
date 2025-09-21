@@ -1,7 +1,7 @@
 mod execute_handler;
 
 use crate::{
-    IntermediateEvent, Process, Symbol,
+    Process, Symbol,
     error::{AT_LEAST_TWO_OUTGOING, Error},
     model::{ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Id, With},
 };
@@ -153,9 +153,9 @@ impl<T> Process<T, Run> {
                         }
                         EventType::IntermediateThrow => {
                             match (name.as_ref(), symbol.as_ref()) {
-                                (Some(name), Some(symbol @ Symbol::Link)) => {
-                                    self.catch_link_lookup(name, symbol, data.process_id)?
-                                }
+                                (Some(name), Some(symbol @ Symbol::Link)) => self
+                                    .diagram
+                                    .find_catch_link(name, symbol, data.process_id)?,
                                 // Follow outputs for other throw events
                                 (Some(_), _) => {
                                     maybe_fork!(self, outputs, data, event_type, name_or_id)
@@ -199,8 +199,9 @@ impl<T> Process<T, Run> {
                                     )
                                 })? {
                                 Some(boundary) => self
-                                    .boundary_lookup(
-                                        bpmn_id,
+                                    .diagram
+                                    .find_boundary(
+                                        id,
                                         boundary.name(),
                                         boundary.symbol(),
                                         data.process_data,
@@ -237,15 +238,14 @@ impl<T> Process<T, Run> {
                                 ..
                             } = self.execute(ExecuteData::new(sp_data, id, data.user_data()))?
                             {
-                                self.boundary_lookup(
-                                    bpmn_id,
-                                    name.as_deref(),
-                                    symbol,
-                                    data.process_data,
-                                )
-                                .ok_or_else(|| {
-                                    Error::MissingBoundary(symbol.to_string(), name_or_id.into())
-                                })?
+                                self.diagram
+                                    .find_boundary(id, name.as_deref(), symbol, data.process_data)
+                                    .ok_or_else(|| {
+                                        Error::MissingBoundary(
+                                            symbol.to_string(),
+                                            name_or_id.into(),
+                                        )
+                                    })?
                             } else {
                                 // Continue from subprocess
                                 maybe_fork!(self, outputs, data, activity_type, name_or_id)
@@ -288,15 +288,14 @@ impl<T> Process<T, Run> {
                                         name_or_id.to_string(),
                                     )
                                 })? {
-                                Some(value) => {
-                                    output_by_name_or_id(value, outputs.ids(), data.process_data)
-                                        .ok_or_else(|| {
-                                            Error::MissingOutput(
-                                                gateway_type.to_string(),
-                                                name_or_id.to_string(),
-                                            )
-                                        })?
-                                }
+                                Some(value) => outputs
+                                    .find_by_name_or_id(value, data.process_data)
+                                    .ok_or_else(|| {
+                                        Error::MissingOutput(
+                                            gateway_type.to_string(),
+                                            name_or_id.to_string(),
+                                        )
+                                    })?,
                                 None => default_path(default, gateway_type, name_or_id)?,
                             }
                         }
@@ -325,15 +324,15 @@ impl<T> Process<T, Run> {
                                     )
                                 })?;
 
-                            output_by_symbol(&value, outputs.ids(), data.process_data).ok_or_else(
-                                || {
+                            outputs
+                                .find_by_intermediate_event(&value, data.process_data)
+                                .ok_or_else(|| {
                                     Error::MissingIntermediateEvent(
                                         gateway_type.to_string(),
                                         name_or_id.to_string(),
                                         value.to_string(),
                                     )
-                                },
-                            )?
+                                })?
                         }
                     }
                 }
@@ -366,9 +365,11 @@ impl<T> Process<T, Run> {
     ) -> Result<Cow<'a, [usize]>, Error> {
         let name_or_id = name.as_deref().unwrap_or(id.bpmn());
         let find_flow = |value| {
-            output_by_name_or_id(value, outputs.ids(), data.process_data).ok_or_else(|| {
-                Error::MissingOutput(gateway_type.to_string(), name_or_id.to_string())
-            })
+            outputs
+                .find_by_name_or_id(value, data.process_data)
+                .ok_or_else(|| {
+                    Error::MissingOutput(gateway_type.to_string(), name_or_id.to_string())
+                })
         };
 
         let value = match func_idx
@@ -398,45 +399,6 @@ impl<T> Process<T, Run> {
         };
         Ok(Cow::Owned(vec![*value]))
     }
-
-    fn boundary_lookup<'a>(
-        &'a self,
-        activity_id: &str,
-        search_name: Option<&str>,
-        search_symbol: &Symbol,
-        process_data: &'a [Bpmn],
-    ) -> Option<&'a usize> {
-        self.diagram
-            .boundaries()
-            .get(activity_id)?
-            .iter()
-            .filter_map(|index| process_data.get(*index))
-            .find_map(|bpmn| match bpmn {
-                Bpmn::Event(Event {
-                    symbol: Some(symbol),
-                    id,
-                    name,
-                    ..
-                }) if symbol == search_symbol && search_name == name.as_deref() => Some(id.local()),
-                _ => None,
-            })
-    }
-
-    // Links in specified process.
-    fn catch_link_lookup(
-        &self,
-        throw_event_name: &str,
-        symbol: &Symbol,
-        process_id: &Id,
-    ) -> Result<&usize, Error> {
-        self.diagram
-            .catch_event_links()
-            .get(process_id.bpmn())
-            .and_then(|links| links.get(throw_event_name))
-            .ok_or_else(|| {
-                Error::MissingIntermediateCatchEvent(symbol.to_string(), throw_event_name.into())
-            })
-    }
 }
 
 fn default_path<'a>(
@@ -448,57 +410,6 @@ fn default_path<'a>(
         .as_ref()
         .map(Id::local)
         .ok_or_else(|| Error::MissingDefault(gateway.to_string(), name_or_id.to_string()))
-}
-
-fn output_by_symbol<'a>(
-    search: &IntermediateEvent,
-    outputs: &'a [usize],
-    process_data: &'a [Bpmn],
-) -> Option<&'a usize> {
-    outputs.iter().find(|index| {
-        process_data
-            .get(**index)
-            .and_then(|bpmn| {
-                if let Bpmn::SequenceFlow { target_ref, .. } = bpmn {
-                    return process_data.get(*target_ref.local());
-                }
-                None
-            })
-            .is_some_and(|bpmn| match bpmn {
-                // We can target both ReceiveTask or Events.
-                Bpmn::Activity {
-                    activity_type: ActivityType::ReceiveTask,
-                    name: Some(name),
-                    ..
-                } => search.1 == Symbol::Message && name.as_str() == search.0,
-                Bpmn::Event(Event {
-                    symbol:
-                        Some(
-                            symbol @ (Symbol::Message
-                            | Symbol::Signal
-                            | Symbol::Timer
-                            | Symbol::Conditional),
-                        ),
-                    name: Some(name),
-                    ..
-                }) => *symbol == search.1 && name.as_str() == search.0,
-                _ => false,
-            })
-    })
-}
-
-fn output_by_name_or_id<'a>(
-    search: impl AsRef<str>,
-    outputs: &'a [usize],
-    process_data: &'a [Bpmn],
-) -> Option<&'a usize> {
-    outputs.iter().find(|index| {
-        if let Some(Bpmn::SequenceFlow { id, name, .. }) = process_data.get(**index) {
-            return name.as_deref().is_some_and(|name| name == search.as_ref())
-                || id.bpmn() == search.as_ref();
-        }
-        false
-    })
 }
 
 pub(super) type ExecuteResult<'a> = Result<&'a Event, Error>;

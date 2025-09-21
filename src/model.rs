@@ -550,6 +550,57 @@ impl Outputs {
             }
         }
     }
+
+    pub(crate) fn find_by_name_or_id(
+        &self,
+        value: impl AsRef<str>,
+        process_data: &[Bpmn],
+    ) -> Option<&usize> {
+        self.ids().iter().find(|index| {
+            if let Some(Bpmn::SequenceFlow { id, name, .. }) = process_data.get(**index) {
+                return name.as_deref().is_some_and(|name| name == value.as_ref())
+                    || id.bpmn() == value.as_ref();
+            }
+            false
+        })
+    }
+
+    pub(crate) fn find_by_intermediate_event(
+        &self,
+        search: &IntermediateEvent,
+        process_data: &[Bpmn],
+    ) -> Option<&usize> {
+        self.ids().iter().find(|index| {
+            process_data
+                .get(**index)
+                .and_then(|bpmn| {
+                    if let Bpmn::SequenceFlow { target_ref, .. } = bpmn {
+                        return process_data.get(*target_ref.local());
+                    }
+                    None
+                })
+                .is_some_and(|bpmn| match bpmn {
+                    // We can target both ReceiveTask or Events.
+                    Bpmn::Activity {
+                        activity_type: ActivityType::ReceiveTask,
+                        name: Some(name),
+                        ..
+                    } => search.1 == Symbol::Message && name.as_str() == search.0,
+                    Bpmn::Event(Event {
+                        symbol:
+                            Some(
+                                symbol @ (Symbol::Message
+                                | Symbol::Signal
+                                | Symbol::Timer
+                                | Symbol::Conditional),
+                            ),
+                        name: Some(name),
+                        ..
+                    }) => symbol == &search.1 && name.as_str() == search.0,
+                    _ => false,
+                })
+        })
+    }
 }
 
 #[derive(Debug)]

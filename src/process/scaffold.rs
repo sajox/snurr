@@ -28,7 +28,7 @@ impl<T> Process<T> {
                     ..
                 } = bpmn
                 {
-                    let symbols = if let Some(boundaries) = self.diagram.boundaries().get(id.bpmn())
+                    let symbols = if let Some(boundaries) = self.diagram.activity_boundaries(id)
                     {
                         boundaries
                             .iter()
