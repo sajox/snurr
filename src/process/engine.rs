@@ -172,13 +172,13 @@ impl<T> Process<T, Run> {
                 }
                 Bpmn::Activity {
                     activity_type,
-                    id: id @ Id { bpmn_id, local_id },
+                    id,
                     func_idx,
                     name,
                     outputs,
                     ..
                 } => {
-                    let name_or_id = name.as_ref().unwrap_or(bpmn_id);
+                    let name_or_id = name.as_deref().unwrap_or(id.bpmn());
                     info!("{activity_type}: {name_or_id}");
                     match activity_type {
                         ActivityType::Task
@@ -218,8 +218,8 @@ impl<T> Process<T, Run> {
                         ActivityType::SubProcess => {
                             let sp_data = self
                                 .diagram
-                                .get_process(*local_id)
-                                .ok_or_else(|| Error::MissingProcessData(bpmn_id.into()))?;
+                                .get_process(*id.local())
+                                .ok_or_else(|| Error::MissingProcessData(id.bpmn().into()))?;
 
                             if let Event {
                                 event_type: EventType::End,

@@ -605,8 +605,8 @@ impl Outputs {
 
 #[derive(Debug)]
 pub(crate) struct Id {
-    pub(crate) bpmn_id: String,
-    pub(crate) local_id: usize,
+    bpmn_id: String,
+    local_id: usize,
 }
 
 impl Display for Id {
@@ -622,6 +622,12 @@ impl Id {
 
     pub(crate) fn local(&self) -> &usize {
         &self.local_id
+    }
+
+    pub(crate) fn update_local_id(&mut self, map: &HashMap<String, usize>) {
+        if let Some(index) = map.get(&self.bpmn_id) {
+            self.local_id = *index;
+        }
     }
 }
 

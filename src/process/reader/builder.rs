@@ -131,7 +131,7 @@ impl DataBuilder {
             }) => {
                 outputs.update_local_ids(&bpmn_index);
                 if let Some(attached_to_ref) = attached_to_ref {
-                    update_local_id(attached_to_ref, &bpmn_index);
+                    attached_to_ref.update_local_id(&bpmn_index);
 
                     // Collect boundary to activity id
                     self.boundaries
@@ -155,10 +155,10 @@ impl DataBuilder {
             }) => {
                 outputs.update_local_ids(&bpmn_index);
                 if let Some(default) = default {
-                    update_local_id(default, &bpmn_index);
+                    default.update_local_id(&bpmn_index)
                 }
             }
-            Bpmn::SequenceFlow { target_ref, .. } => update_local_id(target_ref, &bpmn_index),
+            Bpmn::SequenceFlow { target_ref, .. } => target_ref.update_local_id(&bpmn_index),
             _ => {}
         });
     }
@@ -167,12 +167,6 @@ impl DataBuilder {
 impl From<DataBuilder> for Diagram {
     fn from(builder: DataBuilder) -> Self {
         Diagram::new(builder.data, builder.boundaries, builder.catch_event_links)
-    }
-}
-
-fn update_local_id(Id { bpmn_id, local_id }: &mut Id, map: &HashMap<String, usize>) {
-    if let Some(index) = map.get(bpmn_id) {
-        *local_id = *index;
     }
 }
 
