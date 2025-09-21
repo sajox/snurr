@@ -556,7 +556,7 @@ impl Outputs {
         value: impl AsRef<str>,
         process_data: &[Bpmn],
     ) -> Option<&usize> {
-        self.ids().iter().find(|index| {
+        self.local_ids.iter().find(|index| {
             if let Some(Bpmn::SequenceFlow { id, name, .. }) = process_data.get(**index) {
                 return name.as_deref().is_some_and(|name| name == value.as_ref())
                     || id.bpmn() == value.as_ref();
@@ -570,7 +570,7 @@ impl Outputs {
         search: &IntermediateEvent,
         process_data: &[Bpmn],
     ) -> Option<&usize> {
-        self.ids().iter().find(|index| {
+        self.local_ids.iter().find(|index| {
             process_data
                 .get(**index)
                 .and_then(|bpmn| {
