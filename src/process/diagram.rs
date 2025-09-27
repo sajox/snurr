@@ -2,6 +2,7 @@ use super::handler::HandlerMap;
 use crate::{
     Error, Symbol,
     model::{ActivityType, Bpmn, Event, Gateway, GatewayType, Id},
+    process::handler::HandlerType,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -64,7 +65,7 @@ impl Diagram {
                     ..
                 } => {
                     let name_or_id = name.as_deref().unwrap_or(id.bpmn());
-                    if let Some(id) = handler_map.task().get(name_or_id) {
+                    if let Some(id) = handler_map.get(HandlerType::Task, name_or_id) {
                         func_idx.replace(*id);
                     } else {
                         missing.insert(format!("{activity_type}: {name_or_id}"));
@@ -81,15 +82,15 @@ impl Diagram {
                     outputs,
                     ..
                 }) if outputs.len() > 1 => {
-                    let map = match gateway_type {
-                        GatewayType::Exclusive => handler_map.exclusive(),
-                        GatewayType::Inclusive => handler_map.inclusive(),
-                        GatewayType::EventBased => handler_map.event_based(),
+                    let handler_type = match gateway_type {
+                        GatewayType::Exclusive => HandlerType::Exclusive,
+                        GatewayType::Inclusive => HandlerType::Inclusive,
+                        GatewayType::EventBased => HandlerType::EventBased,
                         _ => continue,
                     };
 
                     let name_or_id = name.as_deref().unwrap_or(id.bpmn());
-                    if let Some(id) = map.get(name_or_id) {
+                    if let Some(id) = handler_map.get(handler_type, name_or_id) {
                         func_idx.replace(*id);
                     } else {
                         missing.insert(format!("{gateway_type}: {name_or_id}"));

@@ -4,6 +4,7 @@ use crate::{
     Process, Symbol,
     error::{AT_LEAST_TWO_OUTGOING, Error},
     model::{ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Id, With},
+    process::handler::CallbackResult,
 };
 use execute_handler::ExecuteHandler;
 use log::{info, warn};
@@ -191,7 +192,10 @@ impl<T> Process<T, Run> {
                         | ActivityType::ManualTask
                         | ActivityType::BusinessRuleTask => {
                             match func_idx
-                                .and_then(|index| self.handler.run_task(index, data.user_data()))
+                                .map(|index| match self.handler.run(index, data.user_data()) {
+                                    Some(CallbackResult::Task(result)) => result,
+                                    _ => None,
+                                })
                                 .ok_or_else(|| {
                                     Error::MissingImplementation(
                                         activity_type.to_string(),
@@ -279,8 +283,9 @@ impl<T> Process<T, Run> {
                         GatewayType::Exclusive if outputs.len() == 1 => outputs.first().unwrap(),
                         GatewayType::Exclusive => {
                             match func_idx
-                                .and_then(|index| {
-                                    self.handler.run_exclusive(index, data.user_data())
+                                .map(|index| match self.handler.run(index, data.user_data()) {
+                                    Some(CallbackResult::Exclusive(result)) => result,
+                                    _ => None,
                                 })
                                 .ok_or_else(|| {
                                     Error::MissingImplementation(
@@ -314,8 +319,9 @@ impl<T> Process<T, Run> {
                         }
                         GatewayType::EventBased => {
                             let value = func_idx
-                                .and_then(|index| {
-                                    self.handler.run_event_based(index, data.user_data())
+                                .and_then(|index| match self.handler.run(index, data.user_data()) {
+                                    Some(CallbackResult::EventBased(result)) => Some(result),
+                                    _ => None,
                                 })
                                 .ok_or_else(|| {
                                     Error::MissingImplementation(
@@ -373,7 +379,10 @@ impl<T> Process<T, Run> {
         };
 
         let value = match func_idx
-            .and_then(|index| self.handler.run_inclusive(index, data.user_data()))
+            .and_then(|index| match self.handler.run(index, data.user_data()) {
+                Some(CallbackResult::Inclusive(result)) => Some(result),
+                _ => None,
+            })
             .ok_or_else(|| {
                 Error::MissingImplementation(gateway_type.to_string(), name_or_id.to_string())
             })? {

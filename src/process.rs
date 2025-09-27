@@ -4,7 +4,7 @@ pub mod handler;
 mod reader;
 mod scaffold;
 
-use crate::{IntermediateEvent, With, error::Error, model::Bpmn};
+use crate::{IntermediateEvent, With, error::Error, model::Bpmn, process::handler::Callback};
 use diagram::Diagram;
 use engine::ExecuteData;
 use handler::{Data, Handler, TaskResult};
@@ -54,7 +54,8 @@ impl<T> Process<T> {
     where
         F: Fn(Data<T>) -> TaskResult + 'static + Sync + Send,
     {
-        self.handler.add_task(name, func);
+        self.handler
+            .add_callback(name, Callback::Task(Box::new(func)));
         self
     }
 
@@ -63,7 +64,8 @@ impl<T> Process<T> {
     where
         F: Fn(Data<T>) -> Option<&'static str> + 'static + Sync + Send,
     {
-        self.handler.add_exclusive(name, func);
+        self.handler
+            .add_callback(name, Callback::Exclusive(Box::new(func)));
         self
     }
 
@@ -72,7 +74,8 @@ impl<T> Process<T> {
     where
         F: Fn(Data<T>) -> With + 'static + Sync + Send,
     {
-        self.handler.add_inclusive(name, func);
+        self.handler
+            .add_callback(name, Callback::Inclusive(Box::new(func)));
         self
     }
 
@@ -81,7 +84,8 @@ impl<T> Process<T> {
     where
         F: Fn(Data<T>) -> IntermediateEvent + 'static + Sync + Send,
     {
-        self.handler.add_event_based(name, func);
+        self.handler
+            .add_callback(name, Callback::EventBased(Box::new(func)));
         self
     }
 
