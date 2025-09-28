@@ -4,7 +4,7 @@ use crate::{
     Process, Symbol,
     error::{AT_LEAST_TWO_OUTGOING, Error},
     model::{ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Id, With},
-    process::handler::CallbackResult,
+    process::{handler::CallbackResult, reader::ProcessData},
 };
 use execute_handler::ExecuteHandler;
 use log::{info, warn};
@@ -32,12 +32,13 @@ macro_rules! maybe_fork {
 }
 
 impl<T> Process<T, Run> {
-    pub(super) fn execute<'a>(&'a self, data: ExecuteData<'a, T>) -> ExecuteResult<'a>
+    pub(super) fn execute<'a>(&'a self, input: ExecuteInput<'a, T>) -> ExecuteResult<'a>
     where
         T: Send,
     {
         let mut end_event = None;
-        let mut handler = ExecuteHandler::new(Cow::from(&[0]));
+        let start = [input.process.start().ok_or(Error::MissingStartEvent)?];
+        let mut handler = ExecuteHandler::new(Cow::from(&start));
         loop {
             let all_tokens = handler.take();
             if all_tokens.is_empty() {
@@ -53,7 +54,7 @@ impl<T> Process<T, Run> {
                         .map(|tokens| {
                             tokens
                                 .par_iter()
-                                .map(|token| self.flow(token, &data))
+                                .map(|token| self.flow(token, &input))
                                 .collect()
                         })
                         .collect::<Vec<_>>();
@@ -62,7 +63,7 @@ impl<T> Process<T, Run> {
                 #[cfg(not(feature = "parallel"))]
                 all_tokens
                     .iter()
-                    .map(|tokens| tokens.iter().map(|token| self.flow(token, &data)))
+                    .map(|tokens| tokens.iter().map(|token| self.flow(token, &input)))
             };
 
             for inner_iter in result_iter.rev() {
@@ -110,7 +111,7 @@ impl<T> Process<T, Run> {
                         }
                         // Handle Fork, the user code determine next token(s) to run.
                         GatewayType::Inclusive => {
-                            handler.pending(self.handle_inclusive_gateway(&data, gateway)?);
+                            handler.pending(self.handle_inclusive_gateway(&input, gateway)?);
                         }
                         _ => {}
                     }
@@ -125,14 +126,14 @@ impl<T> Process<T, Run> {
     fn flow<'a: 'b, 'b>(
         &'a self,
         mut current_id: &'b usize,
-        data: &ExecuteData<'a, T>,
+        input: &ExecuteInput<'a, T>,
     ) -> Result<Return<'a>, Error>
     where
         T: Send,
     {
         loop {
-            current_id = match data
-                .process_data
+            current_id = match input
+                .process
                 .get(*current_id)
                 .ok_or_else(|| Error::MisssingBpmnData(current_id.to_string()))?
             {
@@ -156,7 +157,7 @@ impl<T> Process<T, Run> {
                             match (name.as_ref(), symbol.as_ref()) {
                                 (Some(name), Some(symbol @ Symbol::Link)) => self
                                     .diagram
-                                    .find_catch_link(name, symbol, data.process_id)?,
+                                    .find_catch_link(name, symbol, input.process_id)?,
                                 // Follow outputs for other throw events
                                 (Some(_), _) => {
                                     maybe_fork!(self, outputs, data, event_type, name_or_id)
@@ -192,7 +193,7 @@ impl<T> Process<T, Run> {
                         | ActivityType::ManualTask
                         | ActivityType::BusinessRuleTask => {
                             match func_idx
-                                .map(|index| match self.handler.run(index, data.user_data()) {
+                                .map(|index| match self.handler.run(index, input.user_data()) {
                                     Some(CallbackResult::Task(result)) => result,
                                     _ => None,
                                 })
@@ -208,7 +209,7 @@ impl<T> Process<T, Run> {
                                         id,
                                         boundary.name(),
                                         boundary.symbol(),
-                                        data.process_data,
+                                        input.process.data(),
                                     )
                                     .ok_or_else(|| {
                                         Error::MissingBoundary(
@@ -240,10 +241,16 @@ impl<T> Process<T, Run> {
                                     ),
                                 name,
                                 ..
-                            } = self.execute(ExecuteData::new(sp_data, id, data.user_data()))?
+                            } =
+                                self.execute(ExecuteInput::new(sp_data, id, input.user_data()))?
                             {
                                 self.diagram
-                                    .find_boundary(id, name.as_deref(), symbol, data.process_data)
+                                    .find_boundary(
+                                        id,
+                                        name.as_deref(),
+                                        symbol,
+                                        input.process.data(),
+                                    )
                                     .ok_or_else(|| {
                                         Error::MissingBoundary(
                                             symbol.to_string(),
@@ -283,7 +290,7 @@ impl<T> Process<T, Run> {
                         GatewayType::Exclusive if outputs.len() == 1 => outputs.first().unwrap(),
                         GatewayType::Exclusive => {
                             match func_idx
-                                .map(|index| match self.handler.run(index, data.user_data()) {
+                                .map(|index| match self.handler.run(index, input.user_data()) {
                                     Some(CallbackResult::Exclusive(result)) => result,
                                     _ => None,
                                 })
@@ -294,7 +301,7 @@ impl<T> Process<T, Run> {
                                     )
                                 })? {
                                 Some(value) => outputs
-                                    .find_by_name_or_id(value, data.process_data)
+                                    .find_by_name_or_id(value, input.process.data())
                                     .ok_or_else(|| {
                                         Error::MissingOutput(
                                             gateway_type.to_string(),
@@ -312,16 +319,20 @@ impl<T> Process<T, Run> {
                             return Ok(Return::Fork(Cow::Borrowed(outputs.ids())));
                         }
                         GatewayType::Inclusive => {
-                            return Ok(Return::Fork(self.handle_inclusive_gateway(data, gateway)?));
+                            return Ok(Return::Fork(
+                                self.handle_inclusive_gateway(input, gateway)?,
+                            ));
                         }
                         GatewayType::EventBased if outputs.len() == 1 => {
                             return Err(Error::BpmnRequirement(AT_LEAST_TWO_OUTGOING.into()));
                         }
                         GatewayType::EventBased => {
                             let value = func_idx
-                                .and_then(|index| match self.handler.run(index, data.user_data()) {
-                                    Some(CallbackResult::EventBased(result)) => Some(result),
-                                    _ => None,
+                                .and_then(|index| {
+                                    match self.handler.run(index, input.user_data()) {
+                                        Some(CallbackResult::EventBased(result)) => Some(result),
+                                        _ => None,
+                                    }
                                 })
                                 .ok_or_else(|| {
                                     Error::MissingImplementation(
@@ -331,7 +342,7 @@ impl<T> Process<T, Run> {
                                 })?;
 
                             outputs
-                                .find_by_intermediate_event(&value, data.process_data)
+                                .find_by_intermediate_event(&value, input.process.data())
                                 .ok_or_else(|| {
                                     Error::MissingIntermediateEvent(
                                         gateway_type.to_string(),
@@ -358,7 +369,7 @@ impl<T> Process<T, Run> {
 
     fn handle_inclusive_gateway<'a>(
         &'a self,
-        data: &ExecuteData<'a, T>,
+        input: &ExecuteInput<'a, T>,
         Gateway {
             gateway_type,
             id,
@@ -372,14 +383,14 @@ impl<T> Process<T, Run> {
         let name_or_id = name.as_deref().unwrap_or(id.bpmn());
         let find_flow = |value| {
             outputs
-                .find_by_name_or_id(value, data.process_data)
+                .find_by_name_or_id(value, input.process.data())
                 .ok_or_else(|| {
                     Error::MissingOutput(gateway_type.to_string(), name_or_id.to_string())
                 })
         };
 
         let value = match func_idx
-            .and_then(|index| match self.handler.run(index, data.user_data()) {
+            .and_then(|index| match self.handler.run(index, input.user_data()) {
                 Some(CallbackResult::Inclusive(result)) => Some(result),
                 _ => None,
             })
@@ -424,16 +435,16 @@ fn default_path<'a>(
 pub(super) type ExecuteResult<'a> = Result<&'a Event, Error>;
 
 // Data for the execution engine.
-pub(super) struct ExecuteData<'a, T> {
-    process_data: &'a Vec<Bpmn>,
+pub(super) struct ExecuteInput<'a, T> {
+    process: &'a ProcessData,
     process_id: &'a Id,
     user_data: Data<T>,
 }
 
-impl<'a, T> ExecuteData<'a, T> {
-    pub(super) fn new(process_data: &'a Vec<Bpmn>, process_id: &'a Id, user_data: Data<T>) -> Self {
+impl<'a, T> ExecuteInput<'a, T> {
+    pub(super) fn new(process: &'a ProcessData, process_id: &'a Id, user_data: Data<T>) -> Self {
         Self {
-            process_data,
+            process,
             process_id,
             user_data,
         }

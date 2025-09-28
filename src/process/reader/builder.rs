@@ -1,12 +1,64 @@
-use std::collections::HashMap;
-
 use crate::{
     error::Error,
     model::{Event, Gateway, *},
     process::Diagram,
 };
+use std::collections::HashMap;
 
 const BUILD_PROCESS_ERROR_MSG: &str = "couldn't build process";
+
+#[derive(Default, Debug)]
+pub struct ProcessData {
+    // Start event in the process
+    start: Option<usize>,
+    data: Vec<Bpmn>,
+}
+
+impl ProcessData {
+    fn add(&mut self, mut bpmn: Bpmn) -> Result<(), Error> {
+        let len = self.data.len();
+        if let Bpmn::Event(Event {
+            event_type: EventType::Start,
+            symbol: None,
+            ..
+        }) = bpmn
+            && self.start.replace(len).is_some()
+        {
+            return Err(Error::BpmnRequirement(
+                "Multiple start events with no symbol".into(),
+            ));
+        }
+
+        bpmn.set_local_id(len);
+        self.data.push(bpmn);
+        Ok(())
+    }
+
+    // If it's a process or subprocess, we just insert it. Already correct ID.
+    fn add_process(&mut self, bpmn: Bpmn) {
+        self.data.push(bpmn);
+    }
+
+    pub fn data_mut(&mut self) -> &mut [Bpmn] {
+        &mut self.data
+    }
+
+    pub fn data(&self) -> &[Bpmn] {
+        &self.data
+    }
+
+    pub fn get(&self, index: usize) -> Option<&Bpmn> {
+        self.data.get(index)
+    }
+
+    pub fn start(&self) -> Option<usize> {
+        self.start
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Bpmn> {
+        self.data.iter()
+    }
+}
 
 //
 // data: [
@@ -28,10 +80,10 @@ const BUILD_PROCESS_ERROR_MSG: &str = "couldn't build process";
 
 #[derive(Default)]
 pub(super) struct DataBuilder {
-    data: Vec<Vec<Bpmn>>,
+    data: Vec<ProcessData>,
     boundaries: HashMap<String, Vec<usize>>,
     catch_event_links: HashMap<String, HashMap<String, usize>>,
-    process_stack: Vec<Vec<Bpmn>>,
+    process_stack: Vec<ProcessData>,
     stack: Vec<Bpmn>,
 }
 
@@ -45,11 +97,11 @@ impl DataBuilder {
         self.add(bpmn);
     }
 
-    pub(super) fn add_to_process(&mut self, mut bpmn: Bpmn) {
-        if let Some(current) = self.process_stack.last_mut() {
-            bpmn.set_local_id(current.len());
-            current.push(bpmn);
+    pub(super) fn add_to_process(&mut self, bpmn: Bpmn) -> Result<(), Error> {
+        if let Some(process_data) = self.process_stack.last_mut() {
+            process_data.add(bpmn)?;
         }
+        Ok(())
     }
 
     pub(super) fn update_symbol(&mut self, bpmn_type: &[u8]) {
@@ -82,40 +134,36 @@ impl DataBuilder {
     pub(super) fn end(&mut self) -> Result<(), Error> {
         if let Some(bpmn) = self.stack.pop() {
             check_unsupported(&bpmn)?;
-            self.add_to_process(bpmn);
+            self.add_to_process(bpmn)?;
         }
         Ok(())
     }
 
     pub(super) fn end_process(&mut self) -> Result<(), Error> {
-        let Some((mut bpmn, mut data)) = self.stack.pop().zip(self.process_stack.pop()) else {
+        let Some((mut bpmn, mut process_data)) = self.stack.pop().zip(self.process_stack.pop())
+        else {
             return Err(Error::Builder(BUILD_PROCESS_ERROR_MSG.into()));
         };
 
-        // Definitions only contain processes. Skip it.
-        if !self.process_stack.is_empty() {
-            find_and_swap_startevent(&mut data)?;
-        }
-
         // Process or sub process use local id to point to data index. Do NOT overwrite.
         bpmn.set_local_id(self.data.len());
-        self.update_data(bpmn.id()?, &mut data);
+        self.update_data(bpmn.id()?, process_data.data_mut());
         // Definitions collect all Processes
         // Processes collect all related sub processes
-        if let Some(parent_data) = self.process_stack.last_mut() {
-            parent_data.push(bpmn)
+        if let Some(parent_process_data) = self.process_stack.last_mut() {
+            parent_process_data.add_process(bpmn);
         }
-        self.data.push(data);
+        self.data.push(process_data);
         Ok(())
     }
 
     // Post process to fill local ids to some bpmn objects.
-    fn update_data(&mut self, process_id: &str, data: &mut [Bpmn]) {
+    fn update_data(&mut self, process_id: &Id, data: &mut [Bpmn]) {
         // Collect Bpmn id to index in array
         let bpmn_index: HashMap<String, usize> = data
             .iter()
             .enumerate()
-            .filter_map(|(index, bpmn)| bpmn.id().ok().map(|id| (id.to_string(), index)))
+            .filter_map(|(index, bpmn)| bpmn.id().ok().map(Id::bpmn).map(|id| (id.into(), index)))
             .collect();
 
         data.iter_mut().for_each(|bpmn| match bpmn {
@@ -145,7 +193,7 @@ impl DataBuilder {
                     && EventType::IntermediateCatch == *event_type
                 {
                     self.catch_event_links
-                        .entry(process_id.to_string())
+                        .entry(process_id.bpmn().into())
                         .or_default()
                         .insert(name.clone(), *id.local());
                 }
@@ -180,38 +228,4 @@ fn check_unsupported(bpmn: &Bpmn) -> Result<(), Error> {
         )),
         _ => return Ok(()),
     })
-}
-
-fn find_and_swap_startevent(data: &mut [Bpmn]) -> Result<(), Error> {
-    let index = data
-        .iter()
-        .position(|bpmn| {
-            matches!(
-                bpmn,
-                Bpmn::Event(Event {
-                    event_type: EventType::Start,
-                    symbol: None,
-                    ..
-                })
-            )
-        })
-        .ok_or(Error::MissingStartEvent)?;
-
-    if index > 0 {
-        data.swap(0, index);
-        data[0].set_local_id(0);
-
-        // Sub process use local id to point to data. Do NOT overwrite.
-        let bpmn = &mut data[index];
-        if !matches!(
-            bpmn,
-            Bpmn::Activity {
-                activity_type: ActivityType::SubProcess,
-                ..
-            }
-        ) {
-            bpmn.set_local_id(index);
-        }
-    }
-    Ok(())
 }

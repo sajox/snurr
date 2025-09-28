@@ -380,14 +380,14 @@ pub(crate) enum Bpmn {
 }
 
 impl Bpmn {
-    pub(crate) fn id(&self) -> Result<&str, Error> {
+    pub(crate) fn id(&self) -> Result<&Id, Error> {
         match self {
             Bpmn::Event(Event { id, .. })
             | Bpmn::SequenceFlow { id, .. }
             | Bpmn::Activity { id, .. }
             | Bpmn::Definitions { id, .. }
             | Bpmn::Gateway(Gateway { id, .. })
-            | Bpmn::Process { id, .. } => Ok(id.bpmn()),
+            | Bpmn::Process { id, .. } => Ok(id),
             Bpmn::Direction { direction_type, .. } => {
                 Err(Error::MissingId(direction_type.to_string()))
             }

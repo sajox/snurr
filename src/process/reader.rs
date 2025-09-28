@@ -1,5 +1,7 @@
 mod builder;
 
+pub(crate) use builder::ProcessData;
+
 use super::Diagram;
 use crate::error::Error;
 use crate::model::*;
@@ -63,8 +65,10 @@ pub(super) fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, Er
                         builder.update_symbol(bpmn_type);
                     }
                     bpmn_type @ SEQUENCE_FLOW => {
-                        builder
-                            .add_to_process(Bpmn::try_from((bpmn_type, collect_attributes(&bs)))?);
+                        builder.add_to_process(Bpmn::try_from((
+                            bpmn_type,
+                            collect_attributes(&bs),
+                        ))?)?;
                     }
                     _ => {}
                 }

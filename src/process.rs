@@ -6,7 +6,7 @@ mod scaffold;
 
 use crate::{IntermediateEvent, With, error::Error, model::Bpmn, process::handler::Callback};
 use diagram::Diagram;
-use engine::ExecuteData;
+use engine::ExecuteInput;
 use handler::{Data, Handler, TaskResult};
 use std::{
     marker::PhantomData,
@@ -175,7 +175,7 @@ impl<T> Process<T, Run> {
         // Run every process specified in the diagram
         for bpmn in self
             .diagram
-            .get_processes()
+            .get_definition()
             .ok_or(Error::MissingDefinitionsId)?
             .iter()
         {
@@ -184,7 +184,7 @@ impl<T> Process<T, Run> {
                     .diagram
                     .get_process(*id.local())
                     .ok_or_else(|| Error::MissingProcessData(id.bpmn().into()))?;
-                self.execute(ExecuteData::new(process_data, id, Arc::clone(&data)))?;
+                self.execute(ExecuteInput::new(process_data, id, Arc::clone(&data)))?;
             }
         }
 

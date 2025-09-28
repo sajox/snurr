@@ -20,44 +20,50 @@ impl<T> Process<T> {
     /// ```
     pub fn scaffold(&self, path: impl AsRef<Path>) -> Result<(), Error> {
         let mut scaffold = Scaffold::default();
-        self.diagram.data().iter().for_each(|process: &Vec<Bpmn>| {
+        self.diagram.data().iter().for_each(|process| {
             process.iter().for_each(|bpmn| {
-                if let Bpmn::Activity {
-                    activity_type: ActivityType::Task,
-                    id,
-                    ..
-                } = bpmn
-                {
-                    let symbols = if let Some(boundaries) = self.diagram.activity_boundaries(id)
+                    if let Bpmn::Activity {
+                        activity_type: ActivityType::Task,
+                        id,
+                        ..
+                    } = bpmn
                     {
-                        boundaries
-                            .iter()
-                            .filter_map(|index| process.get(*index))
-                            .filter_map(|bpmn| {
-                                if let Bpmn::Event(Event {
-                                    symbol: Some(symbol),
-                                    name,
-                                    ..
-                                }) = bpmn
-                                {
-                                    Some((name, symbol))
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect()
-                    } else {
-                        Vec::new()
-                    };
-                    scaffold.add_task(bpmn, symbols);
-                }
+                        let symbols = if let Some(boundaries) = self.diagram.activity_boundaries(id)
+                        {
+                            boundaries
+                                .iter()
+                                .filter_map(|index| process.get(*index))
+                                .filter_map(|bpmn| {
+                                    if let Bpmn::Event(Event {
+                                        symbol: Some(symbol),
+                                        name,
+                                        ..
+                                    }) = bpmn
+                                    {
+                                        Some((name, symbol))
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect()
+                        } else {
+                            Vec::new()
+                        };
+                        scaffold.add_task(bpmn, symbols);
+                    }
 
-                if let Bpmn::Gateway(gateway @ Gateway {
-                    gateway_type:
-                        GatewayType::Exclusive | GatewayType::Inclusive | GatewayType::EventBased,
-                    outputs,
-                    ..
-                }) = bpmn && outputs.len() > 1 {
+                    if let Bpmn::Gateway(
+                        gateway @ Gateway {
+                            gateway_type:
+                                GatewayType::Exclusive
+                                | GatewayType::Inclusive
+                                | GatewayType::EventBased,
+                            outputs,
+                            ..
+                        },
+                    ) = bpmn
+                        && outputs.len() > 1
+                    {
                         let names = outputs
                             .ids()
                             .iter()
@@ -71,7 +77,7 @@ impl<T> Process<T> {
                             .collect();
                         scaffold.add_gateway(gateway, names);
                     }
-            });
+                });
         });
         scaffold.create(path)
     }

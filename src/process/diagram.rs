@@ -2,20 +2,20 @@ use super::handler::HandlerMap;
 use crate::{
     Error, Symbol,
     model::{ActivityType, Bpmn, Event, Gateway, GatewayType, Id},
-    process::handler::HandlerType,
+    process::{handler::HandlerType, reader::ProcessData},
 };
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
 pub(super) struct Diagram {
-    data: Vec<Vec<Bpmn>>,
+    data: Vec<ProcessData>,
     boundaries: HashMap<String, Vec<usize>>,
     catch_event_links: HashMap<String, HashMap<String, usize>>,
 }
 
 impl Diagram {
     pub(super) fn new(
-        data: Vec<Vec<Bpmn>>,
+        data: Vec<ProcessData>,
         boundaries: HashMap<String, Vec<usize>>,
         catch_event_links: HashMap<String, HashMap<String, usize>>,
     ) -> Self {
@@ -27,16 +27,16 @@ impl Diagram {
     }
     // All top level processes defined in Definitions.
     // Always last in the Vec as it is a top level construct in the XML.
-    pub(super) fn get_processes(&self) -> Option<&Vec<Bpmn>> {
+    pub(super) fn get_definition(&self) -> Option<&ProcessData> {
         self.data.last()
     }
 
     // Can be a process or sub process
-    pub(super) fn get_process(&self, process_id: usize) -> Option<&Vec<Bpmn>> {
+    pub(super) fn get_process(&self, process_id: usize) -> Option<&ProcessData> {
         self.data.get(process_id)
     }
 
-    pub(super) fn data(&self) -> &[Vec<Bpmn>] {
+    pub(super) fn data(&self) -> &[ProcessData] {
         self.data.as_slice()
     }
 
@@ -46,57 +46,59 @@ impl Diagram {
 
     pub(super) fn install_and_check(&mut self, handler_map: HandlerMap) -> HashSet<String> {
         let mut missing = HashSet::new();
-        for bpmn in self.data.iter_mut().flatten() {
-            match bpmn {
-                Bpmn::Activity {
-                    id,
-                    name,
-                    func_idx,
-                    activity_type:
-                        activity_type @ (ActivityType::Task
-                        | ActivityType::ScriptTask
-                        | ActivityType::UserTask
-                        | ActivityType::ServiceTask
-                        | ActivityType::CallActivity
-                        | ActivityType::ReceiveTask
-                        | ActivityType::SendTask
-                        | ActivityType::ManualTask
-                        | ActivityType::BusinessRuleTask),
-                    ..
-                } => {
-                    let name_or_id = name.as_deref().unwrap_or(id.bpmn());
-                    if let Some(id) = handler_map.get(HandlerType::Task, name_or_id) {
-                        func_idx.replace(*id);
-                    } else {
-                        missing.insert(format!("{activity_type}: {name_or_id}"));
+        for outer in self.data.iter_mut() {
+            for bpmn in outer.data_mut() {
+                match bpmn {
+                    Bpmn::Activity {
+                        id,
+                        name,
+                        func_idx,
+                        activity_type:
+                            activity_type @ (ActivityType::Task
+                            | ActivityType::ScriptTask
+                            | ActivityType::UserTask
+                            | ActivityType::ServiceTask
+                            | ActivityType::CallActivity
+                            | ActivityType::ReceiveTask
+                            | ActivityType::SendTask
+                            | ActivityType::ManualTask
+                            | ActivityType::BusinessRuleTask),
+                        ..
+                    } => {
+                        let name_or_id = name.as_deref().unwrap_or(id.bpmn());
+                        if let Some(id) = handler_map.get(HandlerType::Task, name_or_id) {
+                            func_idx.replace(*id);
+                        } else {
+                            missing.insert(format!("{activity_type}: {name_or_id}"));
+                        }
                     }
-                }
-                Bpmn::Gateway(Gateway {
-                    gateway_type:
-                        gateway_type @ (GatewayType::EventBased
-                        | GatewayType::Exclusive
-                        | GatewayType::Inclusive),
-                    name,
-                    id,
-                    func_idx,
-                    outputs,
-                    ..
-                }) if outputs.len() > 1 => {
-                    let handler_type = match gateway_type {
-                        GatewayType::Exclusive => HandlerType::Exclusive,
-                        GatewayType::Inclusive => HandlerType::Inclusive,
-                        GatewayType::EventBased => HandlerType::EventBased,
-                        _ => continue,
-                    };
+                    Bpmn::Gateway(Gateway {
+                        gateway_type:
+                            gateway_type @ (GatewayType::EventBased
+                            | GatewayType::Exclusive
+                            | GatewayType::Inclusive),
+                        name,
+                        id,
+                        func_idx,
+                        outputs,
+                        ..
+                    }) if outputs.len() > 1 => {
+                        let handler_type = match gateway_type {
+                            GatewayType::Exclusive => HandlerType::Exclusive,
+                            GatewayType::Inclusive => HandlerType::Inclusive,
+                            GatewayType::EventBased => HandlerType::EventBased,
+                            _ => continue,
+                        };
 
-                    let name_or_id = name.as_deref().unwrap_or(id.bpmn());
-                    if let Some(id) = handler_map.get(handler_type, name_or_id) {
-                        func_idx.replace(*id);
-                    } else {
-                        missing.insert(format!("{gateway_type}: {name_or_id}"));
+                        let name_or_id = name.as_deref().unwrap_or(id.bpmn());
+                        if let Some(id) = handler_map.get(handler_type, name_or_id) {
+                            func_idx.replace(*id);
+                        } else {
+                            missing.insert(format!("{gateway_type}: {name_or_id}"));
+                        }
                     }
+                    _ => {}
                 }
-                _ => {}
             }
         }
         missing
