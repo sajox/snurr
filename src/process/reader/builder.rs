@@ -12,6 +12,8 @@ pub struct ProcessData {
     // Start event in the process
     start: Option<usize>,
     data: Vec<Bpmn>,
+    boundaries: HashMap<String, Vec<usize>>,
+    catch_event_links: HashMap<String, usize>,
 }
 
 impl ProcessData {
@@ -37,6 +39,58 @@ impl ProcessData {
         self.data.push(bpmn);
     }
 
+    // Everything in the process has been collected. Update local IDs with correct index.
+    fn finalize(&mut self) {
+        let data = self.data.as_mut_slice();
+        // Collect Bpmn id to index in array
+        let bpmn_index: HashMap<String, usize> = data
+            .iter()
+            .enumerate()
+            .filter_map(|(index, bpmn)| bpmn.id().ok().map(Id::bpmn).map(|id| (id.into(), index)))
+            .collect();
+
+        data.iter_mut().for_each(|bpmn| match bpmn {
+            Bpmn::Activity { outputs, .. } => outputs.update_local_ids(&bpmn_index),
+            Bpmn::Event(Event {
+                event_type,
+                id,
+                outputs,
+                attached_to_ref,
+                symbol,
+                name,
+                ..
+            }) => {
+                outputs.update_local_ids(&bpmn_index);
+                if let Some(attached_to_ref) = attached_to_ref {
+                    attached_to_ref.update_local_id(&bpmn_index);
+
+                    // Collect boundary to activity id
+                    self.boundaries
+                        .entry(attached_to_ref.bpmn().to_owned())
+                        .or_default()
+                        .push(*id.local());
+                }
+
+                if let Some(name) = name
+                    && let Some(Symbol::Link) = symbol
+                    && EventType::IntermediateCatch == *event_type
+                {
+                    self.catch_event_links.insert(name.clone(), *id.local());
+                }
+            }
+            Bpmn::Gateway(Gateway {
+                default, outputs, ..
+            }) => {
+                outputs.update_local_ids(&bpmn_index);
+                if let Some(default) = default {
+                    default.update_local_id(&bpmn_index)
+                }
+            }
+            Bpmn::SequenceFlow { target_ref, .. } => target_ref.update_local_id(&bpmn_index),
+            _ => {}
+        });
+    }
+
     pub fn data_mut(&mut self) -> &mut [Bpmn] {
         &mut self.data
     }
@@ -55,6 +109,36 @@ impl ProcessData {
 
     pub fn iter(&self) -> impl Iterator<Item = &Bpmn> {
         self.data.iter()
+    }
+
+    pub fn activity_boundaries(&self, id: &Id) -> Option<&Vec<usize>> {
+        self.boundaries.get(id.bpmn())
+    }
+
+    pub fn find_boundary<'a>(
+        &'a self,
+        activity_id: &Id,
+        search_name: Option<&str>,
+        search_symbol: &Symbol,
+    ) -> Option<&'a usize> {
+        self.activity_boundaries(activity_id)?
+            .iter()
+            .filter_map(|index| self.data.get(*index))
+            .find_map(|bpmn| match bpmn {
+                Bpmn::Event(Event {
+                    symbol: Some(symbol),
+                    id,
+                    name,
+                    ..
+                }) if symbol == search_symbol && search_name == name.as_deref() => Some(id.local()),
+                _ => None,
+            })
+    }
+
+    pub fn catch_event_link(&self, throw_event_name: &str) -> Result<&usize, Error> {
+        self.catch_event_links.get(throw_event_name).ok_or_else(|| {
+            Error::MissingIntermediateCatchEvent(Symbol::Link.to_string(), throw_event_name.into())
+        })
     }
 }
 
@@ -79,8 +163,6 @@ impl ProcessData {
 #[derive(Default)]
 pub(super) struct DataBuilder {
     data: Vec<ProcessData>,
-    boundaries: HashMap<String, Vec<usize>>,
-    catch_event_links: HashMap<String, HashMap<String, usize>>,
     process_stack: Vec<ProcessData>,
     stack: Vec<Bpmn>,
 }
@@ -143,76 +225,23 @@ impl DataBuilder {
             return Err(Error::Builder(BUILD_PROCESS_ERROR_MSG.into()));
         };
 
-        // Process or sub process use local id to point to data index. Do NOT overwrite.
-        bpmn.set_local_id(self.data.len());
-        self.update_data(bpmn.id()?, process_data.data_mut());
         // Definitions collect all Processes
         // Processes collect all related sub processes
         if let Some(parent_process_data) = self.process_stack.last_mut() {
+            // Process or sub process use local id to point to data index. Do NOT overwrite.
+            bpmn.set_local_id(self.data.len());
             parent_process_data.add_process(bpmn);
         }
+
+        process_data.finalize();
         self.data.push(process_data);
         Ok(())
-    }
-
-    // Post process to fill local ids to some bpmn objects.
-    fn update_data(&mut self, process_id: &Id, data: &mut [Bpmn]) {
-        // Collect Bpmn id to index in array
-        let bpmn_index: HashMap<String, usize> = data
-            .iter()
-            .enumerate()
-            .filter_map(|(index, bpmn)| bpmn.id().ok().map(Id::bpmn).map(|id| (id.into(), index)))
-            .collect();
-
-        data.iter_mut().for_each(|bpmn| match bpmn {
-            Bpmn::Activity { outputs, .. } => outputs.update_local_ids(&bpmn_index),
-            Bpmn::Event(Event {
-                event_type,
-                id,
-                outputs,
-                attached_to_ref,
-                symbol,
-                name,
-                ..
-            }) => {
-                outputs.update_local_ids(&bpmn_index);
-                if let Some(attached_to_ref) = attached_to_ref {
-                    attached_to_ref.update_local_id(&bpmn_index);
-
-                    // Collect boundary to activity id
-                    self.boundaries
-                        .entry(attached_to_ref.bpmn().to_owned())
-                        .or_default()
-                        .push(*id.local());
-                }
-
-                if let Some(name) = name
-                    && let Some(Symbol::Link) = symbol
-                    && EventType::IntermediateCatch == *event_type
-                {
-                    self.catch_event_links
-                        .entry(process_id.bpmn().into())
-                        .or_default()
-                        .insert(name.clone(), *id.local());
-                }
-            }
-            Bpmn::Gateway(Gateway {
-                default, outputs, ..
-            }) => {
-                outputs.update_local_ids(&bpmn_index);
-                if let Some(default) = default {
-                    default.update_local_id(&bpmn_index)
-                }
-            }
-            Bpmn::SequenceFlow { target_ref, .. } => target_ref.update_local_id(&bpmn_index),
-            _ => {}
-        });
     }
 }
 
 impl From<DataBuilder> for Diagram {
     fn from(builder: DataBuilder) -> Self {
-        Diagram::new(builder.data, builder.boundaries, builder.catch_event_links)
+        Diagram::new(builder.data)
     }
 }
 

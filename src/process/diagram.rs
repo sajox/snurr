@@ -1,29 +1,18 @@
 use super::handler::HandlerMap;
 use crate::{
-    Error, Symbol,
-    model::{ActivityType, Bpmn, Event, Gateway, GatewayType, Id},
+    model::{ActivityType, Bpmn, Gateway, GatewayType},
     process::{handler::HandlerType, reader::ProcessData},
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub(super) struct Diagram {
     data: Vec<ProcessData>,
-    boundaries: HashMap<String, Vec<usize>>,
-    catch_event_links: HashMap<String, HashMap<String, usize>>,
 }
 
 impl Diagram {
-    pub(super) fn new(
-        data: Vec<ProcessData>,
-        boundaries: HashMap<String, Vec<usize>>,
-        catch_event_links: HashMap<String, HashMap<String, usize>>,
-    ) -> Self {
-        Self {
-            data,
-            boundaries,
-            catch_event_links,
-        }
+    pub(super) fn new(data: Vec<ProcessData>) -> Self {
+        Self { data }
     }
     // All top level processes defined in Definitions.
     // Always last in the Vec as it is a top level construct in the XML.
@@ -38,10 +27,6 @@ impl Diagram {
 
     pub(super) fn data(&self) -> &[ProcessData] {
         self.data.as_slice()
-    }
-
-    pub(super) fn activity_boundaries(&self, id: &Id) -> Option<&Vec<usize>> {
-        self.boundaries.get(id.bpmn())
     }
 
     pub(super) fn install_and_check(&mut self, handler_map: HandlerMap) -> HashSet<String> {
@@ -102,40 +87,5 @@ impl Diagram {
             }
         }
         missing
-    }
-
-    pub(super) fn find_boundary<'a>(
-        &'a self,
-        activity_id: &Id,
-        search_name: Option<&str>,
-        search_symbol: &Symbol,
-        process_data: &'a [Bpmn],
-    ) -> Option<&'a usize> {
-        self.activity_boundaries(activity_id)?
-            .iter()
-            .filter_map(|index| process_data.get(*index))
-            .find_map(|bpmn| match bpmn {
-                Bpmn::Event(Event {
-                    symbol: Some(symbol),
-                    id,
-                    name,
-                    ..
-                }) if symbol == search_symbol && search_name == name.as_deref() => Some(id.local()),
-                _ => None,
-            })
-    }
-
-    pub(super) fn find_catch_link(
-        &self,
-        throw_event_name: &str,
-        symbol: &Symbol,
-        process_id: &Id,
-    ) -> Result<&usize, Error> {
-        self.catch_event_links
-            .get(process_id.bpmn())
-            .and_then(|links| links.get(throw_event_name))
-            .ok_or_else(|| {
-                Error::MissingIntermediateCatchEvent(symbol.to_string(), throw_event_name.into())
-            })
     }
 }

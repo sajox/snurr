@@ -155,9 +155,9 @@ impl<T> Process<T, Run> {
                         }
                         EventType::IntermediateThrow => {
                             match (name.as_ref(), symbol.as_ref()) {
-                                (Some(name), Some(symbol @ Symbol::Link)) => self
-                                    .diagram
-                                    .find_catch_link(name, symbol, input.process_id)?,
+                                (Some(name), Some(Symbol::Link)) => {
+                                    input.process.catch_event_link(name)?
+                                }
                                 // Follow outputs for other throw events
                                 (Some(_), _) => {
                                     maybe_fork!(self, outputs, data, event_type, name_or_id)
@@ -203,14 +203,9 @@ impl<T> Process<T, Run> {
                                         name_or_id.to_string(),
                                     )
                                 })? {
-                                Some(boundary) => self
-                                    .diagram
-                                    .find_boundary(
-                                        id,
-                                        boundary.name(),
-                                        boundary.symbol(),
-                                        input.process.data(),
-                                    )
+                                Some(boundary) => input
+                                    .process
+                                    .find_boundary(id, boundary.name(), boundary.symbol())
                                     .ok_or_else(|| {
                                         Error::MissingBoundary(
                                             boundary.to_string(),
@@ -241,16 +236,11 @@ impl<T> Process<T, Run> {
                                     ),
                                 name,
                                 ..
-                            } =
-                                self.execute(ExecuteInput::new(sp_data, id, input.user_data()))?
+                            } = self.execute(ExecuteInput::new(sp_data, input.user_data()))?
                             {
-                                self.diagram
-                                    .find_boundary(
-                                        id,
-                                        name.as_deref(),
-                                        symbol,
-                                        input.process.data(),
-                                    )
+                                input
+                                    .process
+                                    .find_boundary(id, name.as_deref(), symbol)
                                     .ok_or_else(|| {
                                         Error::MissingBoundary(
                                             symbol.to_string(),
@@ -437,17 +427,12 @@ pub(super) type ExecuteResult<'a> = Result<&'a Event, Error>;
 // Data for the execution engine.
 pub(super) struct ExecuteInput<'a, T> {
     process: &'a ProcessData,
-    process_id: &'a Id,
     user_data: Data<T>,
 }
 
 impl<'a, T> ExecuteInput<'a, T> {
-    pub(super) fn new(process: &'a ProcessData, process_id: &'a Id, user_data: Data<T>) -> Self {
-        Self {
-            process,
-            process_id,
-            user_data,
-        }
+    pub(super) fn new(process: &'a ProcessData, user_data: Data<T>) -> Self {
+        Self { process, user_data }
     }
 
     fn user_data(&self) -> Data<T> {

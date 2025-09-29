@@ -184,7 +184,7 @@ impl<T> Process<T, Run> {
                     .diagram
                     .get_process(*id.local())
                     .ok_or_else(|| Error::MissingProcessData(id.bpmn().into()))?;
-                self.execute(ExecuteInput::new(process_data, id, Arc::clone(&data)))?;
+                self.execute(ExecuteInput::new(process_data, Arc::clone(&data)))?;
             }
         }
 
