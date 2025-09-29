@@ -85,3 +85,5 @@ pub enum Error {
 // BpmnRequirement
 pub(crate) const AT_LEAST_TWO_OUTGOING: &str =
     "Event gateway must have at least two outgoing sequence flows";
+
+pub(crate) const ONLY_ONE_START_EVENT: &str = "There can only be one start event of type none";

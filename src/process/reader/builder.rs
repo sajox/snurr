@@ -1,5 +1,5 @@
 use crate::{
-    error::Error,
+    error::{Error, ONLY_ONE_START_EVENT},
     model::{Event, Gateway, *},
     process::Diagram,
 };
@@ -24,9 +24,7 @@ impl ProcessData {
         }) = bpmn
             && self.start.replace(len).is_some()
         {
-            return Err(Error::BpmnRequirement(
-                "Multiple start events with no symbol".into(),
-            ));
+            return Err(Error::BpmnRequirement(ONLY_ONE_START_EVENT.into()));
         }
 
         bpmn.set_local_id(len);
