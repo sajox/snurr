@@ -215,10 +215,12 @@ impl<T> Process<T, Run> {
                                 None => maybe_fork!(self, outputs, data, activity_type, name_or_id),
                             }
                         }
-                        ActivityType::SubProcess => {
+                        ActivityType::SubProcess {
+                            data_index: Some(index),
+                        } => {
                             let sp_data = self
                                 .diagram
-                                .get_process(*id.local())
+                                .get_process(*index)
                                 .ok_or_else(|| Error::MissingProcessData(id.bpmn().into()))?;
 
                             if let Event {
@@ -251,6 +253,11 @@ impl<T> Process<T, Run> {
                                 // Continue from subprocess
                                 maybe_fork!(self, outputs, data, activity_type, name_or_id)
                             }
+                        }
+                        ActivityType::SubProcess { .. } => {
+                            return Err(Error::MissingProcessData(
+                                name.as_deref().unwrap_or(id.bpmn()).into(),
+                            ));
                         }
                     }
                 }

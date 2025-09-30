@@ -179,10 +179,15 @@ impl<T> Process<T, Run> {
             .ok_or(Error::MissingDefinitionsId)?
             .iter()
         {
-            if let Bpmn::Process { id, .. } = bpmn {
+            if let Bpmn::Process {
+                id,
+                data_index: Some(index),
+                ..
+            } = bpmn
+            {
                 let process_data = self
                     .diagram
-                    .get_process(*id.local())
+                    .get_process(*index)
                     .ok_or_else(|| Error::MissingProcessData(id.bpmn().into()))?;
                 self.execute(ExecuteInput::new(process_data, Arc::clone(&data)))?;
             }

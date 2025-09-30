@@ -12,7 +12,7 @@ pub struct ProcessData {
     // Start event in the process
     start: Option<usize>,
     data: Vec<Bpmn>,
-    boundaries: HashMap<String, Vec<usize>>,
+    boundaries: HashMap<usize, Vec<usize>>,
     catch_event_links: HashMap<String, usize>,
 }
 
@@ -29,27 +29,22 @@ impl ProcessData {
             return Err(Error::BpmnRequirement(ONLY_ONE_START_EVENT.into()));
         }
 
-        bpmn.set_local_id(len);
+        bpmn.update_local_id(len);
         self.data.push(bpmn);
         Ok(())
     }
 
-    // If it's a process or subprocess, we just insert it. Already correct ID.
-    fn add_process(&mut self, bpmn: Bpmn) {
-        self.data.push(bpmn);
-    }
-
     // Everything in the process has been collected. Update local IDs with correct index.
     fn finalize(&mut self) {
-        let data = self.data.as_mut_slice();
         // Collect Bpmn id to index in array
-        let bpmn_index: HashMap<String, usize> = data
+        let bpmn_index: HashMap<String, usize> = self
+            .data
             .iter()
             .enumerate()
             .filter_map(|(index, bpmn)| bpmn.id().ok().map(Id::bpmn).map(|id| (id.into(), index)))
             .collect();
 
-        data.iter_mut().for_each(|bpmn| match bpmn {
+        self.data.iter_mut().for_each(|bpmn| match bpmn {
             Bpmn::Activity { outputs, .. } => outputs.update_local_ids(&bpmn_index),
             Bpmn::Event(Event {
                 event_type,
@@ -66,7 +61,7 @@ impl ProcessData {
 
                     // Collect boundary to activity id
                     self.boundaries
-                        .entry(attached_to_ref.bpmn().to_owned())
+                        .entry(*attached_to_ref.local())
                         .or_default()
                         .push(*id.local());
                 }
@@ -112,7 +107,7 @@ impl ProcessData {
     }
 
     pub fn activity_boundaries(&self, id: &Id) -> Option<&Vec<usize>> {
-        self.boundaries.get(id.bpmn())
+        self.boundaries.get(id.local())
     }
 
     pub fn find_boundary<'a>(
@@ -228,9 +223,9 @@ impl DataBuilder {
         // Definitions collect all Processes
         // Processes collect all related sub processes
         if let Some(parent_process_data) = self.process_stack.last_mut() {
-            // Process or sub process use local id to point to data index. Do NOT overwrite.
-            bpmn.set_local_id(self.data.len());
-            parent_process_data.add_process(bpmn);
+            // Process or sub process use index to point to data.
+            bpmn.update_data_index(self.data.len());
+            parent_process_data.add(bpmn)?;
         }
 
         process_data.finalize();

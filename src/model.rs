@@ -179,7 +179,7 @@ impl Display for EventType {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum ActivityType {
-    SubProcess,
+    SubProcess { data_index: Option<usize> },
     Task,
     ScriptTask,
     UserTask,
@@ -196,7 +196,7 @@ impl TryFrom<&[u8]> for ActivityType {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Ok(match value {
-            SUB_PROCESS | TRANSACTION => ActivityType::SubProcess,
+            SUB_PROCESS | TRANSACTION => ActivityType::SubProcess { data_index: None },
             TASK => ActivityType::Task,
             SCRIPT_TASK => ActivityType::ScriptTask,
             USER_TASK => ActivityType::UserTask,
@@ -369,6 +369,7 @@ pub(crate) enum Bpmn {
     Gateway(Gateway),
     Process {
         id: Id,
+        data_index: Option<usize>,
         _is_executable: bool,
     },
     SequenceFlow {
@@ -394,7 +395,20 @@ impl Bpmn {
         }
     }
 
-    pub(crate) fn set_local_id(&mut self, value: usize) {
+    pub(crate) fn update_data_index(&mut self, value: usize) {
+        match self {
+            Bpmn::Activity {
+                activity_type: ActivityType::SubProcess { data_index },
+                ..
+            }
+            | Bpmn::Process { data_index, .. } => {
+                data_index.replace(value);
+            }
+            _ => {}
+        }
+    }
+
+    pub(crate) fn update_local_id(&mut self, value: usize) {
         match self {
             Bpmn::Event(Event { id, .. })
             | Bpmn::SequenceFlow { id, .. }
@@ -441,6 +455,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     .remove(ATTRIB_ID)
                     .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
                     .into(),
+                data_index: None,
                 _is_executable: attributes
                     .remove(ATTRIB_IS_EXECUTABLE)
                     .and_then(|s| s.parse::<bool>().ok())
