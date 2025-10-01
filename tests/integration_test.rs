@@ -594,3 +594,31 @@ fn startevent_not_first() -> Result<()> {
     assert_eq!(result.count, 4);
     Ok(())
 }
+
+#[test]
+fn process_multiple_startevent_none() -> Result<()> {
+    let result = Process::<Counter>::new("tests/files/process_multiple_startevent_none.bpmn");
+    if let Err(error) = result {
+        assert!(
+            matches!(error, Error::BpmnRequirement(_)),
+            "Expected BpmnRequirement"
+        );
+    } else {
+        panic!("Expected an error");
+    }
+    Ok(())
+}
+
+#[test]
+fn subprocess_multiple_startevent_none() -> Result<()> {
+    let result = Process::<Counter>::new("tests/files/subprocess_multiple_startevent_none.bpmn");
+    if let Err(error) = result {
+        assert!(
+            matches!(error, Error::BpmnRequirement(_)),
+            "Expected BpmnRequirement"
+        );
+    } else {
+        panic!("Expected an error");
+    }
+    Ok(())
+}
