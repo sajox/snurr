@@ -283,7 +283,7 @@ impl<T> Process<T, Run> {
                             ));
                         }
                         // Handle 1 to 1, probably a temporary design or mistake
-                        _ if outputs.len() == 1 && inputs.len() == 1 => outputs.first().unwrap(),
+                        _ if outputs.len() == 1 && *inputs == 1 => outputs.first().unwrap(),
                         GatewayType::Exclusive if outputs.len() == 1 => outputs.first().unwrap(),
                         GatewayType::Exclusive => {
                             match func_idx
@@ -309,7 +309,7 @@ impl<T> Process<T, Run> {
                             }
                         }
                         // Handle a regular Join or a JoinFork. In both cases, we need to wait for all tokens.
-                        GatewayType::Parallel | GatewayType::Inclusive if inputs.len() > 1 => {
+                        GatewayType::Parallel | GatewayType::Inclusive if *inputs > 1 => {
                             return Ok(Return::Join(gateway));
                         }
                         GatewayType::Parallel => {

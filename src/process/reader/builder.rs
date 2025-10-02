@@ -195,7 +195,7 @@ impl DataBuilder {
         {
             match direction {
                 OUTGOING => parent.add_output(value),
-                _ => parent.add_input(value),
+                _ => parent.add_input(),
             }
         }
     }

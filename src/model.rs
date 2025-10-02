@@ -1,6 +1,6 @@
 use crate::error::Error;
 use core::fmt;
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display, ops::AddAssign};
 
 pub(crate) const DEFINITIONS: &[u8] = b"definitions";
 pub(crate) const PROCESS: &[u8] = b"process";
@@ -52,14 +52,14 @@ pub(crate) const EVENT_BASED_GATEWAY: &[u8] = b"eventBasedGateway";
 
 // Attributes
 pub(crate) const ATTRIB_ID: &[u8] = b"id";
-pub(crate) const ATTRIB_IS_EXECUTABLE: &[u8] = b"isExecutable";
+pub(crate) const _ATTRIB_IS_EXECUTABLE: &[u8] = b"isExecutable";
 pub(crate) const ATTRIB_NAME: &[u8] = b"name";
-pub(crate) const ATTRIB_SOURCE_REF: &[u8] = b"sourceRef";
+pub(crate) const _ATTRIB_SOURCE_REF: &[u8] = b"sourceRef";
 pub(crate) const ATTRIB_TARGET_REF: &[u8] = b"targetRef";
 pub(crate) const ATTRIB_DEFAULT: &[u8] = b"default";
 pub(crate) const _ATTRIB_EXPORTER_VERSION: &[u8] = b"exporterVersion";
 pub(crate) const ATTRIB_ATTACHED_TO_REF: &[u8] = b"attachedToRef";
-pub(crate) const ATTRIB_CANCEL_ACTIVITY: &[u8] = b"cancelActivity";
+pub(crate) const _ATTRIB_CANCEL_ACTIVITY: &[u8] = b"cancelActivity";
 
 /// Inclusive gateway return type
 #[derive(Default, Debug)]
@@ -335,7 +335,7 @@ pub(crate) struct Gateway {
     pub(crate) name: Option<String>,
     pub(crate) default: Option<Id>,
     pub(crate) outputs: Outputs,
-    pub(crate) inputs: Vec<String>,
+    pub(crate) inputs: u16,
 }
 
 #[derive(Debug)]
@@ -345,7 +345,6 @@ pub(crate) struct Event {
     pub(crate) id: Id,
     pub(crate) name: Option<String>,
     pub(crate) attached_to_ref: Option<Id>,
-    pub(crate) _cancel_activity: Option<String>,
     pub(crate) outputs: Outputs,
 }
 
@@ -370,12 +369,10 @@ pub(crate) enum Bpmn {
     Process {
         id: Id,
         data_index: Option<usize>,
-        _is_executable: bool,
     },
     SequenceFlow {
         id: Id,
         name: Option<String>,
-        _source_ref: String,
         target_ref: Id,
     },
 }
@@ -429,9 +426,9 @@ impl Bpmn {
         }
     }
 
-    pub(crate) fn add_input(&mut self, text: String) {
+    pub(crate) fn add_input(&mut self) {
         if let Bpmn::Gateway(Gateway { inputs, .. }) = self {
-            inputs.push(text)
+            inputs.add_assign(1);
         }
     }
 }
@@ -456,10 +453,6 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
                     .into(),
                 data_index: None,
-                _is_executable: attributes
-                    .remove(ATTRIB_IS_EXECUTABLE)
-                    .and_then(|s| s.parse::<bool>().ok())
-                    .unwrap_or_default(),
             },
             START_EVENT
             | END_EVENT
@@ -474,7 +467,6 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     .into(),
                 name: attributes.remove(ATTRIB_NAME),
                 attached_to_ref: attributes.remove(ATTRIB_ATTACHED_TO_REF).map(Into::into),
-                _cancel_activity: attributes.remove(ATTRIB_CANCEL_ACTIVITY),
                 outputs: Default::default(),
             }),
             TASK | SCRIPT_TASK | USER_TASK | SERVICE_TASK | CALL_ACTIVITY | RECEIVE_TASK
@@ -510,9 +502,6 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
                     .into(),
                 name: attributes.remove(ATTRIB_NAME),
-                _source_ref: attributes
-                    .remove(ATTRIB_SOURCE_REF)
-                    .ok_or(Error::MissingSourceRef)?,
                 target_ref: attributes
                     .remove(ATTRIB_TARGET_REF)
                     .ok_or(Error::MissingTargetRef)?
