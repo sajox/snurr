@@ -21,9 +21,6 @@ pub enum Error {
     #[error("could not find BPMN data with id {0}")]
     MisssingBpmnData(String),
 
-    #[error("(sub)process missing start id {0}")]
-    MissingProcessStart(String),
-
     #[error("could not find process data with id {0}")]
     MissingProcessData(String),
 
@@ -32,9 +29,6 @@ pub enum Error {
 
     #[error("sequenceFlow missing targetRef")]
     MissingTargetRef,
-
-    #[error("sequenceFlow missing sourceRef")]
-    MissingSourceRef,
 
     #[error("type {0} not implemented")]
     TypeNotImplemented(String),
@@ -51,10 +45,10 @@ pub enum Error {
     #[error("missing intermediate catch event symbol {0} with name {1}")]
     MissingIntermediateCatchEvent(String, String),
 
-    #[error("missing end event.")]
+    #[error("missing end event")]
     MissingEndEvent,
 
-    #[error("missing start event.")]
+    #[error("missing start event")]
     MissingStartEvent,
 
     #[error("couldn't extract process result")]
@@ -77,13 +71,13 @@ pub enum Error {
 
     #[error(transparent)]
     Utf8(#[from] std::str::Utf8Error),
-
-    #[error(transparent)]
-    Send(#[from] std::sync::mpsc::SendError<(&'static str, String)>),
 }
 
 // BpmnRequirement
 pub(crate) const AT_LEAST_TWO_OUTGOING: &str =
     "Event gateway must have at least two outgoing sequence flows";
-
 pub(crate) const ONLY_ONE_START_EVENT: &str = "There can only be one start event of type none";
+
+// Builder
+pub(crate) const FUNC_MAP_ERROR_MSG: &str = "Handlermap has already been consumed";
+pub(crate) const BUILD_PROCESS_ERROR_MSG: &str = "Couldn't build process";

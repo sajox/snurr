@@ -1,11 +1,9 @@
-use crate::{Error, IntermediateEvent, With, model::Boundary};
+use crate::{Error, IntermediateEvent, With, error::FUNC_MAP_ERROR_MSG, model::Boundary};
 use std::{
     collections::HashMap,
     fmt::Display,
     sync::{Arc, Mutex},
 };
-
-const FUNC_MAP_ERROR_MSG: &str = "couldn't fetch function map";
 
 /// Generic type for the task and gateway inputs.
 pub type Data<T> = Arc<Mutex<T>>;
