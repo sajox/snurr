@@ -646,3 +646,37 @@ fn parallel_stalled_execution() -> Result<()> {
     }
     Ok(())
 }
+
+#[test]
+#[cfg(debug_assertions)]
+fn parallel_unbalanced() -> Result<()> {
+    let bpmn = Process::new("tests/files/parallel_unbalanced.bpmn")?
+        .task(COUNT_1, func_cnt(1))
+        .build()?;
+
+    match bpmn.run(Counter::default()) {
+        Err(error) => assert!(
+            matches!(error, Error::NotSupported(_)),
+            "Expected NotSupported"
+        ),
+        _ => panic!("Expected an error"),
+    }
+    Ok(())
+}
+
+#[test]
+#[cfg(debug_assertions)]
+fn parallel_unbalanced2() -> Result<()> {
+    let bpmn = Process::new("tests/files/parallel_unbalanced2.bpmn")?
+        .task(COUNT_1, func_cnt(1))
+        .build()?;
+
+    match bpmn.run(Counter::default()) {
+        Err(error) => assert!(
+            matches!(error, Error::NotSupported(_)),
+            "Expected NotSupported"
+        ),
+        _ => panic!("Expected an error"),
+    }
+    Ok(())
+}
