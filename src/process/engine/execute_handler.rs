@@ -1,6 +1,8 @@
+use crate::{
+    Error,
+    model::{Gateway, GatewayType},
+};
 use log::debug;
-
-use crate::model::Gateway;
 use std::borrow::Cow;
 
 #[derive(Default, Debug)]
@@ -51,8 +53,8 @@ impl<'a> ExecuteHandler<'a> {
         }
     }
 
-    // Once all tokens have been consumed, return the gateways involved.
-    pub(super) fn tokens_consumed(&mut self) -> Option<Vec<&'a Gateway>> {
+    // Once all tokens have been consumed, return the gateway involved.
+    pub(super) fn tokens_consumed(&mut self) -> Result<Option<&'a Gateway>, Error> {
         if let Some(token_data) = self.token_stack.last()
             && token_data.consumed()
         {
@@ -61,12 +63,32 @@ impl<'a> ExecuteHandler<'a> {
                 token_data.created, token_data.consumed
             );
 
-            #[cfg(debug_assertions)]
-            return self.token_stack.pop().map(|data| data.joined).map(dedup);
-            #[cfg(not(debug_assertions))]
-            return self.token_stack.pop().map(|data| data.joined);
+            if let Some(gateways) = self.token_stack.pop().map(|data| data.joined) {
+                let gateway = gateways.first().copied();
+
+                // Determines whether enough tokens have arrived at the parallel gateway.
+                // Without this, parallel gateways are too permissive.
+                if let Some(Gateway {
+                    gateway_type: GatewayType::Parallel,
+                    inputs,
+                    id,
+                    name,
+                    ..
+                }) = gateway
+                    && gateways.len() < *inputs as usize
+                {
+                    return Err(Error::BpmnRequirement(format!(
+                        "Execution stopped. Not enough tokens at the parallel gateway '{}'",
+                        name.as_deref().unwrap_or(id.bpmn())
+                    )));
+                }
+
+                #[cfg(debug_assertions)]
+                check_unbalanced_diagram(gateways)?;
+                return Ok(gateway);
+            }
         }
-        None
+        Ok(None)
     }
 }
 
@@ -100,13 +122,13 @@ impl<'a> TokenData<'a> {
 }
 
 #[cfg(debug_assertions)]
-fn dedup(mut input: Vec<&Gateway>) -> Vec<&Gateway> {
+fn check_unbalanced_diagram(mut input: Vec<&Gateway>) -> Result<(), Error> {
     let mut seen = std::collections::HashSet::new();
     input.retain(|v| seen.insert(*v.id.local()));
 
     // If many different gateways are visited, we have an unbalanced graph
     if input.len() > 1 {
-        log::error!("Unbalanced diagram detected!");
+        return Err(Error::NotSupported("Unbalanced diagram".into()));
     }
-    input
+    Ok(())
 }

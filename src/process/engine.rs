@@ -1,5 +1,6 @@
 mod execute_handler;
 
+use super::{Run, handler::Data};
 use crate::{
     Process, Symbol,
     error::{AT_LEAST_TWO_OUTGOING, Error},
@@ -9,8 +10,6 @@ use crate::{
 use execute_handler::ExecuteHandler;
 use log::{info, warn};
 use std::{borrow::Cow, collections::HashSet, sync::Arc};
-
-use super::{Run, handler::Data};
 
 #[derive(Debug)]
 enum Return<'a> {
@@ -36,13 +35,13 @@ impl<T> Process<T, Run> {
     where
         T: Send,
     {
-        let mut end_event = None;
+        let mut last_visited_end = None;
         let start = [input.process.start().ok_or(Error::MissingStartEvent)?];
         let mut handler = ExecuteHandler::new(Cow::from(&start));
         loop {
             let all_tokens = handler.take();
             if all_tokens.is_empty() {
-                return end_event.ok_or(Error::MissingEndEvent);
+                return last_visited_end.ok_or(Error::MissingEndEvent);
             }
 
             let result_iter = {
@@ -75,11 +74,11 @@ impl<T> Process<T, Run> {
                             match event {
                                 Event {
                                     event_type: EventType::End,
-                                    symbol: Some(Symbol::Terminate),
+                                    symbol: Some(Symbol::Terminate | Symbol::Cancel),
                                     ..
                                 } => return Ok(event),
                                 _ => {
-                                    end_event.replace(event);
+                                    last_visited_end.replace(event);
                                 }
                             }
                             handler.consume_token(None);
@@ -90,16 +89,13 @@ impl<T> Process<T, Run> {
                 }
 
                 // Once all inputs have been merged for a gateway, then proceed with its outputs.
-                // The gateway vector contains all the gateways involved. Right now we are using balanced diagram
-                // and do not need to investigate further.
-                if let Some(mut gateways) = handler.tokens_consumed()
-                    && let Some(
-                        gateway @ Gateway {
-                            gateway_type,
-                            outputs,
-                            ..
-                        },
-                    ) = gateways.pop()
+                if let Some(
+                    gateway @ Gateway {
+                        gateway_type,
+                        outputs,
+                        ..
+                    },
+                ) = handler.tokens_consumed()?
                 {
                     // We cannot add new tokens until we have correlated all processed flows.
                     match gateway_type {

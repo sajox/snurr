@@ -215,15 +215,14 @@ fn inclusive_gateway_no_output() -> Result<()> {
         // Empty vec run default path
         .inclusive("Gateway_0qmfmmo", |_| Default::default())
         .build()?;
-    if let Err(error) = bpmn.run(Counter::default()) {
-        assert!(
+
+    match bpmn.run(Counter::default()) {
+        Err(error) => assert!(
             matches!(error, Error::MissingOutput(_, _)),
             "Expected missing output"
-        );
-    } else {
-        panic!("Expected an error");
+        ),
+        _ => panic!("Expected an error"),
     }
-
     Ok(())
 }
 
@@ -381,13 +380,12 @@ fn two_process_pools() -> Result<()> {
 #[test]
 fn subprocess_external_link_fail() -> snurr::Result<()> {
     let bpmn = Process::new("tests/files/subprocess_external_link_fail.bpmn")?.build()?;
-    if let Err(error) = bpmn.run(Counter::default()) {
-        assert!(
+    match bpmn.run(Counter::default()) {
+        Err(error) => assert!(
             matches!(error, Error::MissingIntermediateCatchEvent(symbol, name) if symbol == "Link" && name == "Link 2"),
             "Expected Link Symbol with name Link 2"
-        );
-    } else {
-        panic!("Expected an error");
+        ),
+        _ => panic!("Expected an error"),
     }
     Ok(())
 }
@@ -597,28 +595,54 @@ fn startevent_not_first() -> Result<()> {
 
 #[test]
 fn process_multiple_startevent_none() -> Result<()> {
-    let result = Process::<Counter>::new("tests/files/process_multiple_startevent_none.bpmn");
-    if let Err(error) = result {
-        assert!(
+    match Process::<Counter>::new("tests/files/process_multiple_startevent_none.bpmn") {
+        Err(error) => assert!(
             matches!(error, Error::BpmnRequirement(_)),
             "Expected BpmnRequirement"
-        );
-    } else {
-        panic!("Expected an error");
+        ),
+        _ => panic!("Expected an error"),
     }
     Ok(())
 }
 
 #[test]
 fn subprocess_multiple_startevent_none() -> Result<()> {
-    let result = Process::<Counter>::new("tests/files/subprocess_multiple_startevent_none.bpmn");
-    if let Err(error) = result {
-        assert!(
+    match Process::<Counter>::new("tests/files/subprocess_multiple_startevent_none.bpmn") {
+        Err(error) => assert!(
             matches!(error, Error::BpmnRequirement(_)),
             "Expected BpmnRequirement"
-        );
-    } else {
-        panic!("Expected an error");
+        ),
+        _ => panic!("Expected an error"),
+    }
+    Ok(())
+}
+
+#[test]
+fn cancel_transaction() -> Result<()> {
+    // An cancel end event terminates the transaction and use the cancel boundary.
+    let bpmn = Process::new("tests/files/cancel_transaction.bpmn")?
+        .task(COUNT_1, func_cnt(1))
+        .exclusive("Cancel?", |_| "YES".into())
+        .build()?;
+    let result = bpmn.run(Counter::default())?;
+    // NOTE 2 or 3 is OK result. The order in concurrent scenarios might differ.
+    assert!(matches!(result.count, 3 | 4));
+    Ok(())
+}
+
+#[test]
+fn parallel_stalled_execution() -> Result<()> {
+    let bpmn = Process::new("tests/files/parallel_stalled_execution.bpmn")?
+        .task(COUNT_1, func_cnt(1))
+        .exclusive("Message?", |_| "YES".into())
+        .build()?;
+
+    match bpmn.run(Counter::default()) {
+        Err(error) => assert!(
+            matches!(error, Error::BpmnRequirement(_)),
+            "Expected BpmnRequirement"
+        ),
+        _ => panic!("Expected an error"),
     }
     Ok(())
 }
