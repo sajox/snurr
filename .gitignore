@@ -1,0 +1,9 @@
+.*
+!.gitignore
+
+*.lock
+!Cargo.lock
+
+*.log
+
+target/

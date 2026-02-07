@@ -1,0 +1,34 @@
+[package]
+name = "snurr"
+version = "0.14.0-wip"
+edition = "2024"
+rust-version = "1.88"
+authors = ["sajox"]
+description = "Read BPMN 2.0 files and run the process flow"
+readme = "README.md"
+license = "MIT"
+keywords = ["BPMN", "process"]
+
+include = ["Cargo.toml", "LICENSE", "/src", "/examples"]
+
+[lib]
+doctest = false
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[[example]]
+name = "simple"
+
+[dependencies]
+quick-xml = "0.39"
+log = "0.4"
+thiserror = "2"
+rayon = { version = "1", optional = true }
+
+[features]
+default = []
+parallel = ["dep:rayon"]
+
+[dev-dependencies]
+pretty_env_logger = "0.5"
