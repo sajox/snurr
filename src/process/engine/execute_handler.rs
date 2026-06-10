@@ -55,34 +55,32 @@ impl<'a> ExecuteHandler<'a> {
 
     // Once all tokens have been consumed, return the gateway involved.
     pub(super) fn tokens_consumed(&mut self) -> Result<Option<&'a Gateway>, Error> {
-        if let Some(token_data) = self.token_stack.last()
-            && token_data.consumed()
+        if let Some(mut token_data) = self.token_stack.pop_if(|token_data| token_data.consumed())
+            && let tokens_arrived = token_data.joined.len()
         {
             debug!("ALL CONSUMED {}", token_data);
 
-            if let Some(gateways) = self.token_stack.pop().map(|data| data.joined) {
-                let gateway = gateways.first().copied();
+            #[cfg(debug_assertions)]
+            check_unbalanced_diagram(&token_data.joined)?;
 
-                // Determines whether enough tokens have arrived at the parallel gateway.
-                // Without this, parallel gateways are too permissive.
-                if let Some(
-                    gateway @ Gateway {
-                        gateway_type: GatewayType::Parallel,
-                        inputs,
-                        ..
-                    },
-                ) = gateway
-                    && gateways.len() < *inputs as usize
-                {
-                    return Err(Error::BpmnRequirement(format!(
-                        "Execution stopped. Not enough tokens at {gateway}"
-                    )));
-                }
+            let gateway = token_data.joined.pop();
 
-                #[cfg(debug_assertions)]
-                check_unbalanced_diagram(gateways)?;
-                return Ok(gateway);
+            // Determines whether enough tokens have arrived at the parallel gateway.
+            // Without this, parallel gateways are too permissive.
+            if let Some(
+                gateway @ Gateway {
+                    gateway_type: GatewayType::Parallel,
+                    inputs,
+                    ..
+                },
+            ) = gateway
+                && tokens_arrived < *inputs as usize
+            {
+                return Err(Error::BpmnRequirement(format!(
+                    "Execution stopped. Not enough tokens at {gateway}"
+                )));
             }
+            return Ok(gateway);
         }
         Ok(None)
     }
@@ -134,12 +132,10 @@ impl<'a> Display for TokenData<'a> {
 }
 
 #[cfg(debug_assertions)]
-fn check_unbalanced_diagram(mut input: Vec<&Gateway>) -> Result<(), Error> {
-    let mut seen = std::collections::HashSet::new();
-    input.retain(|v| seen.insert(*v.id.local()));
-
+fn check_unbalanced_diagram(input: &[&Gateway]) -> Result<(), Error> {
     // If many different gateways are visited, we have an unbalanced graph
-    if input.len() > 1 {
+    if std::collections::HashSet::<usize>::from_iter(input.iter().map(|g| *g.id.local())).len() > 1
+    {
         return Err(Error::NotSupported("Unbalanced diagram".into()));
     }
     Ok(())
