@@ -1,61 +1,61 @@
 use crate::{
     Error,
     bpmn::{Gateway, GatewayType},
+    process::engine::Tokens,
 };
 use log::debug;
 use std::{borrow::Cow, fmt::Display};
 
 #[derive(Default, Debug)]
 pub(super) struct ExecuteHandler<'a> {
-    tokens_ready: Vec<Cow<'a, [usize]>>,
-    uncommitted: Vec<Cow<'a, [usize]>>,
-    token_stack: Vec<TokenData<'a>>,
+    ready: Vec<Tokens<'a>>,
+    pending: Vec<Tokens<'a>>,
+    stack: Vec<TokenData<'a>>,
 }
 
 impl<'a> ExecuteHandler<'a> {
-    pub(super) fn new(tokens: Cow<'a, [usize]>) -> Self {
+    pub(super) fn new(start_token: usize) -> Self {
         Self {
-            tokens_ready: vec![tokens],
-            uncommitted: Default::default(),
-            token_stack: Default::default(),
+            ready: vec![Cow::from(vec![start_token])],
+            ..Default::default()
         }
     }
 
     // Return tokens to be processed.
-    pub(super) fn active_tokens(&mut self) -> Vec<Cow<'a, [usize]>> {
-        std::mem::take(&mut self.tokens_ready)
+    pub(super) fn active_tokens(&mut self) -> Vec<Tokens<'a>> {
+        std::mem::take(&mut self.ready)
     }
 
-    // Push directly to tokens_ready without the involvement of token_stack.
+    // Push directly to ready without the involvement of token_stack.
     // When we JOIN a gateway with one output we should not increase the token_stack.
-    pub(super) fn immediate(&mut self, item: Cow<'a, [usize]>) {
-        self.tokens_ready.push(item);
+    pub(super) fn immediate(&mut self, item: Tokens<'a>) {
+        self.ready.push(item);
     }
 
     // If a gateway FORK is involved, we need to use the token stack. Even if the gateway only selects one flow.
-    pub(super) fn pending_fork(&mut self, item: Cow<'a, [usize]>) {
-        self.uncommitted.push(item);
+    pub(super) fn pending_fork(&mut self, item: Tokens<'a>) {
+        self.pending.push(item);
     }
 
     // Commit all new tokens.
     pub(super) fn commit(&mut self) {
-        for item in self.uncommitted.drain(..) {
+        for item in self.pending.drain(..) {
             debug!("NEW TOKENS {}", item.len());
-            self.token_stack.push(TokenData::new(item.len()));
-            self.tokens_ready.push(item);
+            self.stack.push(TokenData::new(item.len()));
+            self.ready.push(item);
         }
     }
 
     // Consume a token. Might be a gateway join or end event.
     pub(super) fn consume_token(&mut self, join: Option<&'a Gateway>) {
-        if let Some(token_data) = self.token_stack.last_mut() {
+        if let Some(token_data) = self.stack.last_mut() {
             token_data.consume(join);
         }
     }
 
     // Once all tokens have been consumed, return the gateway involved.
     pub(super) fn tokens_consumed(&mut self) -> Result<Option<&'a Gateway>, Error> {
-        if let Some(mut token_data) = self.token_stack.pop_if(|token_data| token_data.consumed())
+        if let Some(mut token_data) = self.stack.pop_if(|token_data| token_data.consumed())
             && let tokens_arrived = token_data.joined.len()
         {
             debug!("ALL CONSUMED {}", token_data);
@@ -97,8 +97,7 @@ impl<'a> TokenData<'a> {
     fn new(created: usize) -> Self {
         Self {
             created,
-            joined: Default::default(),
-            consumed: Default::default(),
+            ..Default::default()
         }
     }
 

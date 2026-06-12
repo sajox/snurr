@@ -12,9 +12,11 @@ use execute_handler::ExecuteHandler;
 use log::{info, warn};
 use std::{borrow::Cow, collections::HashSet, sync::Arc};
 
+type Tokens<'a> = Cow<'a, [usize]>;
+
 #[derive(Debug)]
 enum Return<'a> {
-    Fork(Cow<'a, [usize]>),
+    Fork(Tokens<'a>),
     Join(&'a Gateway),
     End(&'a Event),
 }
@@ -46,8 +48,7 @@ impl<T> Process<T, Run> {
         T: Send,
     {
         let mut last_visited_end = None;
-        let start = [input.process.start().ok_or(Error::MissingStartEvent)?];
-        let mut handler = ExecuteHandler::new(Cow::from(&start));
+        let mut handler = ExecuteHandler::new(input.process.start()?);
         loop {
             let active_tokens = handler.active_tokens();
             if active_tokens.is_empty() {
@@ -335,7 +336,7 @@ impl<T> Process<T, Run> {
         gateway @ Gateway {
             func_idx, outputs, ..
         }: &'a Gateway,
-    ) -> Result<Cow<'a, [usize]>, Error> {
+    ) -> Result<Tokens<'a>, Error> {
         let value = match func_idx
             .map(|index| self.handler.run_inclusive(index, input.user_data()))
             .ok_or_else(|| Error::MissingImplementation(gateway.to_string()))??

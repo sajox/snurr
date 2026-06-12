@@ -179,8 +179,8 @@ impl ProcessData {
         });
     }
 
-    pub fn start(&self) -> Option<usize> {
-        self.start
+    pub fn start(&self) -> Result<usize, Error> {
+        self.start.ok_or(Error::MissingStartEvent)
     }
 
     pub fn get(&self, index: usize) -> Option<&Bpmn> {

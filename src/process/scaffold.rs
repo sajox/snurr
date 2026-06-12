@@ -2,8 +2,8 @@ use std::{collections::HashSet, io::Write, path::Path};
 
 use crate::{
     Process,
-    error::Error,
     bpmn::{Activity, ActivityType, Bpmn, Event, Gateway, GatewayType, Symbol},
+    error::Error,
 };
 
 impl<T> Process<T> {
@@ -20,39 +20,35 @@ impl<T> Process<T> {
     /// ```
     pub fn scaffold(&self, path: impl AsRef<Path>) -> Result<(), Error> {
         let mut scaffold = Scaffold::default();
-        self.diagram.data().iter().for_each(|process| {
-            process.iter().for_each(|bpmn| {
-                    if let Bpmn::Activity(Activity {
+        for process in self.diagram.data() {
+            for bpmn in process.iter() {
+                match bpmn {
+                    Bpmn::Activity(Activity {
                         activity_type: ActivityType::Task,
                         id,
                         ..
-                    }) = bpmn
-                    {
-                        let symbols = if let Some(boundaries) = process.activity_boundaries(id)
-                        {
-                            boundaries
-                                .iter()
-                                .filter_map(|index| process.get(*index))
-                                .filter_map(|bpmn| {
-                                    if let Bpmn::Event(Event {
-                                        symbol: Some(symbol),
-                                        name,
-                                        ..
-                                    }) = bpmn
-                                    {
-                                        Some((name, symbol))
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .collect()
-                        } else {
-                            Vec::new()
-                        };
+                    }) => {
+                        let symbols = process
+                            .activity_boundaries(id)
+                            .unwrap_or(&Default::default())
+                            .iter()
+                            .filter_map(|index| process.get(*index))
+                            .filter_map(|bpmn| {
+                                if let Bpmn::Event(Event {
+                                    symbol: Some(symbol),
+                                    name,
+                                    ..
+                                }) = bpmn
+                                {
+                                    return Some((name, symbol));
+                                }
+                                None
+                            })
+                            .collect();
+
                         scaffold.add_task(bpmn, symbols);
                     }
-
-                    if let Bpmn::Gateway(
+                    Bpmn::Gateway(
                         gateway @ Gateway {
                             gateway_type:
                                 GatewayType::Exclusive
@@ -61,14 +57,12 @@ impl<T> Process<T> {
                             outputs,
                             ..
                         },
-                    ) = bpmn
-                        && outputs.len() > 1
-                    {
+                    ) if outputs.len() > 1 => {
                         let names = outputs
                             .iter()
-                            .map(|index| process.get(*index))
+                            .filter_map(|index| process.get(*index))
                             .filter_map(|bpmn| {
-                                if let Some(Bpmn::SequenceFlow { name, .. }) = bpmn {
+                                if let Bpmn::SequenceFlow { name, .. } = bpmn {
                                     return name.as_ref();
                                 }
                                 None
@@ -76,8 +70,10 @@ impl<T> Process<T> {
                             .collect();
                         scaffold.add_gateway(gateway, names);
                     }
-                });
-        });
+                    _ => {}
+                }
+            }
+        }
         scaffold.create(path)
     }
 }
