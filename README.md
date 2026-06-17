@@ -1,6 +1,6 @@
 # Snurr
 
-**Snurr** can run the process flow from a Business Process Model and Notation (BPMN) 2.0 file created by <https://demo.bpmn.io/new>.
+**Snurr** can run the process flow from a Business Process Model and Notation (BPMN) 2.0 file created by <https://demo.bpmn.io/new> or the [BPMN Editor](https://github.com/bpmn-io/vs-code-bpmn-io) plugin in VS Code.
 
 - Add your own behavior with Rust code from a small API. The wiring is already setup from the file.
 - Easy to update the BPMN diagram with new Task and Gateways without the need to refactor your old code.
@@ -8,12 +8,6 @@
 - Scaffold the initial BPMN diagram so you don't have to do the boilerplate code.
 - Contains no database.
 - Single or multithreaded (opt in)
-
-Read the [Snurr documentation](/docs/documentation.md) and explore the **tests** folder for more examples.
-
-**_NOTE:_** To view or edit BPMN files in your project you can use the [BPMN Editor](https://github.com/bpmn-io/vs-code-bpmn-io) plugin in VS Code.   
-
-![Tasks](/assets/images/vscode-plugin-bpmnio.png?raw=true)
 
 ## Example
 
@@ -25,7 +19,7 @@ BPMN diagram used in example.
 
 ```toml
 [dependencies]
-snurr = "0.13"
+snurr = "0.14"
 log = "0.4"
 pretty_env_logger = "0.5"
 ```
