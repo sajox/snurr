@@ -13,7 +13,7 @@
 
 BPMN diagram used in example.
 
-![BPMN example](/assets/images/example.png?raw=true)
+![BPMN example](https://github.com/sajox/snurr/blob/main/assets/images/example.png?raw=true)
 
 ### Usage
 
