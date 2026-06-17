@@ -7,9 +7,10 @@ authors = ["sajox"]
 description = "Read BPMN 2.0 files and run the process flow"
 readme = "README.md"
 license = "MIT"
+repository = "https://github.com/sajox/snurr"
 keywords = ["BPMN", "process"]
 
-include = ["Cargo.toml", "LICENSE", "/src", "/examples"]
+include = ["Cargo.toml", "LICENSE", "/src", "/examples", "/assets", "/docs"]
 
 [lib]
 doctest = false
