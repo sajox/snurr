@@ -1,22 +1,22 @@
-use snurr::{Data, Error, Process, Result, Symbol, TaskResult};
+use snurr::{Data, Error, Exclusive, Process, Result, Symbol, Task};
 
 const COUNT_1: &str = "Count 1";
 const COUNT_2: &str = "Count 2";
 const COUNT_3: &str = "Count 3";
 const COUNT_4: &str = "Count 4";
 
-const A: Option<&str> = Some("A");
-const B: Option<&str> = Some("B");
+const A: Exclusive = Exclusive::Flow("A");
+const B: Exclusive = Exclusive::Flow("B");
 
 #[derive(Debug, Default)]
 struct Counter {
     count: u32,
 }
 
-fn func_cnt(value: u32) -> impl Fn(Data<Counter>) -> TaskResult {
+fn func_cnt(value: u32) -> impl Fn(Data<Counter>) -> Task {
     move |input| {
         input.lock().unwrap().count += value;
-        None
+        Default::default()
     }
 }
 
@@ -77,7 +77,7 @@ fn subprocess_message_end() -> Result<()> {
 #[test]
 fn subprocess_error_message_end() -> Result<()> {
     let bpmn = Process::new("tests/files/subprocess_error_message_end.bpmn")?
-        .task(COUNT_1, |_| Some(("Overflow", Symbol::Error).into()))
+        .task(COUNT_1, |_| ("Overflow", Symbol::Error).into())
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
         .build()?;
@@ -210,8 +210,8 @@ fn inclusive_gateway_split_end() -> Result<()> {
 #[test]
 fn inclusive_gateway_no_output() -> Result<()> {
     let bpmn = Process::new("tests/files/inclusive_gateway_no_output.bpmn")?
-        .task("A", |_| None)
-        .task("B", |_| None)
+        .task("A", |_| Default::default())
+        .task("B", |_| Default::default())
         // Empty vec run default path
         .inclusive("Gateway_0qmfmmo", |_| Default::default())
         .build()?;
@@ -309,8 +309,8 @@ fn parallell_gateway() -> Result<()> {
 #[test]
 fn error_handling() -> Result<()> {
     let bpmn = Process::new("tests/files/error_handling.bpmn")?
-        .task(COUNT_1, |_| Some(Symbol::Error.into()))
-        .task(COUNT_2, |_| Some(Symbol::Error.into()))
+        .task(COUNT_1, |_| Symbol::Error.into())
+        .task(COUNT_2, |_| Symbol::Error.into())
         .task(COUNT_3, func_cnt(3))
         .build()?;
     let result = bpmn.run(Counter::default())?;
@@ -321,7 +321,7 @@ fn error_handling() -> Result<()> {
 #[test]
 fn two_boundary_timer_thrown() -> Result<()> {
     let bpmn = Process::new("tests/files/two_boundary.bpmn")?
-        .task(COUNT_1, |_| Some(("Timeout", Symbol::Timer).into()))
+        .task(COUNT_1, |_| ("Timeout", Symbol::Timer).into())
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
         .build()?;
@@ -333,7 +333,7 @@ fn two_boundary_timer_thrown() -> Result<()> {
 #[test]
 fn two_boundary_error_thrown() -> Result<()> {
     let bpmn = Process::new("tests/files/two_boundary.bpmn")?
-        .task(COUNT_1, |_| Some(("Error", Symbol::Error).into()))
+        .task(COUNT_1, |_| ("Error", Symbol::Error).into())
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
         .build()?;
@@ -345,7 +345,7 @@ fn two_boundary_error_thrown() -> Result<()> {
 #[test]
 fn multiple_boundaries_same_symbol() -> Result<()> {
     let bpmn = Process::new("tests/files/multiple_boundaries_same_symbol.bpmn")?
-        .task(COUNT_1, |_| Some(("M2", Symbol::Message).into()))
+        .task(COUNT_1, |_| ("M2", Symbol::Message).into())
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
         .build()?;
@@ -395,7 +395,7 @@ fn showcase() -> Result<()> {
     let bpmn = Process::new("tests/files/showcase.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
-        .task("Timeout 1", |_| Some(Symbol::Timer.into()))
+        .task("Timeout 1", |_| Symbol::Timer.into())
         .inclusive("RUN ALL", |_| vec!["A", "B"].into())
         .inclusive("RUN A", |_| "A".into())
         .exclusive("RUN DEFAULT", |_| Default::default())
@@ -531,7 +531,7 @@ fn event_gateway() -> Result<()> {
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
-        .task("Investigate", |_| None)
+        .task("Investigate", |_| Default::default())
         .event_based("JUNIOR GATEKEEPER", |_| {
             ("Investigate", Symbol::Message).into()
         })

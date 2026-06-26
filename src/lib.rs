@@ -17,7 +17,7 @@
 //! ### Cargo.toml
 //! ```toml
 //! [dependencies]
-//! snurr = "0.14"
+//! snurr = "0.15-wip"
 //! log = "0.4"
 //! pretty_env_logger = "0.5"
 //! ```
@@ -40,7 +40,7 @@
 //!     let bpmn = Process::<Counter>::new("examples/example.bpmn")?
 //!         .task("Count 1", |input| {
 //!             input.lock().unwrap().count += 1;
-//!             None
+//!             Default::default()
 //!         })
 //!         .exclusive("equal to 3", |input| {
 //!             match input.lock().unwrap().count {
@@ -66,7 +66,7 @@ mod diagram;
 mod error;
 mod process;
 
-pub use api::{Boundary, Data, IntermediateEvent, TaskResult, With};
+pub use api::{Data, Exclusive, Inclusive, IntermediateEvent, Task};
 pub use bpmn::Symbol;
 pub use error::{Error, Result};
 pub use process::{Build, Process, Run};

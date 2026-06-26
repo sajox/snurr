@@ -3,7 +3,7 @@ pub mod handler;
 mod scaffold;
 
 use crate::{
-    api::{Data, IntermediateEvent, TaskResult, With},
+    api::{Data, Exclusive, Inclusive, IntermediateEvent, Task},
     bpmn::Bpmn,
     diagram::{Diagram, reader::read_bpmn},
     error::Error,
@@ -55,7 +55,7 @@ impl<T> Process<T> {
     /// Register a task function with name or bpmn id
     pub fn task<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
-        F: Fn(Data<T>) -> TaskResult + 'static + Sync + Send,
+        F: Fn(Data<T>) -> Task + 'static + Sync + Send,
     {
         self.handler
             .add_callback(name, Callback::Task(Box::new(func)));
@@ -65,7 +65,7 @@ impl<T> Process<T> {
     /// Register an exclusive gateway function with name or bpmn id
     pub fn exclusive<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
-        F: Fn(Data<T>) -> Option<&'static str> + 'static + Sync + Send,
+        F: Fn(Data<T>) -> Exclusive + 'static + Sync + Send,
     {
         self.handler
             .add_callback(name, Callback::Exclusive(Box::new(func)));
@@ -75,7 +75,7 @@ impl<T> Process<T> {
     /// Register an inclusive gateway function with name or bpmn id
     pub fn inclusive<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
-        F: Fn(Data<T>) -> With + 'static + Sync + Send,
+        F: Fn(Data<T>) -> Inclusive + 'static + Sync + Send,
     {
         self.handler
             .add_callback(name, Callback::Inclusive(Box::new(func)));
@@ -150,7 +150,7 @@ impl<T> Process<T, Run> {
     ///     let bpmn = Process::<Counter>::new("examples/example.bpmn")?
     ///         .task("Count 1", |input| {
     ///             input.lock().unwrap().count += 1;
-    ///             None
+    ///             Default::default()
     ///         })
     ///         .exclusive("equal to 3", |input| {
     ///             match input.lock().unwrap().count {
@@ -210,8 +210,8 @@ mod tests {
     #[test]
     fn create_and_run() -> Result<(), Box<dyn std::error::Error>> {
         let bpmn = Process::new("examples/example.bpmn")?
-            .task("Count 1", |_| None)
-            .exclusive("equal to 3", |_| None)
+            .task("Count 1", |_| Default::default())
+            .exclusive("equal to 3", |_| Default::default())
             .build()?;
         bpmn.run({})?;
         Ok(())

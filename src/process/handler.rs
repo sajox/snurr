@@ -1,13 +1,13 @@
 use crate::{
     Error,
-    api::{Data, IntermediateEvent, TaskResult, With},
+    api::{Data, Exclusive, Inclusive, IntermediateEvent, Task},
     error::FUNC_MAP_ERROR_MSG,
 };
 use std::{collections::HashMap, fmt::Display};
 
-type TaskCallback<T> = Box<dyn Fn(Data<T>) -> TaskResult + Sync + Send>;
-type ExclusiveCallback<T> = Box<dyn Fn(Data<T>) -> Option<&'static str> + Sync + Send>;
-type InclusiveCallback<T> = Box<dyn Fn(Data<T>) -> With + Sync + Send>;
+type TaskCallback<T> = Box<dyn Fn(Data<T>) -> Task + Sync + Send>;
+type ExclusiveCallback<T> = Box<dyn Fn(Data<T>) -> Exclusive + Sync + Send>;
+type InclusiveCallback<T> = Box<dyn Fn(Data<T>) -> Inclusive + Sync + Send>;
 type EventBasedCallback<T> = Box<dyn Fn(Data<T>) -> IntermediateEvent + Sync + Send>;
 
 pub(super) enum Callback<T> {
@@ -50,7 +50,7 @@ impl<T> Handler<T> {
         }
     }
 
-    pub(super) fn run_task(&self, index: usize, data: Data<T>) -> Result<TaskResult, Error> {
+    pub(super) fn run_task(&self, index: usize, data: Data<T>) -> Result<Task, Error> {
         if let Some(Callback::Task(func)) = self.callbacks.get(index) {
             Ok(func(data))
         } else {
@@ -60,11 +60,7 @@ impl<T> Handler<T> {
         }
     }
 
-    pub(super) fn run_exclusive(
-        &self,
-        index: usize,
-        data: Data<T>,
-    ) -> Result<Option<&'static str>, Error> {
+    pub(super) fn run_exclusive(&self, index: usize, data: Data<T>) -> Result<Exclusive, Error> {
         if let Some(Callback::Exclusive(func)) = self.callbacks.get(index) {
             Ok(func(data))
         } else {
@@ -74,7 +70,7 @@ impl<T> Handler<T> {
         }
     }
 
-    pub(super) fn run_inclusive(&self, index: usize, data: Data<T>) -> Result<With, Error> {
+    pub(super) fn run_inclusive(&self, index: usize, data: Data<T>) -> Result<Inclusive, Error> {
         if let Some(Callback::Inclusive(func)) = self.callbacks.get(index) {
             Ok(func(data))
         } else {

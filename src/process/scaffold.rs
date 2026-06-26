@@ -137,7 +137,9 @@ impl<'a> Scaffold<'a> {
                     ));
                 }
 
-                content.push(format!(r#"    .task("{name_or_id}", |input| None)"#));
+                content.push(format!(
+                    r#"    .task("{name_or_id}", |input| Default::default())"#
+                ));
                 content.push("".into());
             }
         }

@@ -3,7 +3,7 @@ mod execute_handler;
 use super::Run;
 use crate::{
     Process,
-    api::{Data, With},
+    api::{Data, Exclusive, Inclusive, Task},
     bpmn::{Activity, ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Symbol},
     diagram::ProcessData,
     error::{AT_LEAST_TWO_OUTGOING, Error},
@@ -198,16 +198,16 @@ impl<T> Process<T, Run> {
                                 .ok_or_else(|| {
                                     Error::MissingImplementation(activity.to_string())
                                 })?? {
-                                Some(boundary) => input
+                                ref boundary @ Task::Boundary(name, ref symbol) => input
                                     .process
-                                    .find_boundary(id, boundary.name(), boundary.symbol())
+                                    .find_boundary(id, name, symbol)
                                     .ok_or_else(|| {
                                         Error::MissingBoundary(
                                             boundary.to_string(),
                                             activity.to_string(),
                                         )
                                     })?,
-                                None => maybe_fork!(outputs, activity),
+                                Task::Default => maybe_fork!(outputs, activity),
                             }
                         }
                         ActivityType::SubProcess {
@@ -278,8 +278,10 @@ impl<T> Process<T, Run> {
                                 .ok_or_else(|| {
                                     Error::MissingImplementation(gateway.to_string())
                                 })?? {
-                                Some(value) => find_flow!(outputs, value, input, gateway)?,
-                                None => gateway.default_path()?,
+                                Exclusive::Flow(value) => {
+                                    find_flow!(outputs, value, input, gateway)?
+                                }
+                                Exclusive::Default => gateway.default_path()?,
                             }
                         }
                         // Handle a regular Join or a JoinFork. In both cases, we need to wait for all tokens.
@@ -341,8 +343,8 @@ impl<T> Process<T, Run> {
             .map(|index| self.handler.run_inclusive(index, input.user_data()))
             .ok_or_else(|| Error::MissingImplementation(gateway.to_string()))??
         {
-            With::Flow(value) => find_flow!(outputs, value, input, gateway)?,
-            With::Fork(values) => match values.as_slice() {
+            Inclusive::Flow(value) => find_flow!(outputs, value, input, gateway)?,
+            Inclusive::Fork(values) => match values.as_slice() {
                 [] => gateway.default_path()?,
                 [value] => find_flow!(outputs, value, input, gateway)?,
                 [..] => {
@@ -359,7 +361,7 @@ impl<T> Process<T, Run> {
                     return Ok(Cow::Owned(tokens.into_iter().collect()));
                 }
             },
-            With::Default => gateway.default_path()?,
+            Inclusive::Default => gateway.default_path()?,
         };
         Ok(Cow::Owned(vec![*value]))
     }

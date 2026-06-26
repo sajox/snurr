@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bpmn = Process::<Counter>::new("examples/example.bpmn")?
         .task("Count 1", |input| {
             input.lock().unwrap().count += 1;
-            None
+            Default::default()
         })
         .exclusive("equal to 3", |input| {
             match input.lock().unwrap().count {

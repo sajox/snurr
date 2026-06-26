@@ -7,12 +7,10 @@ use std::{
 /// Generic type for the task and gateway inputs.
 pub type Data<T> = Arc<Mutex<T>>;
 
-/// Task result type
-pub type TaskResult = Option<Boundary>;
-
 /// Inclusive gateway return type
 #[derive(Default, Debug)]
-pub enum With {
+pub enum Inclusive {
+    /// Use default flow
     #[default]
     Default,
     /// Outgoing sequence flow by name or id
@@ -21,57 +19,63 @@ pub enum With {
     Fork(Vec<&'static str>),
 }
 
-impl From<&'static str> for With {
+impl From<&'static str> for Inclusive {
     fn from(value: &'static str) -> Self {
         Self::Flow(value)
     }
 }
 
-impl From<Vec<&'static str>> for With {
+impl From<Vec<&'static str>> for Inclusive {
     fn from(value: Vec<&'static str>) -> Self {
         Self::Fork(value)
     }
 }
 
+/// Exclusive gateway return type
+#[derive(Default, Debug)]
+pub enum Exclusive {
+    /// Use default flow
+    #[default]
+    Default,
+    /// Outgoing sequence flow by name or id
+    Flow(&'static str),
+}
+
+impl From<&'static str> for Exclusive {
+    fn from(value: &'static str) -> Self {
+        Self::Flow(value)
+    }
+}
+
 /// Task return type
-#[derive(Debug)]
-pub enum Boundary {
-    Symbol(Symbol),
-    NameSymbol(&'static str, Symbol),
+#[derive(Default, Debug)]
+pub enum Task {
+    /// Use default flow
+    #[default]
+    Default,
+    /// Use a task boundary with optional name and a symbol
+    Boundary(Option<&'static str>, Symbol),
 }
 
-impl Boundary {
-    pub(crate) fn symbol(&self) -> &Symbol {
-        match self {
-            Boundary::Symbol(symbol) | Boundary::NameSymbol(_, symbol) => symbol,
-        }
-    }
-
-    pub(crate) fn name(&self) -> Option<&'static str> {
-        match self {
-            Boundary::NameSymbol(name, _) => Some(name),
-            _ => None,
-        }
-    }
-}
-
-impl From<(&'static str, Symbol)> for Boundary {
+impl From<(&'static str, Symbol)> for Task {
     fn from(value: (&'static str, Symbol)) -> Self {
-        Self::NameSymbol(value.0, value.1)
+        Self::Boundary(Some(value.0), value.1)
     }
 }
 
-impl From<Symbol> for Boundary {
+impl From<Symbol> for Task {
     fn from(symbol: Symbol) -> Self {
-        Self::Symbol(symbol)
+        Self::Boundary(None, symbol)
     }
 }
 
-impl Display for Boundary {
+impl Display for Task {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Boundary::Symbol(symbol) => write!(f, "{symbol}"),
-            Boundary::NameSymbol(name, symbol) => write!(f, "({name}, {symbol})"),
+            Task::Default => write!(f, "Default"),
+            Task::Boundary(name, symbol) => {
+                write!(f, "({}, {symbol})", name.unwrap_or_default())
+            }
         }
     }
 }
