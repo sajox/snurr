@@ -2,6 +2,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Snurr Errors
 #[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
 pub enum Error {
     #[error("BPMN type {0} missing id")]
     MissingId(String),

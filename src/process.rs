@@ -197,7 +197,9 @@ impl<T> Process<T, Run> {
         }
 
         Arc::into_inner(data)
+            // FAIL if Arc has more than one strong reference
             .ok_or(Error::NoProcessResult)?
+            // FAIL if Mutex is poisoned
             .into_inner()
             .map_err(|_| Error::NoProcessResult)
     }
