@@ -1,4 +1,5 @@
-use snurr::{Data, Error, Exclusive, Process, Result, Symbol, Task};
+use snurr::{Error, Exclusive, Process, Result, Symbol, Task};
+use std::sync::{Arc, Mutex};
 
 const COUNT_1: &str = "Count 1";
 const COUNT_2: &str = "Count 2";
@@ -13,7 +14,7 @@ struct Counter {
     count: u32,
 }
 
-fn func_cnt(value: u32) -> impl Fn(Data<Counter>) -> Task {
+fn func_cnt(value: u32) -> impl Fn(Arc<Mutex<Counter>>) -> Task {
     move |input| {
         input.lock().unwrap().count += value;
         Default::default()
@@ -25,8 +26,8 @@ fn one_task() -> Result<()> {
     let bpmn = Process::new("tests/files/one_task.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 1);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 1);
     Ok(())
 }
 
@@ -36,8 +37,8 @@ fn two_task() -> Result<()> {
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 3);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 3);
     Ok(())
 }
 
@@ -47,8 +48,8 @@ fn subprocess() -> Result<()> {
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 3);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 3);
     Ok(())
 }
 
@@ -57,8 +58,8 @@ fn subprocess_nested() -> Result<()> {
     let bpmn = Process::new("tests/files/subprocess_nested.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 3);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 3);
     Ok(())
 }
 
@@ -69,8 +70,8 @@ fn subprocess_message_end() -> Result<()> {
         .task(COUNT_2, func_cnt(2))
         .exclusive("CHOOSE", |_| Default::default())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 3);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 3);
     Ok(())
 }
 
@@ -81,8 +82,8 @@ fn subprocess_error_message_end() -> Result<()> {
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 5);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 5);
     Ok(())
 }
 
@@ -94,8 +95,8 @@ fn exclusive_gateway_default_path() -> Result<()> {
         .task(COUNT_3, func_cnt(3))
         .exclusive("CHOOSE", |_| Default::default())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 4);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 4);
     Ok(())
 }
 
@@ -107,8 +108,8 @@ fn exclusive_gateway() -> Result<()> {
         .task(COUNT_3, func_cnt(3))
         .exclusive("CHOOSE", |_| "YES".into())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 3);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 3);
     Ok(())
 }
 
@@ -121,8 +122,8 @@ fn exclusive_gateway_with_id() -> Result<()> {
         // Navigate by Bpmn diagram Id instead of by Name.
         .exclusive("CHOOSE", |_| "Flow_15z7fe3".into())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 3);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 3);
     Ok(())
 }
 
@@ -135,8 +136,8 @@ fn exclusive_gateway_with_gateway_converge() -> Result<()> {
         .task(COUNT_4, func_cnt(4))
         .exclusive("CHOOSE", |_| "YES".into())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 7);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 7);
     Ok(())
 }
 
@@ -149,8 +150,8 @@ fn exclusive_gateway_with_task_converge() -> Result<()> {
         .task(COUNT_4, func_cnt(4))
         .exclusive("CHOOSE", |_| "YES".into())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 7);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 7);
     Ok(())
 }
 
@@ -163,8 +164,8 @@ fn inclusive_gateway_default_path() -> Result<()> {
         // Empty vec run default path
         .inclusive("CHOOSE", |_| Default::default())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 5);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 5);
     Ok(())
 }
 
@@ -176,8 +177,8 @@ fn inclusive_gateway() -> Result<()> {
         .task(COUNT_3, func_cnt(3))
         .inclusive("CHOOSE", |_| vec!["YES", "NO"].into())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 7);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 7);
     Ok(())
 }
 
@@ -189,8 +190,8 @@ fn inclusive_gateway_same_flow_used_multiple_times() -> Result<()> {
         .task(COUNT_3, func_cnt(3))
         .inclusive("CHOOSE", |_| vec!["YES", "YES", "NO", "NO"].into())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 7);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 7);
     Ok(())
 }
 
@@ -202,21 +203,21 @@ fn inclusive_gateway_split_end() -> Result<()> {
         .task(COUNT_3, func_cnt(3))
         .inclusive("Gateway_0jgakfl", |_| vec!["YES", "NO"].into())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 6);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 6);
     Ok(())
 }
 
 #[test]
 fn inclusive_gateway_no_output() -> Result<()> {
-    let bpmn = Process::new("tests/files/inclusive_gateway_no_output.bpmn")?
+    let bpmn = Process::<Counter>::new("tests/files/inclusive_gateway_no_output.bpmn")?
         .task("A", |_| Default::default())
         .task("B", |_| Default::default())
         // Empty vec run default path
         .inclusive("Gateway_0qmfmmo", |_| Default::default())
         .build()?;
 
-    match bpmn.run(Counter::default()) {
+    match bpmn.run(Default::default()) {
         Err(error) => assert!(
             matches!(error, Error::MissingOutput(_)),
             "Expected missing output"
@@ -233,8 +234,8 @@ fn inclusive_join_fork() -> Result<()> {
         .inclusive("GW A", |_| vec!["A", "B"].into())
         .inclusive("GW B", |_| vec!["A", "B", "C"].into())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 6);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 6);
     Ok(())
 }
 
@@ -245,8 +246,8 @@ fn inclusive_join_fork_gwb_one_flow() -> Result<()> {
         .inclusive("GW A", |_| vec!["A", "B"].into())
         .inclusive("GW B", |_| "A".into())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 4);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 4);
     Ok(())
 }
 
@@ -261,8 +262,8 @@ fn inclusive_join_fork_gateway_verify_sync() -> Result<()> {
             vec!["A", "B", "C"].into()
         })
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 7);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 7);
     Ok(())
 }
 
@@ -277,8 +278,8 @@ fn parallel_inclusive_join_fork() -> Result<()> {
         .inclusive("GW BB", |_| vec!["A", "B"].into())
         .inclusive("GW BBB", |_| vec!["A", "B", "C", "D"].into())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 23);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 23);
     Ok(())
 }
 
@@ -288,8 +289,8 @@ fn inclusive_with_parallel() -> Result<()> {
         .task(COUNT_1, func_cnt(1))
         .inclusive("GW A", |_| vec!["A", "B"].into())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 5);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 5);
     Ok(())
 }
 
@@ -301,8 +302,8 @@ fn parallell_gateway() -> Result<()> {
         .task(COUNT_3, func_cnt(3))
         .task(COUNT_4, func_cnt(4))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 10);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 10);
     Ok(())
 }
 
@@ -313,8 +314,8 @@ fn error_handling() -> Result<()> {
         .task(COUNT_2, |_| Symbol::Error.into())
         .task(COUNT_3, func_cnt(3))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 3);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 3);
     Ok(())
 }
 
@@ -325,8 +326,8 @@ fn two_boundary_timer_thrown() -> Result<()> {
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 3);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 3);
     Ok(())
 }
 
@@ -337,8 +338,8 @@ fn two_boundary_error_thrown() -> Result<()> {
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 2);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 2);
     Ok(())
 }
 
@@ -349,8 +350,8 @@ fn multiple_boundaries_same_symbol() -> Result<()> {
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 3);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 3);
     Ok(())
 }
 
@@ -361,8 +362,8 @@ fn intermediate_event() -> Result<()> {
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 6);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 6);
     Ok(())
 }
 
@@ -372,15 +373,16 @@ fn two_process_pools() -> Result<()> {
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 3);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 3);
     Ok(())
 }
 
 #[test]
 fn subprocess_external_link_fail() -> snurr::Result<()> {
-    let bpmn = Process::new("tests/files/subprocess_external_link_fail.bpmn")?.build()?;
-    match bpmn.run(Counter::default()) {
+    let bpmn =
+        Process::<Counter>::new("tests/files/subprocess_external_link_fail.bpmn")?.build()?;
+    match bpmn.run(Default::default()) {
         Err(error) => assert!(
             matches!(error, Error::MissingIntermediateCatchEvent(symbol, name) if symbol == "Link" && name == "Link 2"),
             "Expected Link Symbol with name Link 2"
@@ -400,8 +402,8 @@ fn showcase() -> Result<()> {
         .inclusive("RUN A", |_| "A".into())
         .exclusive("RUN DEFAULT", |_| Default::default())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 16);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 16);
     Ok(())
 }
 
@@ -410,8 +412,8 @@ fn task_fork() -> Result<()> {
     let bpmn = Process::new("tests/files/task_fork.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 6);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 6);
     Ok(())
 }
 
@@ -420,15 +422,15 @@ fn fork_explosion() -> Result<()> {
     let bpmn = Process::new("tests/files/fork_explosion.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 33);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 33);
     Ok(())
 }
 
 #[test]
 fn process_end_with_symbol() -> Result<()> {
-    let bpmn = Process::new("tests/files/process_end_with_symbol.bpmn")?.build()?;
-    let result = bpmn.run(Counter::default())?;
+    let bpmn = Process::<Counter>::new("tests/files/process_end_with_symbol.bpmn")?.build()?;
+    let result = bpmn.run(Default::default())?;
     assert_eq!(result.count, 0);
     Ok(())
 }
@@ -440,8 +442,8 @@ fn inclusive_gateway_not_all_joined() -> Result<()> {
         .inclusive("RUN ALL", |_| vec!["A", "B"].into())
         .exclusive("RUN C", |_| "C".into())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 3);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 3);
     Ok(())
 }
 
@@ -450,8 +452,8 @@ fn parallel_gateway_not_all_joined() -> Result<()> {
     let bpmn = Process::new("tests/files/parallel_gateway_not_all_joined.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 4);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 4);
     Ok(())
 }
 
@@ -460,8 +462,8 @@ fn parallel_gateway_not_all_joined_inverse() -> Result<()> {
     let bpmn = Process::new("tests/files/parallel_gateway_not_all_joined_inverse.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 4);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 4);
     Ok(())
 }
 
@@ -470,8 +472,8 @@ fn parallel_multi() -> Result<()> {
     let bpmn = Process::new("tests/files/parallel_multi.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 7);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 7);
     Ok(())
 }
 
@@ -480,8 +482,8 @@ fn parallel_join_fork() -> Result<()> {
     let bpmn = Process::new("tests/files/parallel_join_fork.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 6);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 6);
     Ok(())
 }
 
@@ -490,8 +492,8 @@ fn parallel_parallel_join_fork() -> Result<()> {
     let bpmn = Process::new("tests/files/parallel_parallel_join_fork.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 23);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 23);
     Ok(())
 }
 
@@ -500,8 +502,8 @@ fn parallel_one_in_and_out() -> Result<()> {
     let bpmn = Process::new("tests/files/parallel_one_in_and_out.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 1);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 1);
     Ok(())
 }
 
@@ -520,8 +522,8 @@ fn exclusive_gateway_merging_branching() -> Result<()> {
         .exclusive("BRANCHING", |_| A)
         .exclusive("MERGE AND BRANCH", |_| B)
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 3);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 3);
     Ok(())
 }
 
@@ -537,8 +539,8 @@ fn event_gateway() -> Result<()> {
         })
         .event_based("SENIOR GATEKEEPER", |_| ("Sleeping", Symbol::Timer).into())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 2);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 2);
     Ok(())
 }
 
@@ -551,8 +553,8 @@ fn single_flow() -> Result<()> {
         .exclusive("GW C", |_| A)
         .exclusive("GW D", |_| A)
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 18);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 18);
     Ok(())
 }
 
@@ -562,10 +564,10 @@ fn terminate_event() -> Result<()> {
         .task(COUNT_1, func_cnt(1))
         .exclusive("Terminate?", |_| "YES".into())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
+    let result = bpmn.run(Default::default())?;
 
     // NOTE 2 or 3 is OK result. The order in concurrent scenarios might differ.
-    assert!(matches!(result.count, 2 | 3));
+    assert!(matches!(result.lock().unwrap().count, 2 | 3));
     Ok(())
 }
 
@@ -575,10 +577,10 @@ fn terminate_event_sub_process() -> Result<()> {
         .task(COUNT_1, func_cnt(1))
         .exclusive("Terminate?", |_| "YES".into())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
+    let result = bpmn.run(Default::default())?;
 
     // NOTE 4 or 5 is OK result. The order in concurrent scenarios might differ.
-    assert!(matches!(result.count, 4 | 5));
+    assert!(matches!(result.lock().unwrap().count, 4 | 5));
     Ok(())
 }
 
@@ -588,8 +590,8 @@ fn startevent_not_first() -> Result<()> {
     let bpmn = Process::new("tests/files/startevent_not_first.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
-    let result = bpmn.run(Counter::default())?;
-    assert_eq!(result.count, 4);
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 4);
     Ok(())
 }
 
@@ -624,9 +626,9 @@ fn cancel_transaction() -> Result<()> {
         .task(COUNT_1, func_cnt(1))
         .exclusive("Cancel?", |_| "YES".into())
         .build()?;
-    let result = bpmn.run(Counter::default())?;
+    let result = bpmn.run(Default::default())?;
     // NOTE 2 or 3 is OK result. The order in concurrent scenarios might differ.
-    assert!(matches!(result.count, 3 | 4));
+    assert!(matches!(result.lock().unwrap().count, 3 | 4));
     Ok(())
 }
 
@@ -637,7 +639,7 @@ fn parallel_stalled_execution() -> Result<()> {
         .exclusive("Message?", |_| "YES".into())
         .build()?;
 
-    match bpmn.run(Counter::default()) {
+    match bpmn.run(Default::default()) {
         Err(error) => assert!(
             matches!(error, Error::BpmnRequirement(_)),
             "Expected BpmnRequirement"
@@ -654,7 +656,7 @@ fn parallel_unbalanced() -> Result<()> {
         .task(COUNT_1, func_cnt(1))
         .build()?;
 
-    match bpmn.run(Counter::default()) {
+    match bpmn.run(Default::default()) {
         Err(error) => assert!(
             matches!(error, Error::NotSupported(_)),
             "Expected NotSupported"
@@ -671,7 +673,7 @@ fn parallel_unbalanced2() -> Result<()> {
         .task(COUNT_1, func_cnt(1))
         .build()?;
 
-    match bpmn.run(Counter::default()) {
+    match bpmn.run(Default::default()) {
         Err(error) => assert!(
             matches!(error, Error::NotSupported(_)),
             "Expected NotSupported"

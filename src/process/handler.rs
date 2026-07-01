@@ -1,14 +1,14 @@
 use crate::{
     Error,
-    api::{Data, Exclusive, Inclusive, IntermediateEvent, Task},
+    api::{Exclusive, Inclusive, IntermediateEvent, Task},
     error::FUNC_MAP_ERROR_MSG,
 };
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
-type TaskCallback<T> = Box<dyn Fn(Data<T>) -> Task + Sync + Send>;
-type ExclusiveCallback<T> = Box<dyn Fn(Data<T>) -> Exclusive + Sync + Send>;
-type InclusiveCallback<T> = Box<dyn Fn(Data<T>) -> Inclusive + Sync + Send>;
-type EventBasedCallback<T> = Box<dyn Fn(Data<T>) -> IntermediateEvent + Sync + Send>;
+type TaskCallback<T> = Box<dyn Fn(Arc<T>) -> Task + Sync + Send>;
+type ExclusiveCallback<T> = Box<dyn Fn(Arc<T>) -> Exclusive + Sync + Send>;
+type InclusiveCallback<T> = Box<dyn Fn(Arc<T>) -> Inclusive + Sync + Send>;
+type EventBasedCallback<T> = Box<dyn Fn(Arc<T>) -> IntermediateEvent + Sync + Send>;
 
 pub(super) enum Callback<T> {
     Task(TaskCallback<T>),
@@ -50,7 +50,7 @@ impl<T> Handler<T> {
         }
     }
 
-    pub(super) fn run_task(&self, index: usize, data: Data<T>) -> Result<Task, Error> {
+    pub(super) fn run_task(&self, index: usize, data: Arc<T>) -> Result<Task, Error> {
         if let Some(Callback::Task(func)) = self.callbacks.get(index) {
             Ok(func(data))
         } else {
@@ -60,7 +60,7 @@ impl<T> Handler<T> {
         }
     }
 
-    pub(super) fn run_exclusive(&self, index: usize, data: Data<T>) -> Result<Exclusive, Error> {
+    pub(super) fn run_exclusive(&self, index: usize, data: Arc<T>) -> Result<Exclusive, Error> {
         if let Some(Callback::Exclusive(func)) = self.callbacks.get(index) {
             Ok(func(data))
         } else {
@@ -70,7 +70,7 @@ impl<T> Handler<T> {
         }
     }
 
-    pub(super) fn run_inclusive(&self, index: usize, data: Data<T>) -> Result<Inclusive, Error> {
+    pub(super) fn run_inclusive(&self, index: usize, data: Arc<T>) -> Result<Inclusive, Error> {
         if let Some(Callback::Inclusive(func)) = self.callbacks.get(index) {
             Ok(func(data))
         } else {
@@ -83,7 +83,7 @@ impl<T> Handler<T> {
     pub(super) fn run_eventbased(
         &self,
         index: usize,
-        data: Data<T>,
+        data: Arc<T>,
     ) -> Result<IntermediateEvent, Error> {
         if let Some(Callback::EventBased(func)) = self.callbacks.get(index) {
             Ok(func(data))

@@ -11,43 +11,16 @@
 
 This is not a complete implementation of the BPMN 2.0 specification but intend to be a light weight subset of it.
 
-## Migration
+## Changes
 
 ### Version 0.15-wip
 
-- BREAKING CHANGE: Updated Inclusive API. Renamed Enum `With` to `Inclusive`
-- BREAKING CHANGE: Updated Exclusive API. New enum type `Exclusive`
-- BREAKING CHANGE: Updated Task API. New enum type `Task`. Slightly less verbose when a Task Boundary is used.
-
-#### Old Task
-```rust
-.task("Name", |input| {
-    None
-})
-
-.task("Name", |input| {
-    Some(Symbol::Error.into())
-})
-
-.task("Name", |input| {
-    Some(("Not good", Symbol::Error).into())
-})
-```
-
-#### New Task
-```rust
-.task("Name", |input| {
-    Default::default()
-})
-
-.task("Name", |input| {
-    Symbol::Error.into()
-})
-
-.task("Name", |input| {
-    ("Not good", Symbol::Error).into()
-})
-```
+#### BREAKING CHANGES
+- Updated Inclusive API. Renamed Enum `With` to `Inclusive`
+- Updated Exclusive API. New enum type `Exclusive`
+- Updated Task API. New enum type `Task`. Slightly less verbose when a Task Boundary is used.
+- Removed Data<T> type
+- Removed Mutex in Snurr. Allows user to choose synchronization mechanism.
 
 ### Version 0.14
 
@@ -81,24 +54,24 @@ Use scaffold to generate code from the read BPMN file as a good starting point. 
 
 ### Create and run process
 
-Use your own model to be used by the process. 
+Use your own model to be used by the process. Need to be **Send + Sync**. Wrap your model in a Mutex if necessary.
 
 ```rust
 #[derive(Debug, Default)]
 struct Counter {
-    count: u32,
+    count: AtomicU32,
 }
 ```
 Read the bpmn file, add the behavior and run the process.
 
 ```rust
-let bpmn = Process::<Counter>::new("example.bpmn")?
+ let bpmn = Process::<Counter>::new("examples/example.bpmn")?
         .task("Count 1", |input| {
-            input.lock().unwrap().count += 1;
+            input.count.fetch_add(1, Relaxed);
             Default::default()
         })
         .exclusive("equal to 3", |input| {
-            match input.lock().unwrap().count {
+            match input.count.load(Relaxed) {
                 3 => "YES",
                 _ => "NO",
             }
@@ -106,7 +79,7 @@ let bpmn = Process::<Counter>::new("example.bpmn")?
         })
         .build()?;
 
-let result = bpmn.run(Counter::default())?;
+let result = bpmn.run(Default::default())?;
 ```
 
 ### Scaffold
@@ -283,7 +256,7 @@ If one or more boundary's exist on a task, then a boundary can be returned.
 
 ```rust
 .task("Name or id", |input| {
-    Some(Symbol::Error.into())
+    Symbol::Error.into()
 });
 ```
 

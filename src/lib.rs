@@ -17,7 +17,7 @@
 //! ### Cargo.toml
 //! ```toml
 //! [dependencies]
-//! snurr = "0.15-wip"
+//! snurr = { git = "https://github.com/sajox/snurr.git" }
 //! log = "0.4"
 //! pretty_env_logger = "0.5"
 //! ```
@@ -25,12 +25,12 @@
 //!
 //! ```
 //! use snurr::Process;
-//!
+//! use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
 //! extern crate pretty_env_logger;
 //!
 //! #[derive(Debug, Default)]
 //! struct Counter {
-//!     count: u32,
+//!     count: AtomicU32,
 //! }
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -39,11 +39,11 @@
 //!     // Create process from BPMN file
 //!     let bpmn = Process::<Counter>::new("examples/example.bpmn")?
 //!         .task("Count 1", |input| {
-//!             input.lock().unwrap().count += 1;
+//!             input.count.fetch_add(1, Relaxed);
 //!             Default::default()
 //!         })
 //!         .exclusive("equal to 3", |input| {
-//!             match input.lock().unwrap().count {
+//!             match input.count.load(Relaxed) {
 //!                 3 => "YES",
 //!                 _ => "NO",
 //!             }
@@ -52,10 +52,10 @@
 //!         .build()?;
 //!
 //!     // Run the process with input data
-//!     let counter = bpmn.run(Counter::default())?;
+//!     let result = bpmn.run(Default::default())?;
 //!
 //!     // Print the result.
-//!     println!("Count: {}", counter.count);
+//!     println!("Count: {}", result.count.load(Relaxed));
 //!     Ok(())
 //! }
 //! ```
@@ -66,7 +66,7 @@ mod diagram;
 mod error;
 mod process;
 
-pub use api::{Data, Exclusive, Inclusive, IntermediateEvent, Task};
+pub use api::{Exclusive, Inclusive, IntermediateEvent, Task};
 pub use bpmn::Symbol;
 pub use error::{Error, Result};
 pub use process::{Build, Process, Run};

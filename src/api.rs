@@ -1,11 +1,5 @@
 use crate::bpmn::Symbol;
-use std::{
-    fmt::Display,
-    sync::{Arc, Mutex},
-};
-
-/// Generic type for the task and gateway inputs.
-pub type Data<T> = Arc<Mutex<T>>;
+use std::fmt::Display;
 
 /// Inclusive gateway return type
 #[derive(Default, Debug)]

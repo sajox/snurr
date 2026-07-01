@@ -3,7 +3,7 @@ mod execute_handler;
 use super::Run;
 use crate::{
     Process,
-    api::{Data, Exclusive, Inclusive, Task},
+    api::{Exclusive, Inclusive, Task},
     bpmn::{Activity, ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Symbol},
     diagram::ProcessData,
     error::{AT_LEAST_TWO_OUTGOING, Error},
@@ -45,7 +45,7 @@ macro_rules! find_flow {
 impl<T> Process<T, Run> {
     pub(super) fn execute<'a>(&'a self, input: ExecuteInput<'a, T>) -> Result<&'a Event, Error>
     where
-        T: Send,
+        T: Send + Sync,
     {
         let mut last_visited_end = None;
         let mut handler = ExecuteHandler::new(input.process.start()?);
@@ -131,7 +131,7 @@ impl<T> Process<T, Run> {
         input: &ExecuteInput<'a, T>,
     ) -> Result<Return<'a>, Error>
     where
-        T: Send,
+        T: Send + Sync,
     {
         loop {
             current_id = match input
@@ -370,15 +370,15 @@ impl<T> Process<T, Run> {
 // Data for the execution engine.
 pub(super) struct ExecuteInput<'a, T> {
     process: &'a ProcessData,
-    user_data: Data<T>,
+    user_data: Arc<T>,
 }
 
 impl<'a, T> ExecuteInput<'a, T> {
-    pub(super) fn new(process: &'a ProcessData, user_data: Data<T>) -> Self {
+    pub(super) fn new(process: &'a ProcessData, user_data: Arc<T>) -> Self {
         Self { process, user_data }
     }
 
-    fn user_data(&self) -> Data<T> {
+    fn user_data(&self) -> Arc<T> {
         Arc::clone(&self.user_data)
     }
 }

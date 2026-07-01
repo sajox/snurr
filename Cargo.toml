@@ -22,7 +22,7 @@ unsafe_code = "forbid"
 name = "simple"
 
 [dependencies]
-quick-xml = "0.40"
+quick-xml = "0.41"
 log = "0.4"
 thiserror = "2"
 rayon = { version = "1", optional = true }

@@ -19,19 +19,19 @@ BPMN diagram used in example.
 
 ```toml
 [dependencies]
-snurr = "0.14"
+snurr = { git = "https://github.com/sajox/snurr.git" }
 log = "0.4"
 pretty_env_logger = "0.5"
 ```
 
 ```rust
 use snurr::Process;
-
+use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
 extern crate pretty_env_logger;
 
 #[derive(Debug, Default)]
 struct Counter {
-    count: u32,
+    count: AtomicU32,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -39,11 +39,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let bpmn = Process::<Counter>::new("examples/example.bpmn")?
         .task("Count 1", |input| {
-            input.lock().unwrap().count += 1;
-            None
+            input.count.fetch_add(1, Relaxed);
+            Default::default()
         })
         .exclusive("equal to 3", |input| {
-            match input.lock().unwrap().count {
+            match input.count.load(Relaxed) {
                 3 => "YES",
                 _ => "NO",
             }
@@ -51,8 +51,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .build()?;
 
-    let counter = bpmn.run(Counter::default())?;
-    println!("Count: {}", counter.count);
+    let result = bpmn.run(Default::default())?;
+    println!("Count: {}", result.count.load(Relaxed));
     Ok(())
 }
 ```

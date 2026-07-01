@@ -3,7 +3,7 @@ pub mod handler;
 mod scaffold;
 
 use crate::{
-    api::{Data, Exclusive, Inclusive, IntermediateEvent, Task},
+    api::{Exclusive, Inclusive, IntermediateEvent, Task},
     bpmn::Bpmn,
     diagram::{Diagram, reader::read_bpmn},
     error::Error,
@@ -11,12 +11,7 @@ use crate::{
 };
 use engine::ExecuteInput;
 use handler::Handler;
-use std::{
-    marker::PhantomData,
-    path::Path,
-    str::FromStr,
-    sync::{Arc, Mutex},
-};
+use std::{marker::PhantomData, path::Path, str::FromStr, sync::Arc};
 
 /// Process that contains information from the BPMN file
 pub struct Process<T, S = Build>
@@ -55,7 +50,7 @@ impl<T> Process<T> {
     /// Register a task function with name or bpmn id
     pub fn task<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
-        F: Fn(Data<T>) -> Task + 'static + Sync + Send,
+        F: Fn(Arc<T>) -> Task + 'static + Sync + Send,
     {
         self.handler
             .add_callback(name, Callback::Task(Box::new(func)));
@@ -65,7 +60,7 @@ impl<T> Process<T> {
     /// Register an exclusive gateway function with name or bpmn id
     pub fn exclusive<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
-        F: Fn(Data<T>) -> Exclusive + 'static + Sync + Send,
+        F: Fn(Arc<T>) -> Exclusive + 'static + Sync + Send,
     {
         self.handler
             .add_callback(name, Callback::Exclusive(Box::new(func)));
@@ -75,7 +70,7 @@ impl<T> Process<T> {
     /// Register an inclusive gateway function with name or bpmn id
     pub fn inclusive<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
-        F: Fn(Data<T>) -> Inclusive + 'static + Sync + Send,
+        F: Fn(Arc<T>) -> Inclusive + 'static + Sync + Send,
     {
         self.handler
             .add_callback(name, Callback::Inclusive(Box::new(func)));
@@ -85,7 +80,7 @@ impl<T> Process<T> {
     /// Register an event based gateway function with name or bpmn id
     pub fn event_based<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
-        F: Fn(Data<T>) -> IntermediateEvent + 'static + Sync + Send,
+        F: Fn(Arc<T>) -> IntermediateEvent + 'static + Sync + Send,
     {
         self.handler
             .add_callback(name, Callback::EventBased(Box::new(func)));
@@ -137,23 +132,23 @@ impl<T> Process<T, Run> {
     /// Run the process and return the `T` or an `Error`.
     /// ```
     /// use snurr::Process;
+    /// use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
     ///
     /// #[derive(Debug, Default)]
     /// struct Counter {
-    ///     count: u32,
+    ///     count: AtomicU32,
     /// }
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     pretty_env_logger::init();
     ///
     ///     // Create process from BPMN file
     ///     let bpmn = Process::<Counter>::new("examples/example.bpmn")?
     ///         .task("Count 1", |input| {
-    ///             input.lock().unwrap().count += 1;
+    ///             input.count.fetch_add(1, Relaxed);
     ///             Default::default()
     ///         })
     ///         .exclusive("equal to 3", |input| {
-    ///             match input.lock().unwrap().count {
+    ///             match input.count.load(Relaxed) {
     ///                 3 => "YES",
     ///                 _ => "NO",
     ///             }
@@ -162,18 +157,18 @@ impl<T> Process<T, Run> {
     ///         .build()?;
     ///
     ///     // Run the process with input data
-    ///     let counter = bpmn.run(Counter::default())?;
+    ///     let result = bpmn.run(Default::default())?;
     ///
     ///     // Print the result.
-    ///     println!("Count: {}", counter.count);
+    ///     println!("Count: {}", result.count.load(Relaxed));
     ///     Ok(())
     /// }
     /// ```
     pub fn run(&self, data: T) -> Result<T, Error>
     where
-        T: Send,
+        T: Send + Sync,
     {
-        let data = Arc::new(Mutex::new(data));
+        let data = Arc::new(data);
 
         // Run every process specified in the diagram
         for bpmn in self
@@ -198,10 +193,7 @@ impl<T> Process<T, Run> {
 
         Arc::into_inner(data)
             // FAIL if Arc has more than one strong reference
-            .ok_or(Error::NoProcessResult)?
-            // FAIL if Mutex is poisoned
-            .into_inner()
-            .map_err(|_| Error::NoProcessResult)
+            .ok_or(Error::NoProcessResult)
     }
 }
 
