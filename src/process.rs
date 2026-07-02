@@ -11,7 +11,7 @@ use crate::{
 };
 use engine::ExecuteInput;
 use handler::Handler;
-use std::{marker::PhantomData, path::Path, str::FromStr, sync::Arc};
+use std::{marker::PhantomData, path::Path, str::FromStr};
 
 /// Process that contains information from the BPMN file
 pub struct Process<T, S = Build>
@@ -50,7 +50,7 @@ impl<T> Process<T> {
     /// Register a task function with name or bpmn id
     pub fn task<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
-        F: Fn(Arc<T>) -> Task + 'static + Sync + Send,
+        F: Fn(&T) -> Task + 'static + Sync + Send,
     {
         self.handler
             .add_callback(name, Callback::Task(Box::new(func)));
@@ -60,7 +60,7 @@ impl<T> Process<T> {
     /// Register an exclusive gateway function with name or bpmn id
     pub fn exclusive<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
-        F: Fn(Arc<T>) -> Exclusive + 'static + Sync + Send,
+        F: Fn(&T) -> Exclusive + 'static + Sync + Send,
     {
         self.handler
             .add_callback(name, Callback::Exclusive(Box::new(func)));
@@ -70,7 +70,7 @@ impl<T> Process<T> {
     /// Register an inclusive gateway function with name or bpmn id
     pub fn inclusive<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
-        F: Fn(Arc<T>) -> Inclusive + 'static + Sync + Send,
+        F: Fn(&T) -> Inclusive + 'static + Sync + Send,
     {
         self.handler
             .add_callback(name, Callback::Inclusive(Box::new(func)));
@@ -80,7 +80,7 @@ impl<T> Process<T> {
     /// Register an event based gateway function with name or bpmn id
     pub fn event_based<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
-        F: Fn(Arc<T>) -> IntermediateEvent + 'static + Sync + Send,
+        F: Fn(&T) -> IntermediateEvent + 'static + Sync + Send,
     {
         self.handler
             .add_callback(name, Callback::EventBased(Box::new(func)));
@@ -166,8 +166,6 @@ impl<T> Process<T, Run> {
     where
         T: Send + Sync,
     {
-        let data = Arc::new(data);
-
         // Run every process specified in the diagram
         for bpmn in self
             .diagram
@@ -185,13 +183,11 @@ impl<T> Process<T, Run> {
                     .diagram
                     .get_process(*index)
                     .ok_or_else(|| Error::MissingProcessData(id.bpmn().into()))?;
-                self.execute(ExecuteInput::new(process_data, Arc::clone(&data)))?;
+                self.execute(ExecuteInput::new(process_data, &data))?;
             }
         }
 
-        Arc::into_inner(data)
-            // FAIL if Arc has more than one strong reference
-            .ok_or(Error::NoProcessResult)
+        Ok(data)
     }
 }
 

@@ -20,7 +20,8 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
 - Updated Exclusive API. New enum type `Exclusive`
 - Updated Task API. New enum type `Task`. Slightly less verbose when a Task Boundary is used.
 - Removed Data<T> type
-- Removed Mutex in Snurr. Allows user to choose synchronization mechanism.
+- Removed Mutex usage in Snurr. Allows user to choose synchronization mechanism.
+- Removed Arc usage in Snurr. Callbacks now use &T.
 
 ### Version 0.14
 

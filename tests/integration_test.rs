@@ -1,5 +1,5 @@
 use snurr::{Error, Exclusive, Process, Result, Symbol, Task};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 const COUNT_1: &str = "Count 1";
 const COUNT_2: &str = "Count 2";
@@ -14,7 +14,7 @@ struct Counter {
     count: u32,
 }
 
-fn func_cnt(value: u32) -> impl Fn(Arc<Mutex<Counter>>) -> Task {
+fn func_cnt(value: u32) -> impl Fn(&Mutex<Counter>) -> Task {
     move |input| {
         input.lock().unwrap().count += value;
         Default::default()

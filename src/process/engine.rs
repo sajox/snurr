@@ -10,7 +10,7 @@ use crate::{
 };
 use execute_handler::ExecuteHandler;
 use log::{info, warn};
-use std::{borrow::Cow, collections::HashSet, sync::Arc};
+use std::{borrow::Cow, collections::HashSet};
 
 type Tokens<'a> = Cow<'a, [usize]>;
 
@@ -194,7 +194,7 @@ impl<T> Process<T, Run> {
                         | ActivityType::ManualTask
                         | ActivityType::BusinessRuleTask => {
                             match func_idx
-                                .map(|index| self.handler.run_task(index, input.user_data()))
+                                .map(|index| self.handler.run_task(index, input.data))
                                 .ok_or_else(|| {
                                     Error::MissingImplementation(activity.to_string())
                                 })?? {
@@ -213,7 +213,7 @@ impl<T> Process<T, Run> {
                         ActivityType::SubProcess {
                             data_index: Some(index),
                         } => {
-                            let sp_data = self
+                            let subprocess = self
                                 .diagram
                                 .get_process(*index)
                                 .ok_or_else(|| Error::MissingProcessData(id.bpmn().into()))?;
@@ -233,7 +233,7 @@ impl<T> Process<T, Run> {
                                     ),
                                 name,
                                 ..
-                            } = self.execute(ExecuteInput::new(sp_data, input.user_data()))?
+                            } = self.execute(ExecuteInput::new(subprocess, input.data))?
                             {
                                 input
                                     .process
@@ -274,7 +274,7 @@ impl<T> Process<T, Run> {
                         GatewayType::Exclusive if outputs.len() == 1 => outputs.first().unwrap(),
                         GatewayType::Exclusive => {
                             match func_idx
-                                .map(|index| self.handler.run_exclusive(index, input.user_data()))
+                                .map(|index| self.handler.run_exclusive(index, input.data))
                                 .ok_or_else(|| {
                                     Error::MissingImplementation(gateway.to_string())
                                 })?? {
@@ -301,7 +301,7 @@ impl<T> Process<T, Run> {
                         }
                         GatewayType::EventBased => {
                             let value = func_idx
-                                .map(|index| self.handler.run_eventbased(index, input.user_data()))
+                                .map(|index| self.handler.run_eventbased(index, input.data))
                                 .ok_or_else(|| {
                                     Error::MissingImplementation(gateway.to_string())
                                 })??;
@@ -340,7 +340,7 @@ impl<T> Process<T, Run> {
         }: &'a Gateway,
     ) -> Result<Tokens<'a>, Error> {
         let value = match func_idx
-            .map(|index| self.handler.run_inclusive(index, input.user_data()))
+            .map(|index| self.handler.run_inclusive(index, input.data))
             .ok_or_else(|| Error::MissingImplementation(gateway.to_string()))??
         {
             Inclusive::Flow(value) => find_flow!(outputs, value, input, gateway)?,
@@ -370,15 +370,11 @@ impl<T> Process<T, Run> {
 // Data for the execution engine.
 pub(super) struct ExecuteInput<'a, T> {
     process: &'a ProcessData,
-    user_data: Arc<T>,
+    data: &'a T,
 }
 
 impl<'a, T> ExecuteInput<'a, T> {
-    pub(super) fn new(process: &'a ProcessData, user_data: Arc<T>) -> Self {
-        Self { process, user_data }
-    }
-
-    fn user_data(&self) -> Arc<T> {
-        Arc::clone(&self.user_data)
+    pub(super) fn new(process: &'a ProcessData, data: &'a T) -> Self {
+        Self { process, data }
     }
 }
