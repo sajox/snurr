@@ -13,9 +13,9 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
 
 ## Changes
 
-### Version 0.15-wip
+### Main branch (BREAKING CHANGES)
 
-#### BREAKING CHANGES
+- Updated documentation
 - Updated Inclusive API. Renamed Enum `With` to `Inclusive`
 - Updated Exclusive API. New enum type `Exclusive`
 - Updated Task API. New enum type `Task`. Slightly less verbose when a Task Boundary is used.
@@ -36,14 +36,14 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
 
 ```toml
 [dependencies]
-snurr = "0.14"
+snurr = "x.xx"
 ```
 
 With parallel feature enabled, new threads are spawned with parallel, inclusive, task and event forks.
 
 ```toml
 [dependencies]
-snurr = { version = "0.14", features = ["parallel"] }
+snurr = { version = "x.xx", features = ["parallel"] }
 ```
 
 ## Process
@@ -54,30 +54,28 @@ Use scaffold to generate code from the read BPMN file as a good starting point. 
 
 ### Create and run process
 
-Use your own model to be used by the process. Need to be **Send + Sync**. Wrap your model in a Mutex if necessary.
+Use your own model to be used by the process. Need to be **Send + Sync**. If your model is not `Sync`, you can wrap it in a `Mutex` by specifying `Process::<Mutex<YourModel>>::new`.
 
 ```rust
 #[derive(Debug, Default)]
-struct Counter {
-    count: AtomicU32,
-}
+struct Counter(AtomicU32);
 ```
 Read the bpmn file, add the behavior and run the process.
 
 ```rust
- let bpmn = Process::<Counter>::new("examples/example.bpmn")?
-        .task("Count 1", |input| {
-            input.count.fetch_add(1, Relaxed);
-            Default::default()
-        })
-        .exclusive("equal to 3", |input| {
-            match input.count.load(Relaxed) {
-                3 => "YES",
-                _ => "NO",
-            }
-            .into()
-        })
-        .build()?;
+let bpmn = Process::<Counter>::new("examples/example.bpmn")?
+    .task("Count 1", |input| {
+        input.0.fetch_add(1, Relaxed);
+        Default::default()
+    })
+    .exclusive("equal to 3", |input| {
+        match input.0.load(Relaxed) {
+            3 => "YES",
+            _ => "NO",
+        }
+        .into()
+    })
+    .build()?;
 
 let result = bpmn.run(Default::default())?;
 ```
@@ -114,7 +112,7 @@ All tasks is used in the same way regardless of which icon is used in the BPMN d
 
 ### Usage
 
-Register task by **name** (if it exist) or **id**. Return a **None** if no boundary is used and follow regular flow.
+Register task by **name** (if it exist) or **id**. Return a **Default** if no boundary is used and follow regular flow.
 
 ```rust
 .task("Name or id", |input| {
@@ -210,7 +208,7 @@ Default flow
 
 ![Parallel gateway](/assets/images/parallel-gateway.png)
 
-**Parallel gateways** run **all** available flows. No need to add gateway. (And you can't)
+**Parallel gateways** run **all** available flows. No need to add gateway code. (And you can't)
 
 ## End event
 
