@@ -15,13 +15,22 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
 
 ### Main branch (BREAKING CHANGES)
 
-- Updated documentation
-- Updated Inclusive API. Renamed Enum `With` to `Inclusive`
-- Updated Exclusive API. New enum type `Exclusive`
+- Updated documentation.
+- Updated Inclusive API. Renamed Enum `With` to `Inclusive`.
+- Updated Exclusive API. New enum type `Exclusive`.
 - Updated Task API. New enum type `Task`. Slightly less verbose when a Task Boundary is used.
-- Removed Data<T> type
-- Removed Mutex usage in Snurr. Allows user to choose synchronization mechanism.
-- Removed Arc usage in Snurr. Callbacks now use &T.
+- Removed Arc and Mutex usage in Snurr and let the user choose. Callbacks now use `&T` instead of `Arc<Mutex<T>>`.
+    - Change your process type to `Process::<Arc<Mutex<YourModel>>>::new` to maintain compatibility with existing code.
+    - And to extract result
+        ```rust
+        let data = Arc::into_inner(process_result) // FAIL if Arc has more than one strong reference
+                    .ok_or(YourError::NoProcessResult)? 
+                    .into_inner() // FAIL if Mutex is poisoned
+                    .map_err(|_| YourError::NoProcessResult)?;
+        ```
+- Removed `Data<T>` type as it was `Arc<Mutex<T>>`.
+
+
 
 ### Version 0.14
 
@@ -55,7 +64,7 @@ Use scaffold to generate code from the read BPMN file as a good starting point. 
 
 ### Create and run process
 
-Use your own model to be used by the process. Need to be **Send + Sync**. If your model is not `Sync`, you can wrap it in a `Mutex` by specifying `Process::<Mutex<YourModel>>::new`.
+Use your own model in the process. It must be **Send + Sync**, regardless of the "parallel" feature is enabled or not. If your model is not `Sync`, you can wrap it in a `Mutex` by specifying `Process::<Mutex<YourModel>>::new`.
 
 ```rust
 #[derive(Debug, Default)]
@@ -107,13 +116,13 @@ pub fn build(process: Process<()>) -> Result<Process<(), Run>, Error> {
 
 ## Tasks
 
-All tasks is used in the same way regardless of which icon is used in the BPMN diagram. The input to a task is thread safe. In parallel flows you might need to consider when using and releasing the lock to the input. If a task name is given then every task with same name will use the same closure.
+All tasks is used in the same way regardless of which icon is used in the BPMN diagram. If a task name is given then every task with same name will use the same closure. Register a task by **name** (if it exist) or by **id** if no name was given.
 
 ![Tasks](/assets/images/tasks.png)
 
 ### Usage
 
-Register task by **name** (if it exist) or **id**. Return a **Default** if no boundary is used and follow regular flow.
+Return **Default** if no boundary is used and follow regular flow.
 
 ```rust
 .task("Name or id", |input| {
@@ -140,7 +149,7 @@ Boundary with name
 
 ## Gateways
 
-Only branching/forking exclusive, event-based and inclusive gateways need to be added. If a gateway name is given then every gateway with same name will use the same closure. Register a gateway by **name** (if it exist) or **id** and return the flow taken by **name** or **id**. 
+Only branching/forking exclusive, event-based and inclusive gateways need to be added. If a gateway name is given then every gateway with same name and type will use the same closure. Register a gateway by **name** (if it exist) or by **id** if no name was given, and return the outgoing sequence flow taken by **name** or **id**.
 
 **NOTE** No merging/joining gateway need to be added from the BPMN diagram.
 

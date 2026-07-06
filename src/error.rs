@@ -52,9 +52,6 @@ pub enum Error {
     #[error("missing start event")]
     MissingStartEvent,
 
-    #[error("couldn't extract process result")]
-    NoProcessResult,
-
     #[error("{0} not supported")]
     NotSupported(String),
 
