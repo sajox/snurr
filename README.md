@@ -9,11 +9,13 @@
 - Contains no database.
 - Single or multithreaded (opt in)
 
+This is not a complete implementation of the BPMN 2.0 specification but intend to be a light weight subset of it.
+
 ## Example
 
-BPMN diagram used in example.
+### BPMN diagram
 
-![BPMN example](https://github.com/sajox/snurr/blob/main/assets/images/example.png?raw=true)
+![image of example.bpmn file](https://github.com/sajox/snurr/blob/main/assets/images/example.png?raw=true)
 
 ### Usage
 
@@ -59,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 If RUST_LOG=info is set when running [example](#usage)
 
-```
+```text
  INFO  snurr::process::engine > Start "Begin process"
  INFO  snurr::process::engine > SequenceFlow "count"
  INFO  snurr::process::engine > Task "Count 1"
@@ -76,12 +78,4 @@ If RUST_LOG=info is set when running [example](#usage)
  INFO  snurr::process::engine > SequenceFlow "YES"
  INFO  snurr::process::engine > End "End process"
 Counter(3)
-```
-
-### Prepared sample
-
-Run or copy the simple.rs in the examples folder
-
-```
-RUST_LOG=info cargo run --example simple
 ```

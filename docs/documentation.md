@@ -118,8 +118,6 @@ pub fn build(process: Process<()>) -> Result<Process<(), Run>, Error> {
 
 All tasks is used in the same way regardless of which icon is used in the BPMN diagram. If a task name is given then every task with same name will use the same closure. Register a task by **name** (if it exist) or by **id** if no name was given.
 
-![Tasks](/assets/images/tasks.png)
-
 ### Usage
 
 Return **Default** if no boundary is used and follow regular flow.
@@ -152,8 +150,6 @@ Boundary with name
 Only branching/forking exclusive, event-based and inclusive gateways need to be added. If a gateway name is given then every gateway with same name and type will use the same closure. Register a gateway by **name** (if it exist) or by **id** if no name was given, and return the outgoing sequence flow taken by **name** or **id**.
 
 **NOTE** No merging/joining gateway need to be added from the BPMN diagram.
-
-![Exclusive, inclusive and parallel gateway](/assets/images/gateways.png)
 
 ### Exclusive gateway
 
@@ -222,8 +218,6 @@ Default flow
 
 ## End event
 
-![End events](/assets/images/end-events.png)
-
 - **None**
 - **Terminate** ends the process. In a subprocess, only the subprocess ends and continues with the parent process.
 - **Cancel** ends the process in a transaction and run the cancel boundary.
@@ -232,12 +226,8 @@ Default flow
 ## Intermediate event
 
 - Intermediate **none** events (no icon) don't do anything and just follow its output. 
-- **Link** (throw and catch need a matching name)
+- **Link** throw and catch need a matching name
 - **Other symbols** don't do anything and just follow its output.
-
-Example with message Link throw and catch event:
-
-![Intermediate throw and catch event](/assets/images/intermediate_event.png)
  
 ## Boundary event
 
@@ -254,44 +244,16 @@ Boundary symbols recognized:
 - Signal
 - Timer
 
-Example with a task error boundary:
-
-![Boundary events](/assets/images/error-boundary.png)
-
-### Usage
-
-If one or more boundary's exist on a task, then a boundary can be returned.
-
-```rust
-.task("Name or id", |input| {
-    Symbol::Error.into()
-});
-```
-
 ## Subprocess
 
 Collapsed, expanded sub-process or transaction can be used.
-
-![Sub-process](/assets/images/subprocess.png)
-
-An end event symbol can be used in a sub-process to use the boundary as an alternate flow.
-
-![End events](/assets/images/subprocess-message.png)
-
-## Logging
-
-### info
-
-```
-RUST_LOG=info cargo run
-```
 
 ## Not supported
 
 ### Conditional Sequence Flows
 
-![Conditional Sequence Flows](/tests/not_supported/conditional_sequence_flows.png)
+Use an explicit gateway instead. Snurr return an `Error::NotSupported` if present.
 
-### Unbalanced Inclusive and Parallel gateways
+### Unbalanced Inclusive or Parallel gateway construction
 
-![Unbalanced Inclusive gateway](/tests/not_supported/inclusive_unbalanced.png)
+Re-write the process with balanced gateway pairs. Snurr return an `Error::NotSupported` if occured while running the process. The check is only active in debug mode.
