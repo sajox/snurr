@@ -1,9 +1,11 @@
+mod events;
 pub mod reader;
 
 use crate::{
     Error,
     api::IntermediateEvent,
     bpmn::{Activity, ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Symbol},
+    diagram::events::Events,
     error::ONLY_ONE_START_EVENT,
     process::handler::{HandlerMap, HandlerType},
 };
@@ -105,8 +107,7 @@ pub struct ProcessData {
     // Start event in the process
     start: Option<usize>,
     data: Vec<Bpmn>,
-    boundaries: HashMap<usize, Vec<usize>>,
-    catch_event_links: HashMap<String, usize>,
+    events: Events,
 }
 
 impl ProcessData {
@@ -139,32 +140,13 @@ impl ProcessData {
 
         self.data.iter_mut().for_each(|bpmn| match bpmn {
             Bpmn::Activity(Activity { outputs, .. }) => outputs.update_local_ids(&bpmn_index),
-            Bpmn::Event(Event {
-                event_type,
-                id,
-                outputs,
-                attached_to_ref,
-                symbol,
-                name,
-                ..
-            }) => {
-                outputs.update_local_ids(&bpmn_index);
-                if let Some(attached_to_ref) = attached_to_ref {
+            Bpmn::Event(event) => {
+                event.outputs.update_local_ids(&bpmn_index);
+                if let Some(attached_to_ref) = &mut event.attached_to_ref {
                     attached_to_ref.update_local_id(&bpmn_index);
-
-                    // Collect boundary to activity id
-                    self.boundaries
-                        .entry(*attached_to_ref.local())
-                        .or_default()
-                        .push(*id.local());
                 }
 
-                if let Some(name) = name
-                    && let Some(Symbol::Link) = symbol
-                    && EventType::IntermediateCatch == *event_type
-                {
-                    self.catch_event_links.insert(name.clone(), *id.local());
-                }
+                self.events.register(event);
             }
             Bpmn::Gateway(Gateway {
                 default, outputs, ..
@@ -191,8 +173,8 @@ impl ProcessData {
         self.data.iter()
     }
 
-    pub fn activity_boundaries(&self, id: &Id) -> Option<&Vec<usize>> {
-        self.boundaries.get(id.local())
+    pub fn events(&self) -> &Events {
+        &self.events
     }
 
     pub fn find_boundary<'a>(
@@ -201,7 +183,8 @@ impl ProcessData {
         search_name: Option<&str>,
         search_symbol: &Symbol,
     ) -> Option<&'a usize> {
-        self.activity_boundaries(activity_id)?
+        self.events
+            .boundaries(activity_id)?
             .iter()
             .filter_map(|index| self.data.get(*index))
             .find_map(|bpmn| match bpmn {
@@ -213,12 +196,6 @@ impl ProcessData {
                 }) if symbol == search_symbol && search_name == name.as_deref() => Some(id.local()),
                 _ => None,
             })
-    }
-
-    pub fn catch_event_link(&self, throw_event_name: &str) -> Result<&usize, Error> {
-        self.catch_event_links.get(throw_event_name).ok_or_else(|| {
-            Error::MissingIntermediateCatchEvent(Symbol::Link.to_string(), throw_event_name.into())
-        })
     }
 
     pub fn find_by_name_or_id<'a>(

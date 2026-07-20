@@ -29,7 +29,8 @@ impl<T> Process<T> {
                         ..
                     }) => {
                         let symbols = process
-                            .activity_boundaries(id)
+                            .events()
+                            .boundaries(id)
                             .unwrap_or(&Default::default())
                             .iter()
                             .filter_map(|index| process.get(*index))
@@ -160,8 +161,7 @@ impl<'a> Scaffold<'a> {
             let name_or_id = name.as_deref().unwrap_or(id.bpmn());
             if seen_gateways.insert(name_or_id) {
                 content.push(format!(
-                    r#"    // {} gateway. Names: {}. Flows: {}."#,
-                    gateway_type,
+                    r#"    // Names: {}. Ids: {}."#,
                     names
                         .iter()
                         .map(|value| value.to_string())

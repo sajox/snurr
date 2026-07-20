@@ -108,7 +108,7 @@ use snurr::{Error, Process, Run};
 pub fn build(process: Process<()>) -> Result<Process<(), Run>, Error> {
     process
         .task("Count 1", |input| Default::default())
-        // Exclusive gateway. Names: YES, NO. Flows: Flow_1h0jtl6, Flow_0rsqhpi.
+        // Names: YES, NO. Ids: Flow_1h0jtl6, Flow_0rsqhpi.
         .exclusive("equal to 3", |input| Default::default())
         .build()
 }

@@ -157,7 +157,7 @@ impl<T> Process<T, Run> {
                         EventType::IntermediateThrow => {
                             match (name.as_ref(), symbol.as_ref()) {
                                 (Some(name), Some(Symbol::Link)) => {
-                                    input.process.catch_event_link(name)?
+                                    input.process.events().catch_event_link(name)?
                                 }
                                 // Follow outputs for other throw events
                                 (Some(_), _) => {
