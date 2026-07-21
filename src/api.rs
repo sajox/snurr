@@ -9,7 +9,7 @@ pub enum Inclusive {
     Default,
     /// Outgoing sequence flow by name or id
     Flow(&'static str),
-    /// Collection of outgoing sequence flow by name or id
+    /// Collection of outgoing sequence flow by name or id. An empty Vec selects the default sequence flow.
     Fork(Vec<&'static str>),
 }
 
