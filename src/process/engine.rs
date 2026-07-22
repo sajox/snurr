@@ -83,7 +83,7 @@ impl<T> Process<T, Run> {
                         Ok(Return::End(event)) => {
                             if let Event {
                                 event_type: EventType::End,
-                                symbol: Some(Symbol::Terminate | Symbol::Cancel),
+                                symbol: Some(Symbol::Terminate | Symbol::Cancel | Symbol::Error),
                                 ..
                             } = event
                             {
