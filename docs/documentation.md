@@ -116,7 +116,9 @@ pub fn build(process: Process<()>) -> Result<Process<(), Run>, Error> {
 
 ## Tasks
 
-All tasks is used in the same way regardless of which icon is used in the BPMN diagram. If a task name is given then every task with same name will use the same closure. Register a task by **name** (if it exist) or by **id** if no name was given.
+All tasks is used in the same way regardless of which icon is used in the BPMN diagram. If a task name is given then every task with same name will use the same closure. Register a task by **name** (if it exist) or by **id** if no name was given. 
+
+Two or more outgoing sequence flows from a task create a fork of the flow. It is recommended to use a parallel gateway after the task instead, for the sake of clarity.
 
 ### Usage
 
@@ -147,9 +149,9 @@ Boundary with name
 
 ## Gateways
 
-Only branching/forking exclusive, event-based and inclusive gateways need to be added. If a gateway name is given then every gateway with same name and type will use the same closure. Register a gateway by **name** (if it exist) or by **id** if no name was given, and return the outgoing sequence flow taken by **name** or **id**.
+Only branching/forking exclusive, event-based and inclusive gateways need to be added. If a gateway name is given then every gateway with same name and type will use the same closure. Register a gateway by **name** (if it exist) or by **id** if no name was given, and return the outgoing sequence flow taken by **name** or **id**. No merging/joining gateway need to be added from the BPMN diagram with only one output.
 
-**NOTE** No merging/joining gateway need to be added from the BPMN diagram.
+Same gateway can do both join and fork instead of using two separate gateways. The latter is recommended for clarity. (i.e two gateways)
 
 ### Exclusive gateway
 
@@ -216,20 +218,22 @@ Default flow
 
 **Parallel gateways** run **all** available flows. No need to add gateway code. (And you can't)
 
-## End event
+## Events
+
+### End event
 
 - **None**
 - **Terminate** ends the process. In a subprocess, only the subprocess ends and continues with the parent process.
 - **Cancel** ends the process in a transaction and run the cancel boundary.
 - **Other symbols** can be used in a subprocess to select a subprocess boundary event.
 
-## Intermediate event
+### Intermediate event
 
 - Intermediate **none** events (no icon) don't do anything and just follow its output. 
 - **Link** throw and catch need a matching name
 - **Other symbols** don't do anything and just follow its output.
  
-## Boundary event
+### Boundary event
 
 Only interrupting boundary events is implemented and can be used on a task or a sub-process.
 
@@ -256,4 +260,4 @@ Use an explicit gateway instead. Snurr return an `Error::NotSupported` if presen
 
 ### Unbalanced Inclusive or Parallel gateway construction
 
-Re-write the process with balanced gateway pairs. Snurr return an `Error::NotSupported` if occured while running the process. The check is only active in debug mode.
+Re-write the process with balanced/symmetric gateway pairs. Snurr return an `Error::NotSupported` if occured while running the process. The check is only active in debug mode.
