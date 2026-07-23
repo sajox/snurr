@@ -183,7 +183,7 @@ impl<T> Process<T, Run> {
                     .diagram
                     .get_process(*index)
                     .ok_or_else(|| Error::MissingProcessData(id.bpmn().into()))?;
-                self.execute(ExecuteInput::new(process_data, &data))?;
+                self.execute(ExecuteInput::new(process_data, false, &data))?;
             }
         }
 

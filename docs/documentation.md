@@ -222,10 +222,15 @@ Default flow
 
 ### End event
 
-- **None**
-- **Terminate** ends the process. In a subprocess, only the subprocess ends and continues with the parent process.
-- **Cancel** ends the process in a transaction and run the cancel boundary.
-- **Other symbols** can be used in a subprocess to select a subprocess boundary event.
+End events have different effects depending on where they are used. In a regular process or a subprocess. Some of these events are not used in accordance with the BPMN specification and are marked with `!BPMN`. They should not trigger a boundary event in this way.
+
+- **Cancel** ends the transaction subprocess and run the cancel boundary.
+- **Compensation** In a subprocess, ends and run the Compensation boundary. `!BPMN`
+- **Error** ends the process. In a subprocess, ends and run the error boundary.
+- **Escalation** In a subprocess, ends and run the Escalation boundary.
+- **Message** In a subprocess, ends and run the Message boundary. `!BPMN`
+- **Signal** In a subprocess, ends and run the Signal boundary.
+- **Terminate** ends the process. In a subprocess, ends and continues with the parent process.
 
 ### Intermediate event
 
@@ -235,22 +240,21 @@ Default flow
  
 ### Boundary event
 
-Only interrupting boundary events is implemented and can be used on a task or a sub-process.
+Only interrupting boundary events is implemented and can be used on a task or a subprocess.
 
 Boundary symbols recognized:
-- Cancel
-- Compensation
-- Conditional
-- Error
-- Escalation
-- Link
-- Message
-- Signal
-- Timer
+- **Cancel** (Only transaction subprocess)
+- **Compensation**
+- **Conditional**
+- **Error**
+- **Escalation**
+- **Message**
+- **Signal**
+- **Timer**
 
 ## Subprocess
 
-Collapsed, expanded sub-process or transaction can be used.
+Collapsed, expanded subprocess or transaction can be used.
 
 ## Not supported
 

@@ -81,16 +81,25 @@ impl<T> Process<T, Run> {
                     match flow_result {
                         Ok(Return::Join(gateway)) => handler.consume_token(Some(gateway)),
                         Ok(Return::End(event)) => {
-                            if let Event {
-                                event_type: EventType::End,
-                                symbol: Some(Symbol::Terminate | Symbol::Cancel | Symbol::Error),
-                                ..
-                            } = event
-                            {
-                                return Ok(event);
+                            match event {
+                                // A subprocess end event, terminate early. The result is used by the subprocess to choose boundary (interrupting).
+                                Event {
+                                    event_type: EventType::End,
+                                    symbol: Some(_),
+                                    ..
+                                } if input.is_subprocess => return Ok(event),
+
+                                // Regular process
+                                Event {
+                                    event_type: EventType::End,
+                                    symbol: Some(Symbol::Terminate | Symbol::Error),
+                                    ..
+                                } => return Ok(event),
+                                _ => {
+                                    last_visited_end.replace(event);
+                                    handler.consume_token(None);
+                                }
                             }
-                            last_visited_end.replace(event);
-                            handler.consume_token(None);
                         }
                         Ok(Return::Fork(item)) => handler.pending_fork(item),
                         Err(value) => return Err(value),
@@ -224,17 +233,16 @@ impl<T> Process<T, Run> {
                                     Some(
                                         symbol @ (Symbol::Cancel
                                         | Symbol::Compensation
-                                        | Symbol::Conditional
                                         | Symbol::Error
                                         | Symbol::Escalation
                                         | Symbol::Message
-                                        | Symbol::Signal
-                                        | Symbol::Timer),
+                                        | Symbol::Signal),
                                     ),
                                 name,
                                 ..
-                            } = self.execute(ExecuteInput::new(subprocess, input.data))?
+                            } = self.execute(ExecuteInput::new(subprocess, true, input.data))?
                             {
+                                // Jump to boundary
                                 input
                                     .process
                                     .find_boundary(id, name.as_deref(), symbol)
@@ -370,11 +378,16 @@ impl<T> Process<T, Run> {
 // Data for the execution engine.
 pub(super) struct ExecuteInput<'a, T> {
     process: &'a ProcessData,
+    is_subprocess: bool,
     data: &'a T,
 }
 
 impl<'a, T> ExecuteInput<'a, T> {
-    pub(super) fn new(process: &'a ProcessData, data: &'a T) -> Self {
-        Self { process, data }
+    pub(super) fn new(process: &'a ProcessData, is_subprocess: bool, data: &'a T) -> Self {
+        Self {
+            process,
+            is_subprocess,
+            data,
+        }
     }
 }
