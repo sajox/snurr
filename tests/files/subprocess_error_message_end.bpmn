@@ -26,19 +26,15 @@
       </bpmn:boundaryEvent>
       <bpmn:sequenceFlow id="Flow_1eec6ff" name="Error occured" sourceRef="Event_0fdj80m" targetRef="Activity_015s7ai" />
       <bpmn:sequenceFlow id="Flow_10lf18k" sourceRef="Activity_015s7ai" targetRef="Event_1pwwg7u" />
-      <bpmn:endEvent id="Event_1pwwg7u" name="B7">
-        <bpmn:incoming>Flow_10lf18k</bpmn:incoming>
-        <bpmn:messageEventDefinition id="MessageEventDefinition_1u79cq9" />
-      </bpmn:endEvent>
       <bpmn:endEvent id="Event_16gsgu3">
         <bpmn:incoming>Flow_0d8c5vr</bpmn:incoming>
       </bpmn:endEvent>
+      <bpmn:endEvent id="Event_1pwwg7u" name="B7">
+        <bpmn:incoming>Flow_10lf18k</bpmn:incoming>
+        <bpmn:errorEventDefinition id="ErrorEventDefinition_02f30vv" />
+      </bpmn:endEvent>
     </bpmn:subProcess>
     <bpmn:sequenceFlow id="Flow_1jpp2ze" sourceRef="StartEvent_0fqyv2p" targetRef="Activity_0zd8r93" />
-    <bpmn:boundaryEvent id="Event_0r55d8a" name="B7" attachedToRef="Activity_0zd8r93">
-      <bpmn:outgoing>Flow_1kxqmic</bpmn:outgoing>
-      <bpmn:messageEventDefinition id="MessageEventDefinition_1m0prw7" />
-    </bpmn:boundaryEvent>
     <bpmn:task id="Activity_1su37i7" name="Count 3">
       <bpmn:incoming>Flow_1kxqmic</bpmn:incoming>
       <bpmn:outgoing>Flow_1szm808</bpmn:outgoing>
@@ -52,6 +48,10 @@
       <bpmn:incoming>Flow_0np9gen</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_0np9gen" sourceRef="Activity_0zd8r93" targetRef="Event_0k88pbg" />
+    <bpmn:boundaryEvent id="Event_0r55d8a" name="B7" attachedToRef="Activity_0zd8r93">
+      <bpmn:outgoing>Flow_1kxqmic</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorEventDefinition_0bhauw6" />
+    </bpmn:boundaryEvent>
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_1meln4r">
@@ -78,16 +78,16 @@
         <dc:Bounds x="420" y="280" width="100" height="80" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_16ehlm1_di" bpmnElement="Event_1pwwg7u">
-        <dc:Bounds x="622" y="302" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="634" y="345" width="14" height="14" />
-        </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Event_1wz9tbq_di" bpmnElement="Event_16gsgu3">
         <dc:Bounds x="622" y="162" width="36" height="36" />
         <bpmndi:BPMNLabel>
           <dc:Bounds x="611" y="205" width="58" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1xsbrad_di" bpmnElement="Event_1pwwg7u">
+        <dc:Bounds x="622" y="302" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="634" y="345" width="14" height="14" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Event_0fdj80m_di" bpmnElement="Event_0fdj80m">
@@ -128,7 +128,7 @@
       <bpmndi:BPMNShape id="Event_0k88pbg_di" bpmnElement="Event_0k88pbg">
         <dc:Bounds x="902" y="242" width="36" height="36" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Event_0r55d8a_di" bpmnElement="Event_0r55d8a">
+      <bpmndi:BPMNShape id="Event_03xx0ct_di" bpmnElement="Event_0r55d8a">
         <dc:Bounds x="462" y="392" width="36" height="36" />
         <bpmndi:BPMNLabel>
           <dc:Bounds x="433" y="426" width="14" height="14" />
