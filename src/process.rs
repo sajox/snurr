@@ -13,7 +13,13 @@ use engine::ExecuteInput;
 use handler::Handler;
 use std::{marker::PhantomData, path::Path, str::FromStr};
 
-/// Process that contains information from the BPMN file
+/// Process Build state
+pub struct Build;
+
+/// Process Run state
+pub struct Run;
+
+/// Process that contains information from the BPMN file and registered functions
 pub struct Process<T, S = Build>
 where
     Self: Sync + Send,
@@ -22,12 +28,6 @@ where
     handler: Handler<T>,
     _marker: PhantomData<S>,
 }
-
-/// Process Build state
-pub struct Build;
-
-/// Process Run state
-pub struct Run;
 
 impl<T> Process<T> {
     /// Create new process and initialize it from the BPMN file path.
@@ -186,7 +186,6 @@ impl<T> Process<T, Run> {
                 self.execute(ExecuteInput::new(process_data, false, &data))?;
             }
         }
-
         Ok(data)
     }
 }

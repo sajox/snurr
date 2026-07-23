@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### Output
 
-If RUST_LOG=info is set when running [example](#usage)
+If `RUST_LOG=info` is set when running example
 
 ```text
  INFO  snurr::process::engine > Start "Begin process"

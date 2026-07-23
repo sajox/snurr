@@ -357,7 +357,7 @@ impl<T> Process<T, Run> {
                 [value] => find_flow!(outputs, value, input, gateway)?,
                 [..] => {
                     let mut tokens = HashSet::with_capacity(values.len());
-                    for &value in values.iter() {
+                    for value in values {
                         // Breaks on first error
                         if !tokens.insert(*find_flow!(outputs, value, input, gateway)?) {
                             // The flow has already been used, we just log an warning and continue.
