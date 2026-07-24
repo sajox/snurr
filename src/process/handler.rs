@@ -5,6 +5,20 @@ use crate::{
 };
 use std::{collections::HashMap, fmt::Display};
 
+macro_rules! callback {
+    ($name:ident, $variant:pat => $value:ident, $ret:ty) => {
+        pub(super) fn $name(&self, index: usize, data: &T) -> Result<$ret, Error> {
+            let Some($variant) = self.callbacks.get(index) else {
+                return Err(Error::MissingImplementation(format!(
+                    "{} with index: {index}",
+                    stringify!($name)
+                )));
+            };
+            Ok($value(data))
+        }
+    };
+}
+
 type TaskCallback<T> = Box<dyn Fn(&T) -> Task + Sync + Send>;
 type ExclusiveCallback<T> = Box<dyn Fn(&T) -> Exclusive + Sync + Send>;
 type InclusiveCallback<T> = Box<dyn Fn(&T) -> Inclusive + Sync + Send>;
@@ -50,49 +64,10 @@ impl<T> Handler<T> {
         }
     }
 
-    pub(super) fn run_task(&self, index: usize, data: &T) -> Result<Task, Error> {
-        if let Some(Callback::Task(func)) = self.callbacks.get(index) {
-            Ok(func(data))
-        } else {
-            Err(Error::MissingImplementation(format!(
-                "Task with index: {index}"
-            )))
-        }
-    }
-
-    pub(super) fn run_exclusive(&self, index: usize, data: &T) -> Result<Exclusive, Error> {
-        if let Some(Callback::Exclusive(func)) = self.callbacks.get(index) {
-            Ok(func(data))
-        } else {
-            Err(Error::MissingImplementation(format!(
-                "Exclusive with index: {index}"
-            )))
-        }
-    }
-
-    pub(super) fn run_inclusive(&self, index: usize, data: &T) -> Result<Inclusive, Error> {
-        if let Some(Callback::Inclusive(func)) = self.callbacks.get(index) {
-            Ok(func(data))
-        } else {
-            Err(Error::MissingImplementation(format!(
-                "Inclusive with index: {index}"
-            )))
-        }
-    }
-
-    pub(super) fn run_eventbased(
-        &self,
-        index: usize,
-        data: &T,
-    ) -> Result<IntermediateEvent, Error> {
-        if let Some(Callback::EventBased(func)) = self.callbacks.get(index) {
-            Ok(func(data))
-        } else {
-            Err(Error::MissingImplementation(format!(
-                "Eventbased with index: {index}"
-            )))
-        }
-    }
+    callback!(run_task, Callback::Task(func) => func, Task);
+    callback!(run_exclusive, Callback::Exclusive(func) => func, Exclusive);
+    callback!(run_inclusive, Callback::Inclusive(func) => func, Inclusive);
+    callback!(run_eventbased, Callback::EventBased(func) => func, IntermediateEvent);
 
     // Consumes the handler_map and cannot add more things with add_
     pub(super) fn build(&mut self) -> Result<HandlerMap, Error> {
