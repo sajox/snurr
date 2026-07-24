@@ -21,6 +21,9 @@ unsafe_code = "forbid"
 [[example]]
 name = "simple"
 
+[[example]]
+name = "reusable"
+
 [dependencies]
 quick-xml = "0.41"
 log = "0.4"
