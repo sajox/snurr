@@ -1,15 +1,14 @@
 use crate::{
-    Error,
     api::{Exclusive, Inclusive, IntermediateEvent, Task},
-    error::FUNC_MAP_ERROR_MSG,
+    error::{BuildError, RuntimeError},
 };
 use std::{collections::HashMap, fmt::Display};
 
 macro_rules! callback {
     ($name:ident, $variant:pat => $value:ident, $ret:ty) => {
-        pub(super) fn $name(&self, index: usize, data: &T) -> Result<$ret, Error> {
+        pub(super) fn $name(&self, index: usize, data: &T) -> Result<$ret, RuntimeError> {
             let Some($variant) = self.callbacks.get(index) else {
-                return Err(Error::MissingImplementation(format!(
+                return Err(RuntimeError::MissingImplementation(format!(
                     "{} with index: {index}",
                     stringify!($name)
                 )));
@@ -70,10 +69,8 @@ impl<T> Handler<T> {
     callback!(run_eventbased, Callback::EventBased(func) => func, IntermediateEvent);
 
     // Consumes the handler_map and cannot add more things with add_
-    pub(super) fn build(&mut self) -> Result<HandlerMap, Error> {
-        self.handler_map
-            .take()
-            .ok_or_else(|| Error::Builder(FUNC_MAP_ERROR_MSG.into()))
+    pub(super) fn build(&mut self) -> Result<HandlerMap, BuildError> {
+        self.handler_map.take().ok_or(BuildError::MapConsumed)
     }
 }
 

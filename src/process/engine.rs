@@ -6,7 +6,7 @@ use crate::{
     api::{Exclusive, Inclusive, Task},
     bpmn::{Activity, ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Symbol},
     diagram::ProcessData,
-    error::{AT_LEAST_TWO_OUTGOING, Error},
+    error::{AT_LEAST_TWO_OUTGOING, RuntimeError},
 };
 use execute_handler::ExecuteHandler;
 use log::{debug, warn};
@@ -26,7 +26,7 @@ macro_rules! maybe_fork {
         if $outputs.len() <= 1 {
             $outputs
                 .first()
-                .ok_or_else(|| Error::MissingOutput($ty.to_string()))?
+                .ok_or_else(|| RuntimeError::MissingOutput($ty.to_string()))?
         } else {
             return Ok(Return::Fork(Cow::Borrowed($outputs.ids())));
         }
@@ -38,12 +38,15 @@ macro_rules! find_flow {
         $input
             .process
             .find_by_name_or_id($value, $outputs)
-            .ok_or_else(|| Error::MissingOutput($ty.to_string()))
+            .ok_or_else(|| RuntimeError::MissingOutput($ty.to_string()))
     };
 }
 
 impl<T> Process<T, Run> {
-    pub(super) fn execute<'a>(&'a self, input: ExecuteInput<'a, T>) -> Result<&'a Event, Error>
+    pub(super) fn execute<'a>(
+        &'a self,
+        input: ExecuteInput<'a, T>,
+    ) -> Result<&'a Event, RuntimeError>
     where
         T: Send + Sync,
     {
@@ -52,7 +55,7 @@ impl<T> Process<T, Run> {
         loop {
             let active_tokens = handler.active_tokens();
             if active_tokens.is_empty() {
-                return last_visited_end.ok_or(Error::MissingEndEvent);
+                return last_visited_end.ok_or(RuntimeError::MissingEndEvent);
             }
 
             let flows_iter = {
@@ -138,7 +141,7 @@ impl<T> Process<T, Run> {
         &'a self,
         mut current_id: &'b usize,
         input: &ExecuteInput<'a, T>,
-    ) -> Result<Return<'a>, Error>
+    ) -> Result<Return<'a>, RuntimeError>
     where
         T: Send + Sync,
     {
@@ -146,7 +149,7 @@ impl<T> Process<T, Run> {
             current_id = match input
                 .process
                 .get(*current_id)
-                .ok_or_else(|| Error::MisssingBpmnData(current_id.to_string()))?
+                .ok_or_else(|| RuntimeError::MisssingBpmnData(current_id.to_string()))?
             {
                 Bpmn::Event(
                     event @ Event {
@@ -172,9 +175,9 @@ impl<T> Process<T, Run> {
                                 (Some(_), _) => {
                                     maybe_fork!(outputs, event)
                                 }
-                                _ => {
-                                    Err(Error::MissingIntermediateThrowEventName(id.bpmn().into()))?
-                                }
+                                _ => Err(RuntimeError::MissingIntermediateThrowEventName(
+                                    id.bpmn().into(),
+                                ))?,
                             }
                         }
                         EventType::End => {
@@ -205,13 +208,13 @@ impl<T> Process<T, Run> {
                             match func_idx
                                 .map(|index| self.handler.run_task(index, input.data))
                                 .ok_or_else(|| {
-                                    Error::MissingImplementation(activity.to_string())
+                                    RuntimeError::MissingImplementation(activity.to_string())
                                 })?? {
                                 ref boundary @ Task::Boundary(name, ref symbol) => input
                                     .process
                                     .find_boundary(id, name, symbol)
                                     .ok_or_else(|| {
-                                        Error::MissingBoundary(
+                                        RuntimeError::MissingBoundary(
                                             boundary.to_string(),
                                             activity.to_string(),
                                         )
@@ -222,10 +225,9 @@ impl<T> Process<T, Run> {
                         ActivityType::SubProcess {
                             data_index: Some(index),
                         } => {
-                            let subprocess = self
-                                .diagram
-                                .get_process(*index)
-                                .ok_or_else(|| Error::MissingProcessData(id.bpmn().into()))?;
+                            let subprocess = self.diagram.get_process(*index).ok_or_else(|| {
+                                RuntimeError::MissingProcessData(id.bpmn().into())
+                            })?;
 
                             if let Event {
                                 event_type: EventType::End,
@@ -247,7 +249,7 @@ impl<T> Process<T, Run> {
                                     .process
                                     .find_boundary(id, name.as_deref(), symbol)
                                     .ok_or_else(|| {
-                                        Error::MissingBoundary(
+                                        RuntimeError::MissingBoundary(
                                             symbol.to_string(),
                                             activity.to_string(),
                                         )
@@ -258,7 +260,7 @@ impl<T> Process<T, Run> {
                             }
                         }
                         ActivityType::SubProcess { .. } => {
-                            return Err(Error::MissingProcessData(activity.to_string()));
+                            return Err(RuntimeError::MissingProcessData(activity.to_string()));
                         }
                     }
                 }
@@ -275,7 +277,7 @@ impl<T> Process<T, Run> {
                     debug!("{gateway}");
                     match gateway_type {
                         _ if outputs.len() == 0 => {
-                            return Err(Error::MissingOutput(gateway.to_string()));
+                            return Err(RuntimeError::MissingOutput(gateway.to_string()));
                         }
                         // Handle 1 to 1, probably a temporary design or mistake
                         _ if outputs.len() == 1 && *inputs == 1 => outputs.first().unwrap(),
@@ -284,7 +286,7 @@ impl<T> Process<T, Run> {
                             match func_idx
                                 .map(|index| self.handler.run_exclusive(index, input.data))
                                 .ok_or_else(|| {
-                                    Error::MissingImplementation(gateway.to_string())
+                                    RuntimeError::MissingImplementation(gateway.to_string())
                                 })?? {
                                 Exclusive::Flow(value) => {
                                     find_flow!(outputs, value, input, gateway)?
@@ -305,20 +307,22 @@ impl<T> Process<T, Run> {
                             ));
                         }
                         GatewayType::EventBased if outputs.len() == 1 => {
-                            return Err(Error::BpmnRequirement(AT_LEAST_TWO_OUTGOING.into()));
+                            return Err(RuntimeError::BpmnRequirement(
+                                AT_LEAST_TWO_OUTGOING.into(),
+                            ));
                         }
                         GatewayType::EventBased => {
                             let value = func_idx
                                 .map(|index| self.handler.run_eventbased(index, input.data))
                                 .ok_or_else(|| {
-                                    Error::MissingImplementation(gateway.to_string())
+                                    RuntimeError::MissingImplementation(gateway.to_string())
                                 })??;
 
                             input
                                 .process
                                 .find_by_intermediate_event(&value, outputs)
                                 .ok_or_else(|| {
-                                    Error::MissingIntermediateEvent(
+                                    RuntimeError::MissingIntermediateEvent(
                                         gateway.to_string(),
                                         value.to_string(),
                                     )
@@ -335,7 +339,7 @@ impl<T> Process<T, Run> {
                     debug!(r#"SequenceFlow "{}""#, name.as_deref().unwrap_or(id.bpmn()));
                     target_ref.local()
                 }
-                bpmn => return Err(Error::TypeNotImplemented(format!("{bpmn:?}"))),
+                bpmn => return Err(RuntimeError::TypeNotImplemented(format!("{bpmn:?}"))),
             };
         }
     }
@@ -346,10 +350,10 @@ impl<T> Process<T, Run> {
         gateway @ Gateway {
             func_idx, outputs, ..
         }: &'a Gateway,
-    ) -> Result<Tokens<'a>, Error> {
+    ) -> Result<Tokens<'a>, RuntimeError> {
         let value = match func_idx
             .map(|index| self.handler.run_inclusive(index, input.data))
-            .ok_or_else(|| Error::MissingImplementation(gateway.to_string()))??
+            .ok_or_else(|| RuntimeError::MissingImplementation(gateway.to_string()))??
         {
             Inclusive::Flow(value) => find_flow!(outputs, value, input, gateway)?,
             Inclusive::Fork(values) => match values.as_slice() {

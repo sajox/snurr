@@ -6,7 +6,7 @@ use crate::{
     api::{Exclusive, Inclusive, IntermediateEvent, Task},
     bpmn::Bpmn,
     diagram::{Diagram, reader::read_bpmn},
-    error::Error,
+    error::{BuildError, ParseError, RuntimeError},
     process::handler::Callback,
 };
 use engine::ExecuteInput;
@@ -39,7 +39,7 @@ impl<T> Process<T> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn new(path: impl AsRef<Path>) -> Result<Self, Error> {
+    pub fn new(path: impl AsRef<Path>) -> Result<Self, ParseError> {
         Ok(Self {
             diagram: read_bpmn(quick_xml::Reader::from_file(path)?)?,
             handler: Default::default(),
@@ -89,7 +89,7 @@ impl<T> Process<T> {
 
     /// Install and check that all required functions have been registered. You cannot run a process before `build` is called.
     /// If `build` returns an error, it contains the missing functions.
-    pub fn build(mut self) -> Result<Process<T, Run>, Error> {
+    pub fn build(mut self) -> Result<Process<T, Run>, BuildError> {
         let result = self.diagram.install_and_check(self.handler.build()?);
         if result.is_empty() {
             Ok(Process {
@@ -98,7 +98,7 @@ impl<T> Process<T> {
                 _marker: Default::default(),
             })
         } else {
-            Err(Error::MissingImplementations(
+            Err(BuildError::MissingImplementations(
                 result.into_iter().collect::<Vec<_>>().join(", "),
             ))
         }
@@ -106,7 +106,7 @@ impl<T> Process<T> {
 }
 
 impl<T> FromStr for Process<T> {
-    type Err = Error;
+    type Err = ParseError;
 
     /// Create new process and initialize it from a BPMN `&str`.
     /// ```
@@ -162,7 +162,7 @@ impl<T> Process<T, Run> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn run(&self, data: T) -> Result<T, Error>
+    pub fn run(&self, data: T) -> Result<T, RuntimeError>
     where
         T: Send + Sync,
     {
@@ -170,7 +170,7 @@ impl<T> Process<T, Run> {
         for bpmn in self
             .diagram
             .get_definition()
-            .ok_or(Error::MissingDefinitionsId)?
+            .ok_or(RuntimeError::MissingDefinitionsId)?
             .iter()
         {
             if let Bpmn::Process {
@@ -182,7 +182,7 @@ impl<T> Process<T, Run> {
                 let process_data = self
                     .diagram
                     .get_process(*index)
-                    .ok_or_else(|| Error::MissingProcessData(id.bpmn().into()))?;
+                    .ok_or_else(|| RuntimeError::MissingProcessData(id.bpmn().into()))?;
                 self.execute(ExecuteInput::new(process_data, false, &data))?;
             }
         }

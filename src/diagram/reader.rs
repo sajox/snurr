@@ -1,8 +1,8 @@
 mod builder;
 
 use super::Diagram;
-use crate::bpmn::*;
-use crate::error::{Error, XML_ERROR_MSG};
+use crate::error::XML_ERROR_MSG;
+use crate::{bpmn::*, error::ParseError};
 use builder::DataBuilder;
 use log::error;
 use quick_xml::events::Event;
@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::io::BufRead;
 
 // Read BPMN content and return the Diagram
-pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, Error> {
+pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, ParseError> {
     let mut error_found = false;
     let mut builder = DataBuilder::default();
     let mut buf = Vec::new();
@@ -111,7 +111,7 @@ pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, Error> {
     }
 
     if error_found {
-        return Err(Error::Builder(XML_ERROR_MSG.to_owned()));
+        return Err(ParseError::Builder(XML_ERROR_MSG.to_owned()));
     }
     Ok(builder.into())
 }

@@ -1,6 +1,6 @@
 use crate::{
-    Error,
     bpmn::{Gateway, GatewayType},
+    error::RuntimeError,
     process::engine::Tokens,
 };
 use log::trace;
@@ -54,7 +54,7 @@ impl<'a> ExecuteHandler<'a> {
     }
 
     // Once all tokens have been consumed, return the gateway involved.
-    pub(super) fn tokens_consumed(&mut self) -> Result<Option<&'a Gateway>, Error> {
+    pub(super) fn tokens_consumed(&mut self) -> Result<Option<&'a Gateway>, RuntimeError> {
         if let Some(mut token_data) = self.stack.pop_if(|token_data| token_data.consumed())
             && let tokens_arrived = token_data.joined.len()
         {
@@ -76,7 +76,7 @@ impl<'a> ExecuteHandler<'a> {
             ) = gateway
                 && tokens_arrived < *inputs as usize
             {
-                return Err(Error::BpmnRequirement(format!(
+                return Err(RuntimeError::BpmnRequirement(format!(
                     "Execution stopped. Not enough tokens at {gateway}"
                 )));
             }
@@ -131,11 +131,11 @@ impl<'a> Display for TokenData<'a> {
 }
 
 #[cfg(debug_assertions)]
-fn check_unbalanced_diagram(input: &[&Gateway]) -> Result<(), Error> {
+fn check_unbalanced_diagram(input: &[&Gateway]) -> Result<(), RuntimeError> {
     // If many different gateways are visited, we have an unbalanced graph
     if std::collections::HashSet::<usize>::from_iter(input.iter().map(|g| *g.id.local())).len() > 1
     {
-        return Err(Error::NotSupported("Unbalanced diagram".into()));
+        return Err(RuntimeError::NotSupported("Unbalanced diagram".into()));
     }
     Ok(())
 }

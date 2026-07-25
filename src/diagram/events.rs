@@ -1,7 +1,7 @@
 use crate::{
-    Error, Symbol,
-    bpmn::{Event, EventType},
+    bpmn::{Event, EventType, Symbol},
     diagram::Id,
+    error::RuntimeError,
 };
 use std::collections::HashMap;
 
@@ -41,9 +41,12 @@ impl Events {
         self.boundaries.get(id.local())
     }
 
-    pub(crate) fn catch_event_link(&self, throw_event_name: &str) -> Result<&usize, Error> {
+    pub(crate) fn catch_event_link(&self, throw_event_name: &str) -> Result<&usize, RuntimeError> {
         self.catch_event_links.get(throw_event_name).ok_or_else(|| {
-            Error::MissingIntermediateCatchEvent(Symbol::Link.to_string(), throw_event_name.into())
+            RuntimeError::MissingIntermediateCatchEvent(
+                Symbol::Link.to_string(),
+                throw_event_name.into(),
+            )
         })
     }
 }

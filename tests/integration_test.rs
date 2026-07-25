@@ -1,4 +1,4 @@
-use snurr::{Error, Exclusive, Process, Result, Symbol, Task};
+use snurr::{Exclusive, ParseError, Process, Result, RuntimeError, Symbol, Task};
 use std::sync::Mutex;
 
 const COUNT_1: &str = "Count 1";
@@ -219,7 +219,7 @@ fn inclusive_gateway_no_output() -> Result<()> {
 
     match bpmn.run(Default::default()) {
         Err(error) => assert!(
-            matches!(error, Error::MissingOutput(_)),
+            matches!(error, RuntimeError::MissingOutput(_)),
             "Expected missing output"
         ),
         _ => panic!("Expected an error"),
@@ -384,7 +384,7 @@ fn subprocess_external_link_fail() -> snurr::Result<()> {
         Process::<Counter>::new("tests/files/subprocess_external_link_fail.bpmn")?.build()?;
     match bpmn.run(Default::default()) {
         Err(error) => assert!(
-            matches!(error, Error::MissingIntermediateCatchEvent(symbol, name) if symbol == "Link" && name == "Link 2"),
+            matches!(error, RuntimeError::MissingIntermediateCatchEvent(symbol, name) if symbol == "Link" && name == "Link 2"),
             "Expected Link Symbol with name Link 2"
         ),
         _ => panic!("Expected an error"),
@@ -599,7 +599,7 @@ fn startevent_not_first() -> Result<()> {
 fn process_multiple_startevent_none() -> Result<()> {
     match Process::<Counter>::new("tests/files/process_multiple_startevent_none.bpmn") {
         Err(error) => assert!(
-            matches!(error, Error::BpmnRequirement(_)),
+            matches!(error, ParseError::BpmnRequirement(_)),
             "Expected BpmnRequirement"
         ),
         _ => panic!("Expected an error"),
@@ -611,7 +611,7 @@ fn process_multiple_startevent_none() -> Result<()> {
 fn subprocess_multiple_startevent_none() -> Result<()> {
     match Process::<Counter>::new("tests/files/subprocess_multiple_startevent_none.bpmn") {
         Err(error) => assert!(
-            matches!(error, Error::BpmnRequirement(_)),
+            matches!(error, ParseError::BpmnRequirement(_)),
             "Expected BpmnRequirement"
         ),
         _ => panic!("Expected an error"),
@@ -641,7 +641,7 @@ fn parallel_stalled_execution() -> Result<()> {
 
     match bpmn.run(Default::default()) {
         Err(error) => assert!(
-            matches!(error, Error::BpmnRequirement(_)),
+            matches!(error, RuntimeError::BpmnRequirement(_)),
             "Expected BpmnRequirement"
         ),
         _ => panic!("Expected an error"),
@@ -658,7 +658,7 @@ fn parallel_unbalanced() -> Result<()> {
 
     match bpmn.run(Default::default()) {
         Err(error) => assert!(
-            matches!(error, Error::NotSupported(_)),
+            matches!(error, RuntimeError::NotSupported(_)),
             "Expected NotSupported"
         ),
         _ => panic!("Expected an error"),
@@ -675,7 +675,7 @@ fn parallel_unbalanced2() -> Result<()> {
 
     match bpmn.run(Default::default()) {
         Err(error) => assert!(
-            matches!(error, Error::NotSupported(_)),
+            matches!(error, RuntimeError::NotSupported(_)),
             "Expected NotSupported"
         ),
         _ => panic!("Expected an error"),

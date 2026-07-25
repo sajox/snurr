@@ -8,5 +8,5 @@ mod process;
 
 pub use api::{Exclusive, Inclusive, IntermediateEvent, Task};
 pub use bpmn::Symbol;
-pub use error::{Error, Result};
+pub use error::{BuildError, Error, ParseError, Result, RuntimeError};
 pub use process::{Build, Process, Run};

@@ -1,6 +1,6 @@
 use crate::{
     diagram::{Id, Outputs},
-    error::Error,
+    error::{ParseError, RuntimeError},
 };
 use core::fmt;
 use std::{collections::HashMap, fmt::Display};
@@ -74,7 +74,7 @@ pub(crate) enum EventType {
 }
 
 impl TryFrom<&[u8]> for EventType {
-    type Error = Error;
+    type Error = ParseError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -84,7 +84,7 @@ impl TryFrom<&[u8]> for EventType {
             INTERMEDIATE_THROW_EVENT => EventType::IntermediateThrow,
             START_EVENT => EventType::Start,
             _ => {
-                return Err(Error::TypeNotImplemented(
+                return Err(ParseError::TypeNotImplemented(
                     std::str::from_utf8(value)?.into(),
                 ));
             }
@@ -113,7 +113,7 @@ pub(crate) enum ActivityType {
 }
 
 impl TryFrom<&[u8]> for ActivityType {
-    type Error = Error;
+    type Error = ParseError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -128,7 +128,7 @@ impl TryFrom<&[u8]> for ActivityType {
             MANUAL_TASK => ActivityType::ManualTask,
             BUSINESS_RULE_TASK => ActivityType::BusinessRuleTask,
             _ => {
-                return Err(Error::TypeNotImplemented(
+                return Err(ParseError::TypeNotImplemented(
                     std::str::from_utf8(value)?.into(),
                 ));
             }
@@ -151,7 +151,7 @@ pub(crate) enum GatewayType {
 }
 
 impl TryFrom<&[u8]> for GatewayType {
-    type Error = Error;
+    type Error = ParseError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -160,7 +160,7 @@ impl TryFrom<&[u8]> for GatewayType {
             PARALLEL_GATEWAY => GatewayType::Parallel,
             EVENT_BASED_GATEWAY => GatewayType::EventBased,
             _ => {
-                return Err(Error::TypeNotImplemented(
+                return Err(ParseError::TypeNotImplemented(
                     std::str::from_utf8(value)?.into(),
                 ));
             }
@@ -196,9 +196,9 @@ impl Display for Symbol {
 }
 
 impl TryFrom<&[u8]> for Symbol {
-    type Error = Error;
+    type Error = ParseError;
 
-    fn try_from(value: &[u8]) -> Result<Self, Error> {
+    fn try_from(value: &[u8]) -> Result<Self, ParseError> {
         let ty = match value {
             CANCEL_EVENT_DEFINITION => Symbol::Cancel,
             COMPENSATE_EVENT_DEFINITION => Symbol::Compensation,
@@ -211,7 +211,7 @@ impl TryFrom<&[u8]> for Symbol {
             TERMINATE_EVENT_DEFINITION => Symbol::Terminate,
             TIMER_EVENT_DEFINITION => Symbol::Timer,
             _ => {
-                return Err(Error::TypeNotImplemented(
+                return Err(ParseError::TypeNotImplemented(
                     std::str::from_utf8(value)?.into(),
                 ));
             }
@@ -232,11 +232,11 @@ pub(crate) struct Gateway {
 }
 
 impl Gateway {
-    pub(crate) fn default_path(&self) -> Result<&usize, Error> {
+    pub(crate) fn default_path(&self) -> Result<&usize, RuntimeError> {
         self.default
             .as_ref()
             .map(Id::local)
-            .ok_or_else(|| Error::MissingDefault(self.to_string()))
+            .ok_or_else(|| RuntimeError::MissingDefault(self.to_string()))
     }
 }
 
@@ -313,7 +313,7 @@ pub(crate) enum Bpmn {
 }
 
 impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
-    type Error = Error;
+    type Error = ParseError;
 
     fn try_from(
         (bpmn_type, mut attributes): (&[u8], HashMap<&[u8], String>),
@@ -323,13 +323,13 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
             DEFINITIONS => Bpmn::Definitions {
                 id: attributes
                     .remove(ATTRIB_ID)
-                    .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
+                    .ok_or_else(|| ParseError::MissingId(bpmn_type_str.into()))?
                     .into(),
             },
             PROCESS => Bpmn::Process {
                 id: attributes
                     .remove(ATTRIB_ID)
-                    .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
+                    .ok_or_else(|| ParseError::MissingId(bpmn_type_str.into()))?
                     .into(),
                 data_index: None,
             },
@@ -342,7 +342,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                 symbol: None,
                 id: attributes
                     .remove(ATTRIB_ID)
-                    .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
+                    .ok_or_else(|| ParseError::MissingId(bpmn_type_str.into()))?
                     .into(),
                 name: attributes.remove(ATTRIB_NAME),
                 attached_to_ref: attributes.remove(ATTRIB_ATTACHED_TO_REF).map(Into::into),
@@ -354,7 +354,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     activity_type: bpmn_type.try_into()?,
                     id: attributes
                         .remove(ATTRIB_ID)
-                        .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
+                        .ok_or_else(|| ParseError::MissingId(bpmn_type_str.into()))?
                         .into(),
                     func_idx: None,
                     name: attributes.remove(ATTRIB_NAME),
@@ -366,7 +366,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     gateway_type: bpmn_type.try_into()?,
                     id: attributes
                         .remove(ATTRIB_ID)
-                        .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
+                        .ok_or_else(|| ParseError::MissingId(bpmn_type_str.into()))?
                         .into(),
                     func_idx: None,
                     name: attributes.remove(ATTRIB_NAME),
@@ -378,16 +378,16 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
             SEQUENCE_FLOW => Bpmn::SequenceFlow {
                 id: attributes
                     .remove(ATTRIB_ID)
-                    .ok_or_else(|| Error::MissingId(bpmn_type_str.into()))?
+                    .ok_or_else(|| ParseError::MissingId(bpmn_type_str.into()))?
                     .into(),
                 name: attributes.remove(ATTRIB_NAME),
                 target_ref: attributes
                     .remove(ATTRIB_TARGET_REF)
-                    .ok_or(Error::MissingTargetRef)?
+                    .ok_or(ParseError::MissingTargetRef)?
                     .into(),
             },
             INCOMING | OUTGOING => Bpmn::Direction(None),
-            _ => return Err(Error::TypeNotImplemented(bpmn_type_str.into())),
+            _ => return Err(ParseError::TypeNotImplemented(bpmn_type_str.into())),
         };
         Ok(ty)
     }

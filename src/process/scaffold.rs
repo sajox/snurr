@@ -3,7 +3,6 @@ use std::{collections::HashSet, io::Write, path::Path};
 use crate::{
     Process,
     bpmn::{Activity, ActivityType, Bpmn, Event, Gateway, GatewayType, Symbol},
-    error::Error,
 };
 
 impl<T> Process<T> {
@@ -18,7 +17,7 @@ impl<T> Process<T> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn scaffold(&self, path: impl AsRef<Path>) -> Result<(), Error> {
+    pub fn scaffold(&self, path: impl AsRef<Path>) -> Result<(), std::io::Error> {
         let mut scaffold = Scaffold::default();
         for process in self.diagram.data() {
             for bpmn in process.iter() {
@@ -108,7 +107,7 @@ impl<'a> Scaffold<'a> {
 
     // Generate code from all the task and gateways to the given file path.
     // No file is allowed to exist at the target location.
-    fn create(&mut self, path: impl AsRef<Path>) -> Result<(), Error> {
+    fn create(&mut self, path: impl AsRef<Path>) -> Result<(), std::io::Error> {
         let mut content = vec![
             "use snurr::{Error, Process, Run};\n".into(),
             "// Replace () with your type".into(),

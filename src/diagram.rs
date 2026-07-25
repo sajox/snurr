@@ -2,11 +2,11 @@ mod events;
 pub mod reader;
 
 use crate::{
-    Error,
     api::IntermediateEvent,
     bpmn::{Activity, ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Symbol},
     diagram::events::Events,
     error::ONLY_ONE_START_EVENT,
+    error::{ParseError, RuntimeError},
     process::handler::{HandlerMap, HandlerType},
 };
 
@@ -111,7 +111,7 @@ pub struct ProcessData {
 }
 
 impl ProcessData {
-    fn add(&mut self, mut bpmn: Bpmn) -> Result<(), Error> {
+    fn add(&mut self, mut bpmn: Bpmn) -> Result<(), ParseError> {
         let len = self.data.len();
         if let Bpmn::Event(Event {
             event_type: EventType::Start,
@@ -120,7 +120,7 @@ impl ProcessData {
         }) = bpmn
             && self.start.replace(len).is_some()
         {
-            return Err(Error::BpmnRequirement(ONLY_ONE_START_EVENT.into()));
+            return Err(ParseError::BpmnRequirement(ONLY_ONE_START_EVENT.into()));
         }
 
         bpmn.update_local_id(len);
@@ -161,8 +161,8 @@ impl ProcessData {
         });
     }
 
-    pub fn start(&self) -> Result<usize, Error> {
-        self.start.ok_or(Error::MissingStartEvent)
+    pub fn start(&self) -> Result<usize, RuntimeError> {
+        self.start.ok_or(RuntimeError::MissingStartEvent)
     }
 
     pub fn get(&self, index: usize) -> Option<&Bpmn> {

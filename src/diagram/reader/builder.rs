@@ -1,7 +1,7 @@
 use crate::{
     bpmn::{Event, *},
     diagram::{Diagram, ProcessData},
-    error::{BUILD_PROCESS_ERROR_MSG, Error},
+    error::{BUILD_PROCESS_ERROR_MSG, ParseError},
 };
 
 //
@@ -39,7 +39,7 @@ impl DataBuilder {
         self.add(bpmn);
     }
 
-    pub(super) fn add_to_process(&mut self, bpmn: Bpmn) -> Result<(), Error> {
+    pub(super) fn add_to_process(&mut self, bpmn: Bpmn) -> Result<(), ParseError> {
         if let Some(process_data) = self.process_stack.last_mut() {
             process_data.add(bpmn)?;
         }
@@ -69,7 +69,7 @@ impl DataBuilder {
         }
     }
 
-    pub(super) fn end(&mut self) -> Result<(), Error> {
+    pub(super) fn end(&mut self) -> Result<(), ParseError> {
         if let Some(bpmn) = self.stack.pop() {
             check_unsupported(&bpmn)?;
             self.add_to_process(bpmn)?;
@@ -77,10 +77,10 @@ impl DataBuilder {
         Ok(())
     }
 
-    pub(super) fn end_process(&mut self) -> Result<(), Error> {
+    pub(super) fn end_process(&mut self) -> Result<(), ParseError> {
         let Some((mut bpmn, mut process_data)) = self.stack.pop().zip(self.process_stack.pop())
         else {
-            return Err(Error::Builder(BUILD_PROCESS_ERROR_MSG.into()));
+            return Err(ParseError::Builder(BUILD_PROCESS_ERROR_MSG.into()));
         };
 
         // Definitions collect all Processes
@@ -103,10 +103,10 @@ impl From<DataBuilder> for Diagram {
     }
 }
 
-fn check_unsupported(bpmn: &Bpmn) -> Result<(), Error> {
+fn check_unsupported(bpmn: &Bpmn) -> Result<(), ParseError> {
     Err(match bpmn {
         // SequenceFlow with Start and End tag is Conditional Sequence Flow
-        Bpmn::SequenceFlow { id, name, .. } => Error::NotSupported(format!(
+        Bpmn::SequenceFlow { id, name, .. } => ParseError::NotSupported(format!(
             "{}: {}",
             name.as_deref().unwrap_or(id.bpmn()),
             "conditional sequence flow",
