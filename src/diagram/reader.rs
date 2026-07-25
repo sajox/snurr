@@ -2,7 +2,7 @@ mod builder;
 
 use super::Diagram;
 use crate::bpmn::*;
-use crate::error::Error;
+use crate::error::{Error, XML_ERROR_MSG};
 use builder::DataBuilder;
 use log::error;
 use quick_xml::events::Event;
@@ -12,11 +12,16 @@ use std::io::BufRead;
 
 // Read BPMN content and return the Diagram
 pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, Error> {
+    let mut error_found = false;
     let mut builder = DataBuilder::default();
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
-            Err(e) => error!("Error at position {}: {:?}", reader.buffer_position(), e),
+            Err(e) => {
+                // Let it scan the complete BPMN file if more error occurs.
+                error!("Error at position {}: {:?}", reader.buffer_position(), e);
+                error_found = true;
+            }
             Ok(Event::Eof) => break,
             Ok(Event::Start(bs)) => match bs.local_name().as_ref() {
                 bpmn_type @ (START_EVENT
@@ -103,6 +108,10 @@ pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, Error> {
             _ => (),
         }
         buf.clear();
+    }
+
+    if error_found {
+        return Err(Error::Builder(XML_ERROR_MSG.to_owned()));
     }
     Ok(builder.into())
 }

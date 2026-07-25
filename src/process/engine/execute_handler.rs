@@ -3,7 +3,7 @@ use crate::{
     bpmn::{Gateway, GatewayType},
     process::engine::Tokens,
 };
-use log::debug;
+use log::trace;
 use std::{borrow::Cow, fmt::Display};
 
 #[derive(Default, Debug)]
@@ -40,7 +40,7 @@ impl<'a> ExecuteHandler<'a> {
     // Commit all new tokens.
     pub(super) fn commit(&mut self) {
         for item in self.pending.drain(..) {
-            debug!("NEW TOKENS {}", item.len());
+            trace!("NEW TOKENS {}", item.len());
             self.stack.push(TokenData::new(item.len()));
             self.ready.push(item);
         }
@@ -58,7 +58,7 @@ impl<'a> ExecuteHandler<'a> {
         if let Some(mut token_data) = self.stack.pop_if(|token_data| token_data.consumed())
             && let tokens_arrived = token_data.joined.len()
         {
-            debug!("ALL CONSUMED {}", token_data);
+            trace!("ALL CONSUMED {}", token_data);
 
             #[cfg(debug_assertions)]
             check_unbalanced_diagram(&token_data.joined)?;
@@ -106,7 +106,7 @@ impl<'a> TokenData<'a> {
             self.joined.push(gateway)
         }
         self.consumed += 1;
-        debug!("TOKENS CONSUMED {}", self.consumed);
+        trace!("TOKENS CONSUMED {}", self.consumed);
     }
 
     fn consumed(&self) -> bool {

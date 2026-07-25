@@ -9,7 +9,7 @@ use crate::{
     error::{AT_LEAST_TWO_OUTGOING, Error},
 };
 use execute_handler::ExecuteHandler;
-use log::{info, warn};
+use log::{debug, warn};
 use std::{borrow::Cow, collections::HashSet};
 
 type Tokens<'a> = Cow<'a, [usize]>;
@@ -158,7 +158,7 @@ impl<T> Process<T, Run> {
                         ..
                     },
                 ) => {
-                    info!("{event}");
+                    debug!("{event}");
                     match event_type {
                         EventType::Start | EventType::IntermediateCatch | EventType::Boundary => {
                             maybe_fork!(outputs, event)
@@ -191,7 +191,7 @@ impl<T> Process<T, Run> {
                         ..
                     },
                 ) => {
-                    info!("{activity}");
+                    debug!("{activity}");
                     match activity_type {
                         ActivityType::Task
                         | ActivityType::ScriptTask
@@ -272,7 +272,7 @@ impl<T> Process<T, Run> {
                         ..
                     },
                 ) => {
-                    info!("{gateway}");
+                    debug!("{gateway}");
                     match gateway_type {
                         _ if outputs.len() == 0 => {
                             return Err(Error::MissingOutput(gateway.to_string()));
@@ -332,7 +332,7 @@ impl<T> Process<T, Run> {
                     target_ref,
                     ..
                 } => {
-                    info!(r#"SequenceFlow "{}""#, name.as_deref().unwrap_or(id.bpmn()));
+                    debug!(r#"SequenceFlow "{}""#, name.as_deref().unwrap_or(id.bpmn()));
                     target_ref.local()
                 }
                 bpmn => return Err(Error::TypeNotImplemented(format!("{bpmn:?}"))),

@@ -79,3 +79,4 @@ pub(crate) const ONLY_ONE_START_EVENT: &str = "There can only be one start event
 // Builder
 pub(crate) const FUNC_MAP_ERROR_MSG: &str = "Handlermap has already been consumed";
 pub(crate) const BUILD_PROCESS_ERROR_MSG: &str = "Couldn't build process";
+pub(crate) const XML_ERROR_MSG: &str = "XML error(s) found. Check logs.";
