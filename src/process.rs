@@ -1,12 +1,11 @@
 mod engine;
-pub mod handler;
+pub(crate) mod handler;
 mod scaffold;
 
 use crate::{
     api::{Exclusive, Inclusive, IntermediateEvent, Task},
     bpmn::Bpmn,
     diagram::{Diagram, reader::read_bpmn},
-    error::{BuildError, ParseError, RuntimeError},
     process::handler::Callback,
 };
 use engine::ExecuteInput;
@@ -39,9 +38,20 @@ impl<T> Process<T> {
     ///     Ok(())
     /// }
     /// ```
-    pub fn new(path: impl AsRef<Path>) -> Result<Self, ParseError> {
+    pub fn new(path: impl AsRef<Path>) -> Result<Self, BpmnFileError> {
+        let path = path.as_ref();
+        let diagram = (|| {
+            let reader = quick_xml::Reader::from_file(path)
+                .map_err(|e| BpmnFileErrorKind::ReadFile(e.into()))?;
+            read_bpmn(reader).map_err(BpmnFileErrorKind::Parse)
+        })()
+        .map_err(|source| BpmnFileError {
+            path: path.into(),
+            source,
+        })?;
+
         Ok(Self {
-            diagram: read_bpmn(quick_xml::Reader::from_file(path)?)?,
+            diagram,
             handler: Default::default(),
             _marker: Default::default(),
         })
@@ -170,7 +180,7 @@ impl<T> Process<T, Run> {
         for bpmn in self
             .diagram
             .get_definition()
-            .ok_or(RuntimeError::MissingDefinitionsId)?
+            .ok_or(RuntimeErrorKind::MissingDefinitionsId)?
             .iter()
         {
             if let Bpmn::Process {
@@ -182,12 +192,118 @@ impl<T> Process<T, Run> {
                 let process_data = self
                     .diagram
                     .get_process(*index)
-                    .ok_or_else(|| RuntimeError::MissingProcessData(id.bpmn().into()))?;
+                    .ok_or_else(|| RuntimeErrorKind::MissingProcessData(id.bpmn().into()))?;
                 self.execute(ExecuteInput::new(process_data, false, &data))?;
             }
         }
         Ok(data)
     }
+}
+
+// Process errors
+
+#[derive(thiserror::Error, Debug)]
+#[error("error reading `{path}`")]
+#[non_exhaustive]
+pub struct BpmnFileError {
+    pub path: Box<std::path::Path>,
+    pub source: BpmnFileErrorKind,
+}
+
+#[derive(thiserror::Error, Debug)]
+#[error(transparent)]
+pub enum BpmnFileErrorKind {
+    ReadFile(Box<dyn std::error::Error + Send + Sync>),
+    Parse(ParseError),
+}
+
+/// Errors that can occur while parsing BPMN data.
+#[derive(thiserror::Error, Debug)]
+#[error("error parsing `{source}`")]
+#[non_exhaustive]
+pub struct ParseError {
+    #[from]
+    pub source: ParseErrorKind,
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum ParseErrorKind {
+    #[error("BPMN type {0} missing id")]
+    MissingId(String),
+    #[error("sequenceFlow missing targetRef")]
+    MissingTargetRef,
+    #[error("type {0} not implemented")]
+    TypeNotImplemented(String),
+    #[error("{0} not supported")]
+    NotSupported(String),
+    #[error("could not build process")]
+    ProcessBuild,
+    #[error(transparent)]
+    Encoding(Box<dyn std::error::Error + Send + Sync>),
+    #[error("Error at position {pos} with {source}")]
+    Xml {
+        pos: u64,
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
+}
+
+impl From<std::str::Utf8Error> for ParseError {
+    fn from(value: std::str::Utf8Error) -> Self {
+        ParseError {
+            source: ParseErrorKind::Encoding(value.into()),
+        }
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+#[error("error running `{source}`")]
+#[non_exhaustive]
+pub struct RuntimeError {
+    #[from]
+    pub source: RuntimeErrorKind,
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum RuntimeErrorKind {
+    #[error("{0} has no output. (Used correct name or id?)")]
+    MissingOutput(String),
+    #[error("{0} has no implementation")]
+    MissingImplementation(String),
+    #[error("{0} has no default flow")]
+    MissingDefault(String),
+    #[error("could not find BPMN data with id {0}")]
+    MisssingBpmnData(String),
+    #[error("could not find process data with id {0}")]
+    MissingProcessData(String),
+    #[error("missing definitions id")]
+    MissingDefinitionsId,
+    #[error("type {0} not implemented")]
+    TypeNotImplemented(String),
+    #[error("could not find {0} boundary symbol attached to {1}")]
+    MissingBoundary(String, String),
+    #[error("{0} could not find {1}")]
+    MissingIntermediateEvent(String, String),
+    #[error("missing intermediate throw event name on {0}")]
+    MissingIntermediateThrowEventName(String),
+    #[error("missing intermediate catch event symbol {0} with name {1}")]
+    MissingIntermediateCatchEvent(String, String),
+    #[error("missing end event")]
+    MissingEndEvent,
+    #[error("missing start event")]
+    MissingStartEvent,
+    #[error("{0} not supported")]
+    NotSupported(String),
+    #[error("{0}")]
+    BpmnRequirement(String),
+}
+
+/// Errors that can occur while trying to build a process to make it runnable.
+#[derive(thiserror::Error, Debug)]
+pub enum BuildError {
+    #[error("Missing implementations {0}")]
+    MissingImplementations(String),
+    #[error("Handlermap has already been consumed")]
+    MapConsumed,
 }
 
 #[cfg(test)]

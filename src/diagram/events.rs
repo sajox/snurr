@@ -1,7 +1,7 @@
 use crate::{
     bpmn::{Event, EventType, Symbol},
     diagram::Id,
-    error::RuntimeError,
+    process::{RuntimeError, RuntimeErrorKind},
 };
 use std::collections::HashMap;
 
@@ -43,10 +43,11 @@ impl Events {
 
     pub(crate) fn catch_event_link(&self, throw_event_name: &str) -> Result<&usize, RuntimeError> {
         self.catch_event_links.get(throw_event_name).ok_or_else(|| {
-            RuntimeError::MissingIntermediateCatchEvent(
+            RuntimeErrorKind::MissingIntermediateCatchEvent(
                 Symbol::Link.to_string(),
                 throw_event_name.into(),
             )
+            .into()
         })
     }
 }

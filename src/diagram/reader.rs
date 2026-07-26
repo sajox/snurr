@@ -1,10 +1,11 @@
 mod builder;
 
 use super::Diagram;
-use crate::error::XML_ERROR_MSG;
-use crate::{bpmn::*, error::ParseError};
+use crate::{
+    bpmn::*,
+    process::{ParseError, ParseErrorKind},
+};
 use builder::DataBuilder;
-use log::error;
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 use std::collections::HashMap;
@@ -12,15 +13,16 @@ use std::io::BufRead;
 
 // Read BPMN content and return the Diagram
 pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, ParseError> {
-    let mut error_found = false;
     let mut builder = DataBuilder::default();
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
             Err(e) => {
-                // Let it scan the complete BPMN file if more error occurs.
-                error!("Error at position {}: {:?}", reader.buffer_position(), e);
-                error_found = true;
+                return Err(ParseErrorKind::Xml {
+                    pos: reader.buffer_position(),
+                    source: e.into(),
+                }
+                .into());
             }
             Ok(Event::Eof) => break,
             Ok(Event::Start(bs)) => match bs.local_name().as_ref() {
@@ -101,17 +103,17 @@ pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, ParseErro
                 _ => {}
             },
             Ok(Event::Text(bt)) => {
-                builder.add_text(bt.decode().map_err(quick_xml::Error::from)?.into_owned());
+                builder.add_text(
+                    bt.decode()
+                        .map_err(|e| ParseErrorKind::Encoding(e.into()))?
+                        .into_owned(),
+                );
             }
 
             // Ignore other XML events
             _ => (),
         }
         buf.clear();
-    }
-
-    if error_found {
-        return Err(ParseError::Builder(XML_ERROR_MSG.to_owned()));
     }
     Ok(builder.into())
 }

@@ -5,9 +5,10 @@ use crate::{
     api::IntermediateEvent,
     bpmn::{Activity, ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Symbol},
     diagram::events::Events,
-    error::ONLY_ONE_START_EVENT,
-    error::{ParseError, RuntimeError},
-    process::handler::{HandlerMap, HandlerType},
+    process::{
+        ParseError, ParseErrorKind, RuntimeError, RuntimeErrorKind,
+        handler::{HandlerMap, HandlerType},
+    },
 };
 
 use std::{
@@ -120,7 +121,9 @@ impl ProcessData {
         }) = bpmn
             && self.start.replace(len).is_some()
         {
-            return Err(ParseError::BpmnRequirement(ONLY_ONE_START_EVENT.into()));
+            return Err(ParseError {
+                source: ParseErrorKind::NotSupported("multiple start event".into()),
+            });
         }
 
         bpmn.update_local_id(len);
@@ -162,7 +165,7 @@ impl ProcessData {
     }
 
     pub fn start(&self) -> Result<usize, RuntimeError> {
-        self.start.ok_or(RuntimeError::MissingStartEvent)
+        self.start.ok_or(RuntimeErrorKind::MissingStartEvent.into())
     }
 
     pub fn get(&self, index: usize) -> Option<&Bpmn> {

@@ -1,6 +1,6 @@
 use crate::{
     api::{Exclusive, Inclusive, IntermediateEvent, Task},
-    error::{BuildError, RuntimeError},
+    process::{BuildError, RuntimeError, RuntimeErrorKind},
 };
 use std::{collections::HashMap, fmt::Display};
 
@@ -8,10 +8,11 @@ macro_rules! callback {
     ($name:ident, $variant:pat => $value:ident, $ret:ty) => {
         pub(super) fn $name(&self, index: usize, data: &T) -> Result<$ret, RuntimeError> {
             let Some($variant) = self.callbacks.get(index) else {
-                return Err(RuntimeError::MissingImplementation(format!(
+                return Err(RuntimeErrorKind::MissingImplementation(format!(
                     "{} with index: {index}",
                     stringify!($name)
-                )));
+                ))
+                .into());
             };
             Ok($value(data))
         }

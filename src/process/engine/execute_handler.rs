@@ -1,7 +1,7 @@
 use crate::{
     bpmn::{Gateway, GatewayType},
-    error::RuntimeError,
     process::engine::Tokens,
+    process::{RuntimeError, RuntimeErrorKind},
 };
 use log::trace;
 use std::{borrow::Cow, fmt::Display};
@@ -76,9 +76,10 @@ impl<'a> ExecuteHandler<'a> {
             ) = gateway
                 && tokens_arrived < *inputs as usize
             {
-                return Err(RuntimeError::BpmnRequirement(format!(
+                return Err(RuntimeErrorKind::BpmnRequirement(format!(
                     "Execution stopped. Not enough tokens at {gateway}"
-                )));
+                ))
+                .into());
             }
             return Ok(gateway);
         }
@@ -135,7 +136,7 @@ fn check_unbalanced_diagram(input: &[&Gateway]) -> Result<(), RuntimeError> {
     // If many different gateways are visited, we have an unbalanced graph
     if std::collections::HashSet::<usize>::from_iter(input.iter().map(|g| *g.id.local())).len() > 1
     {
-        return Err(RuntimeError::NotSupported("Unbalanced diagram".into()));
+        return Err(RuntimeErrorKind::NotSupported("Unbalanced diagram".into()).into());
     }
     Ok(())
 }
