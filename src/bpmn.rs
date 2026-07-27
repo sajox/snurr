@@ -1,6 +1,6 @@
 use crate::{
     diagram::{Id, Outputs},
-    process::{ParseError, ParseErrorKind, RuntimeError, RuntimeErrorKind},
+    process::{RuntimeError, RuntimeErrorKind},
 };
 use core::fmt;
 use std::{collections::HashMap, fmt::Display};
@@ -74,7 +74,7 @@ pub(crate) enum EventType {
 }
 
 impl TryFrom<&[u8]> for EventType {
-    type Error = ParseError;
+    type Error = BpmnError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -85,7 +85,7 @@ impl TryFrom<&[u8]> for EventType {
             START_EVENT => EventType::Start,
             _ => {
                 return Err(
-                    ParseErrorKind::TypeNotImplemented(std::str::from_utf8(value)?.into()).into(),
+                    BpmnErrorKind::TypeNotImplemented(std::str::from_utf8(value)?.into()).into(),
                 );
             }
         })
@@ -113,7 +113,7 @@ pub(crate) enum ActivityType {
 }
 
 impl TryFrom<&[u8]> for ActivityType {
-    type Error = ParseError;
+    type Error = BpmnError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -129,7 +129,7 @@ impl TryFrom<&[u8]> for ActivityType {
             BUSINESS_RULE_TASK => ActivityType::BusinessRuleTask,
             _ => {
                 return Err(
-                    ParseErrorKind::TypeNotImplemented(std::str::from_utf8(value)?.into()).into(),
+                    BpmnErrorKind::TypeNotImplemented(std::str::from_utf8(value)?.into()).into(),
                 );
             }
         })
@@ -151,7 +151,7 @@ pub(crate) enum GatewayType {
 }
 
 impl TryFrom<&[u8]> for GatewayType {
-    type Error = ParseError;
+    type Error = BpmnError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Ok(match value {
@@ -161,7 +161,7 @@ impl TryFrom<&[u8]> for GatewayType {
             EVENT_BASED_GATEWAY => GatewayType::EventBased,
             _ => {
                 return Err(
-                    ParseErrorKind::TypeNotImplemented(std::str::from_utf8(value)?.into()).into(),
+                    BpmnErrorKind::TypeNotImplemented(std::str::from_utf8(value)?.into()).into(),
                 );
             }
         })
@@ -196,9 +196,9 @@ impl Display for Symbol {
 }
 
 impl TryFrom<&[u8]> for Symbol {
-    type Error = ParseError;
+    type Error = BpmnError;
 
-    fn try_from(value: &[u8]) -> Result<Self, ParseError> {
+    fn try_from(value: &[u8]) -> Result<Self, BpmnError> {
         let ty = match value {
             CANCEL_EVENT_DEFINITION => Symbol::Cancel,
             COMPENSATE_EVENT_DEFINITION => Symbol::Compensation,
@@ -212,7 +212,7 @@ impl TryFrom<&[u8]> for Symbol {
             TIMER_EVENT_DEFINITION => Symbol::Timer,
             _ => {
                 return Err(
-                    ParseErrorKind::TypeNotImplemented(std::str::from_utf8(value)?.into()).into(),
+                    BpmnErrorKind::TypeNotImplemented(std::str::from_utf8(value)?.into()).into(),
                 );
             }
         };
@@ -313,7 +313,7 @@ pub(crate) enum Bpmn {
 }
 
 impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
-    type Error = ParseError;
+    type Error = BpmnError;
 
     fn try_from(
         (bpmn_type, mut attributes): (&[u8], HashMap<&[u8], String>),
@@ -323,13 +323,13 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
             DEFINITIONS => Bpmn::Definitions {
                 id: attributes
                     .remove(ATTRIB_ID)
-                    .ok_or_else(|| ParseErrorKind::MissingId(bpmn_type_str.into()))?
+                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type_str.into()))?
                     .into(),
             },
             PROCESS => Bpmn::Process {
                 id: attributes
                     .remove(ATTRIB_ID)
-                    .ok_or_else(|| ParseErrorKind::MissingId(bpmn_type_str.into()))?
+                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type_str.into()))?
                     .into(),
                 data_index: None,
             },
@@ -342,7 +342,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                 symbol: None,
                 id: attributes
                     .remove(ATTRIB_ID)
-                    .ok_or_else(|| ParseErrorKind::MissingId(bpmn_type_str.into()))?
+                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type_str.into()))?
                     .into(),
                 name: attributes.remove(ATTRIB_NAME),
                 attached_to_ref: attributes.remove(ATTRIB_ATTACHED_TO_REF).map(Into::into),
@@ -354,7 +354,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     activity_type: bpmn_type.try_into()?,
                     id: attributes
                         .remove(ATTRIB_ID)
-                        .ok_or_else(|| ParseErrorKind::MissingId(bpmn_type_str.into()))?
+                        .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type_str.into()))?
                         .into(),
                     func_idx: None,
                     name: attributes.remove(ATTRIB_NAME),
@@ -366,7 +366,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     gateway_type: bpmn_type.try_into()?,
                     id: attributes
                         .remove(ATTRIB_ID)
-                        .ok_or_else(|| ParseErrorKind::MissingId(bpmn_type_str.into()))?
+                        .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type_str.into()))?
                         .into(),
                     func_idx: None,
                     name: attributes.remove(ATTRIB_NAME),
@@ -378,19 +378,48 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
             SEQUENCE_FLOW => Bpmn::SequenceFlow {
                 id: attributes
                     .remove(ATTRIB_ID)
-                    .ok_or_else(|| ParseErrorKind::MissingId(bpmn_type_str.into()))?
+                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type_str.into()))?
                     .into(),
                 name: attributes.remove(ATTRIB_NAME),
                 target_ref: attributes
                     .remove(ATTRIB_TARGET_REF)
-                    .ok_or(ParseErrorKind::MissingTargetRef)?
+                    .ok_or(BpmnErrorKind::MissingTargetRef)?
                     .into(),
             },
             INCOMING | OUTGOING => Bpmn::Direction(None),
             _ => {
-                return Err(ParseErrorKind::TypeNotImplemented(bpmn_type_str.into()).into());
+                return Err(BpmnErrorKind::TypeNotImplemented(bpmn_type_str.into()).into());
             }
         };
         Ok(ty)
+    }
+}
+
+/// Errors that can occur while constructing Bpmn data.
+#[derive(thiserror::Error, Debug)]
+#[error("could not create Bpmn type")]
+#[non_exhaustive]
+pub struct BpmnError {
+    #[from]
+    pub source: BpmnErrorKind,
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum BpmnErrorKind {
+    #[error("tag `{0}` missing attribute id")]
+    MissingId(String),
+    #[error("tag `sequenceFlow` missing attribute targetRef")]
+    MissingTargetRef,
+    #[error("tag `{0}` not implemented")]
+    TypeNotImplemented(String),
+    #[error(transparent)]
+    Encoding(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl From<std::str::Utf8Error> for BpmnError {
+    fn from(value: std::str::Utf8Error) -> Self {
+        BpmnError {
+            source: BpmnErrorKind::Encoding(value.into()),
+        }
     }
 }

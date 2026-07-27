@@ -4,7 +4,7 @@ mod scaffold;
 
 use crate::{
     api::{Exclusive, Inclusive, IntermediateEvent, Task},
-    bpmn::Bpmn,
+    bpmn::{Bpmn, BpmnError},
     diagram::{Diagram, reader::read_bpmn},
     process::handler::Callback,
 };
@@ -219,7 +219,7 @@ pub enum BpmnFileErrorKind {
 
 /// Errors that can occur while parsing BPMN data.
 #[derive(thiserror::Error, Debug)]
-#[error("error parsing `{source}`")]
+#[error(transparent)]
 #[non_exhaustive]
 pub struct ParseError {
     #[from]
@@ -228,35 +228,24 @@ pub struct ParseError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ParseErrorKind {
-    #[error("BPMN type {0} missing id")]
-    MissingId(String),
-    #[error("sequenceFlow missing targetRef")]
-    MissingTargetRef,
-    #[error("type {0} not implemented")]
-    TypeNotImplemented(String),
+    #[error("error on line {line}")]
+    Bpmn { line: usize, source: BpmnError },
+    #[error("could not build the snurr process")]
+    ProcessBuild,
     #[error("{0} not supported")]
     NotSupported(String),
-    #[error("could not build process")]
-    ProcessBuild,
     #[error(transparent)]
     Encoding(Box<dyn std::error::Error + Send + Sync>),
-    #[error("Error at position {pos} with {source}")]
+    #[error("xml error on line {line} and column {column}")]
     Xml {
-        pos: u64,
+        line: usize,
+        column: usize,
         source: Box<dyn std::error::Error + Send + Sync>,
     },
 }
 
-impl From<std::str::Utf8Error> for ParseError {
-    fn from(value: std::str::Utf8Error) -> Self {
-        ParseError {
-            source: ParseErrorKind::Encoding(value.into()),
-        }
-    }
-}
-
 #[derive(thiserror::Error, Debug)]
-#[error("error running `{source}`")]
+#[error("error running")]
 #[non_exhaustive]
 pub struct RuntimeError {
     #[from]
@@ -271,7 +260,7 @@ pub enum RuntimeErrorKind {
     MissingImplementation(String),
     #[error("{0} has no default flow")]
     MissingDefault(String),
-    #[error("could not find BPMN data with id {0}")]
+    #[error("could not find bpmn data with id {0}")]
     MisssingBpmnData(String),
     #[error("could not find process data with id {0}")]
     MissingProcessData(String),
@@ -281,7 +270,7 @@ pub enum RuntimeErrorKind {
     TypeNotImplemented(String),
     #[error("could not find {0} boundary symbol attached to {1}")]
     MissingBoundary(String, String),
-    #[error("{0} could not find {1}")]
+    #[error("event gateway {0} could not find intermediate catch event {1}")]
     MissingIntermediateEvent(String, String),
     #[error("missing intermediate throw event name on {0}")]
     MissingIntermediateThrowEventName(String),
