@@ -12,9 +12,6 @@ keywords = ["BPMN", "process"]
 
 include = ["Cargo.toml", "LICENSE", "/src", "/examples", "/assets", "/docs"]
 
-[lib]
-doctest = true
-
 [lints.rust]
 unsafe_code = "forbid"
 

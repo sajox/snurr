@@ -244,7 +244,7 @@ impl Display for Gateway {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            r#"{} "{}""#,
+            "{} `{}`",
             self.gateway_type,
             self.name.as_deref().unwrap_or(self.id.bpmn())
         )
@@ -265,7 +265,7 @@ impl Display for Event {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            r#"{} "{}""#,
+            "{} `{}`",
             self.event_type,
             self.name.as_deref().unwrap_or(self.id.bpmn())
         )
@@ -285,7 +285,7 @@ impl Display for Activity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            r#"{} "{}""#,
+            "{} `{}`",
             self.activity_type,
             self.name.as_deref().unwrap_or(self.id.bpmn())
         )

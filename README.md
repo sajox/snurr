@@ -62,20 +62,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 If `RUST_LOG=debug` is set when running example
 
 ```text
- DEBUG snurr::process::engine > Start "Begin process"
- DEBUG snurr::process::engine > SequenceFlow "count"
- DEBUG snurr::process::engine > Task "Count 1"
- DEBUG snurr::process::engine > SequenceFlow "control"
- DEBUG snurr::process::engine > Exclusive "equal to 3"
- DEBUG snurr::process::engine > SequenceFlow "NO"
- DEBUG snurr::process::engine > Task "Count 1"
- DEBUG snurr::process::engine > SequenceFlow "control"
- DEBUG snurr::process::engine > Exclusive "equal to 3"
- DEBUG snurr::process::engine > SequenceFlow "NO"
- DEBUG snurr::process::engine > Task "Count 1"
- DEBUG snurr::process::engine > SequenceFlow "control"
- DEBUG snurr::process::engine > Exclusive "equal to 3"
- DEBUG snurr::process::engine > SequenceFlow "YES"
- DEBUG snurr::process::engine > End "End process"
+ DEBUG snurr::process::engine > Start `Begin process`
+ DEBUG snurr::process::engine > SequenceFlow `count`
+ DEBUG snurr::process::engine > Task `Count 1`
+ DEBUG snurr::process::engine > SequenceFlow `control`
+ DEBUG snurr::process::engine > Exclusive `equal to 3`
+ DEBUG snurr::process::engine > SequenceFlow `NO`
+ DEBUG snurr::process::engine > Task `Count 1`
+ DEBUG snurr::process::engine > SequenceFlow `control`
+ DEBUG snurr::process::engine > Exclusive `equal to 3`
+ DEBUG snurr::process::engine > SequenceFlow `NO`
+ DEBUG snurr::process::engine > Task `Count 1`
+ DEBUG snurr::process::engine > SequenceFlow `control`
+ DEBUG snurr::process::engine > Exclusive `equal to 3`
+ DEBUG snurr::process::engine > SequenceFlow `YES`
+ DEBUG snurr::process::engine > End `End process`
 Counter(3)
 ```

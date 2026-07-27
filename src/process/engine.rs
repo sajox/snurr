@@ -340,7 +340,7 @@ impl<T> Process<T, Run> {
                     target_ref,
                     ..
                 } => {
-                    debug!(r#"SequenceFlow "{}""#, name.as_deref().unwrap_or(id.bpmn()));
+                    debug!("SequenceFlow `{}`", name.as_deref().unwrap_or(id.bpmn()));
                     target_ref.local()
                 }
                 bpmn => {
