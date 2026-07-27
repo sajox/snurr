@@ -19,6 +19,7 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
 - Updated Inclusive API. Renamed Enum `With` to `Inclusive`.
 - Updated Exclusive API. New enum type `Exclusive`.
 - Updated Task API. New enum type `Task`. Slightly less verbose when a Task Boundary is used.
+- Error redesign.
 - Removed Arc and Mutex usage in Snurr and let the user choose. Callbacks now use `&T` instead of `Arc<Mutex<T>>`.
     - Change your process type to `Process::<Arc<Mutex<YourModel>>>::new` to maintain compatibility with existing code.
     - And to extract result
@@ -29,8 +30,6 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
                     .map_err(|_| YourError::NoProcessResult)?;
         ```
 - Removed `Data<T>` type as it was `Arc<Mutex<T>>`.
-
-
 
 ### Version 0.14
 
@@ -260,8 +259,8 @@ Collapsed, expanded subprocess or transaction can be used.
 
 ### Conditional Sequence Flows
 
-Use an explicit gateway instead. Snurr return an `Error::NotSupported` if present.
+Use an explicit gateway instead. Snurr return an `ParseError::NotSupported` if present.
 
 ### Unbalanced Inclusive or Parallel gateway construction
 
-Re-write the process with balanced/symmetric gateway pairs. Snurr return an `Error::NotSupported` if occured while running the process. The check is only active in debug mode.
+Re-write the process with balanced/symmetric gateway pairs. Snurr return an `RuntimeError::NotSupported` if occured while running the process. The check is only active in debug mode.
