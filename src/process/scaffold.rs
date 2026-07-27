@@ -8,7 +8,7 @@ use crate::{
 impl<T> Process<T> {
     /// Generate code from all the task and gateways to the given file path.
     /// No file with same name is allowed to exist at the target location.
-    /// ```
+    /// ```ignore
     /// use snurr::Process;
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {

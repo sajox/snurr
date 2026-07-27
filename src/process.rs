@@ -219,7 +219,7 @@ pub enum BpmnFileErrorKind {
 
 /// Errors that can occur while parsing BPMN data.
 #[derive(thiserror::Error, Debug)]
-#[error(transparent)]
+#[error("error parsing")]
 #[non_exhaustive]
 pub struct ParseError {
     #[from]
