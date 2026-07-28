@@ -98,9 +98,13 @@ impl<T> Process<T> {
     }
 
     /// Install and check that all required functions have been registered. You cannot run a process before `build` is called.
-    /// If `build` returns an error, it contains the missing functions.
+    /// If `build` returns an error, it contains the missing functions. Will panic if called again after an error.
     pub fn build(mut self) -> Result<Process<T, Run>, BuildError> {
-        let result = self.diagram.install_and_check(self.handler.build()?);
+        let result = self.diagram.install_and_check(
+            self.handler
+                .build()
+                .expect("handler map already consumed and cannot proceed, add missing implementations and retry"),
+        );
         if result.is_empty() {
             Ok(Process {
                 diagram: self.diagram,
@@ -200,8 +204,7 @@ impl<T> Process<T, Run> {
     }
 }
 
-// Process errors
-
+/// Errors that can occur while reading a bpmn file
 #[derive(thiserror::Error, Debug)]
 #[error("error reading `{path}`")]
 #[non_exhaustive]
@@ -217,7 +220,7 @@ pub enum BpmnFileErrorKind {
     Parse(ParseError),
 }
 
-/// Errors that can occur while parsing BPMN data.
+/// Errors that can occur while parsing bpmn data.
 #[derive(thiserror::Error, Debug)]
 #[error("error parsing")]
 #[non_exhaustive]
@@ -244,6 +247,7 @@ pub enum ParseErrorKind {
     },
 }
 
+/// Errors that can occur while running the process
 #[derive(thiserror::Error, Debug)]
 #[error("error running")]
 #[non_exhaustive]
@@ -286,13 +290,11 @@ pub enum RuntimeErrorKind {
     BpmnRequirement(String),
 }
 
-/// Errors that can occur while trying to build a process to make it runnable.
+/// Errors that can occur while trying to make a process runnable
 #[derive(thiserror::Error, Debug)]
 pub enum BuildError {
-    #[error("Missing implementations {0}")]
+    #[error("missing implementations {0}")]
     MissingImplementations(String),
-    #[error("Handlermap has already been consumed")]
-    MapConsumed,
 }
 
 #[cfg(test)]

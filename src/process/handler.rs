@@ -1,6 +1,6 @@
 use crate::{
     api::{Exclusive, Inclusive, IntermediateEvent, Task},
-    process::{BuildError, RuntimeError, RuntimeErrorKind},
+    process::{RuntimeError, RuntimeErrorKind},
 };
 use std::{collections::HashMap, fmt::Display};
 
@@ -70,8 +70,8 @@ impl<T> Handler<T> {
     callback!(run_eventbased, Callback::EventBased(func) => func, IntermediateEvent);
 
     // Consumes the handler_map and cannot add more things with add_
-    pub(super) fn build(&mut self) -> Result<HandlerMap, BuildError> {
-        self.handler_map.take().ok_or(BuildError::MapConsumed)
+    pub(super) fn build(&mut self) -> Option<HandlerMap> {
+        self.handler_map.take()
     }
 }
 

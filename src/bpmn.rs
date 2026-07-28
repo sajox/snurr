@@ -395,9 +395,9 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
     }
 }
 
-/// Errors that can occur while constructing Bpmn data.
+/// Errors that can occur while constructing bpmn types.
 #[derive(thiserror::Error, Debug)]
-#[error("could not create Bpmn type")]
+#[error("could not create bpmn type")]
 #[non_exhaustive]
 pub struct BpmnError {
     #[from]
