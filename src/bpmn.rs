@@ -83,11 +83,9 @@ impl TryFrom<&[u8]> for EventType {
             INTERMEDIATE_CATCH_EVENT => EventType::IntermediateCatch,
             INTERMEDIATE_THROW_EVENT => EventType::IntermediateThrow,
             START_EVENT => EventType::Start,
-            _ => {
-                return Err(
-                    BpmnErrorKind::TypeNotImplemented(std::str::from_utf8(value)?.into()).into(),
-                );
-            }
+            _ => Err(BpmnErrorKind::TypeNotImplemented(
+                std::str::from_utf8(value)?.into(),
+            ))?,
         })
     }
 }
@@ -127,11 +125,9 @@ impl TryFrom<&[u8]> for ActivityType {
             SEND_TASK => ActivityType::SendTask,
             MANUAL_TASK => ActivityType::ManualTask,
             BUSINESS_RULE_TASK => ActivityType::BusinessRuleTask,
-            _ => {
-                return Err(
-                    BpmnErrorKind::TypeNotImplemented(std::str::from_utf8(value)?.into()).into(),
-                );
-            }
+            _ => Err(BpmnErrorKind::TypeNotImplemented(
+                std::str::from_utf8(value)?.into(),
+            ))?,
         })
     }
 }
@@ -159,11 +155,9 @@ impl TryFrom<&[u8]> for GatewayType {
             INCLUSIVE_GATEWAY => GatewayType::Inclusive,
             PARALLEL_GATEWAY => GatewayType::Parallel,
             EVENT_BASED_GATEWAY => GatewayType::EventBased,
-            _ => {
-                return Err(
-                    BpmnErrorKind::TypeNotImplemented(std::str::from_utf8(value)?.into()).into(),
-                );
-            }
+            _ => Err(BpmnErrorKind::TypeNotImplemented(
+                std::str::from_utf8(value)?.into(),
+            ))?,
         })
     }
 }
@@ -210,11 +204,9 @@ impl TryFrom<&[u8]> for Symbol {
             SIGNAL_EVENT_DEFINITION => Symbol::Signal,
             TERMINATE_EVENT_DEFINITION => Symbol::Terminate,
             TIMER_EVENT_DEFINITION => Symbol::Timer,
-            _ => {
-                return Err(
-                    BpmnErrorKind::TypeNotImplemented(std::str::from_utf8(value)?.into()).into(),
-                );
-            }
+            _ => Err(BpmnErrorKind::TypeNotImplemented(
+                std::str::from_utf8(value)?.into(),
+            ))?,
         };
         Ok(ty)
     }
@@ -387,9 +379,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     .into(),
             },
             INCOMING | OUTGOING => Bpmn::Direction(None),
-            _ => {
-                return Err(BpmnErrorKind::TypeNotImplemented(bpmn_type_str.into()).into());
-            }
+            _ => Err(BpmnErrorKind::TypeNotImplemented(bpmn_type_str.into()))?,
         };
         Ok(ty)
     }

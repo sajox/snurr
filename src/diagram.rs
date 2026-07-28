@@ -121,9 +121,7 @@ impl ProcessData {
         }) = bpmn
             && self.start.replace(len).is_some()
         {
-            return Err(ParseError {
-                source: ParseErrorKind::NotSupported("multiple start event".into()),
-            });
+            Err(ParseErrorKind::NotSupported("multiple start event".into()))?
         }
 
         bpmn.update_local_id(len);

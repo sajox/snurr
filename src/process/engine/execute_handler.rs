@@ -76,10 +76,9 @@ impl<'a> ExecuteHandler<'a> {
             ) = gateway
                 && tokens_arrived < *inputs as usize
             {
-                return Err(RuntimeErrorKind::BpmnRequirement(format!(
+                Err(RuntimeErrorKind::BpmnRequirement(format!(
                     "Execution stopped. Not enough tokens at {gateway}"
-                ))
-                .into());
+                )))?
             }
             return Ok(gateway);
         }
@@ -136,7 +135,7 @@ fn check_unbalanced_diagram(input: &[&Gateway]) -> Result<(), RuntimeError> {
     // If many different gateways are visited, we have an unbalanced graph
     if std::collections::HashSet::<usize>::from_iter(input.iter().map(|g| *g.id.local())).len() > 1
     {
-        return Err(RuntimeErrorKind::NotSupported("Unbalanced diagram".into()).into());
+        Err(RuntimeErrorKind::NotSupported("Unbalanced diagram".into()))?
     }
     Ok(())
 }

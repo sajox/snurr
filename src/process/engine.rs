@@ -96,7 +96,7 @@ impl<T> Process<T, Run> {
                             }
                         }
                         Ok(Return::Fork(item)) => handler.pending_fork(item),
-                        Err(value) => return Err(value),
+                        Err(value) => Err(value)?,
                     }
                 }
 
@@ -219,9 +219,7 @@ impl<T> Process<T, Run> {
                             {
                                 process_data
                             } else {
-                                return Err(
-                                    RuntimeErrorKind::MissingProcessData(id.bpmn().into()).into()
-                                );
+                                Err(RuntimeErrorKind::MissingProcessData(id.bpmn().into()))?
                             };
 
                             if let Event {
@@ -268,7 +266,7 @@ impl<T> Process<T, Run> {
                     debug!("{gateway}");
                     match gateway_type {
                         _ if outputs.len() == 0 => {
-                            return Err(RuntimeErrorKind::MissingOutput(gateway.to_string()).into());
+                            Err(RuntimeErrorKind::MissingOutput(gateway.to_string()))?
                         }
                         // Handle 1 to 1, probably a temporary design or mistake
                         _ if outputs.len() == 1 && *inputs == 1 => outputs.first().unwrap(),
@@ -298,11 +296,10 @@ impl<T> Process<T, Run> {
                             ));
                         }
                         GatewayType::EventBased if outputs.len() == 1 => {
-                            return Err(RuntimeErrorKind::BpmnRequirement(
+                            Err(RuntimeErrorKind::BpmnRequirement(
                                 "Event gateway must have at least two outgoing sequence flows"
                                     .into(),
-                            )
-                            .into());
+                            ))?
                         }
                         GatewayType::EventBased => {
                             let value = func_idx
@@ -332,9 +329,7 @@ impl<T> Process<T, Run> {
                     debug!("SequenceFlow `{}`", name.as_deref().unwrap_or(id.bpmn()));
                     target_ref.local()
                 }
-                bpmn => {
-                    return Err(RuntimeErrorKind::TypeNotImplemented(format!("{bpmn:?}")).into());
-                }
+                bpmn => Err(RuntimeErrorKind::TypeNotImplemented(format!("{bpmn:?}")))?,
             };
         }
     }

@@ -80,7 +80,7 @@ impl DataBuilder {
     pub(super) fn end_process(&mut self) -> Result<(), ParseError> {
         let Some((mut bpmn, mut process_data)) = self.stack.pop().zip(self.process_stack.pop())
         else {
-            return Err(ParseErrorKind::ProcessBuild.into());
+            Err(ParseErrorKind::ProcessBuild)?
         };
 
         // Definitions collect all Processes
@@ -110,8 +110,7 @@ fn check_unsupported(bpmn: &Bpmn) -> Result<(), ParseError> {
             "{}: {}",
             name.as_deref().unwrap_or(id.bpmn()),
             "conditional sequence flow",
-        ))
-        .into(),
+        )),
         _ => return Ok(()),
-    })
+    })?
 }

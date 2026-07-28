@@ -8,11 +8,10 @@ macro_rules! callback {
     ($name:ident, $variant:pat => $value:ident, $ret:ty) => {
         pub(super) fn $name(&self, index: usize, data: &T) -> Result<$ret, RuntimeError> {
             let Some($variant) = self.callbacks.get(index) else {
-                return Err(RuntimeErrorKind::MissingImplementation(format!(
+                Err(RuntimeErrorKind::MissingImplementation(format!(
                     "{} with index: {index}",
                     stringify!($name)
-                ))
-                .into());
+                )))?
             };
             Ok($value(data))
         }

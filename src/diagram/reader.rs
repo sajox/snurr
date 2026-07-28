@@ -21,12 +21,11 @@ pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, ParseErro
         match reader.read_event_into(&mut buf) {
             Err(e) => {
                 let (line, column) = reader.line_and_column(&buf, true)?;
-                return Err(ParseErrorKind::Xml {
+                Err(ParseErrorKind::Xml {
                     line,
                     column,
                     source: e.into(),
-                }
-                .into());
+                })?
             }
             Ok(Event::Eof) => break,
             Ok(Event::Start(bs)) => match bs.local_name().as_ref() {
