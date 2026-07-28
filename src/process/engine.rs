@@ -213,12 +213,16 @@ impl<T> Process<T, Run> {
                                 Task::Default => maybe_fork!(outputs, activity),
                             }
                         }
-                        ActivityType::SubProcess {
-                            data_index: Some(index),
-                        } => {
-                            let subprocess = self.diagram.get_process(*index).ok_or_else(|| {
-                                RuntimeErrorKind::MissingProcessData(id.bpmn().into())
-                            })?;
+                        ActivityType::SubProcess { data_index } => {
+                            let subprocess = if let Some(index) = data_index
+                                && let Some(process_data) = self.diagram.get_process(*index)
+                            {
+                                process_data
+                            } else {
+                                return Err(
+                                    RuntimeErrorKind::MissingProcessData(id.bpmn().into()).into()
+                                );
+                            };
 
                             if let Event {
                                 event_type: EventType::End,
@@ -250,14 +254,8 @@ impl<T> Process<T, Run> {
                                 maybe_fork!(outputs, activity)
                             }
                         }
-                        ActivityType::SubProcess { .. } => {
-                            return Err(
-                                RuntimeErrorKind::MissingProcessData(activity.to_string()).into()
-                            );
-                        }
                     }
                 }
-
                 Bpmn::Gateway(
                     gateway @ Gateway {
                         gateway_type,
