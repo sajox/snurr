@@ -5,12 +5,12 @@ use crate::{
     Process,
     api::{Exclusive, Inclusive, Task},
     bpmn::{Activity, ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Symbol},
-    diagram::ProcessData,
+    diagram::{Outputs, ProcessData},
     process::{RuntimeError, RuntimeErrorKind},
 };
 use execute_handler::ExecuteHandler;
 use log::{debug, warn};
-use std::{borrow::Cow, collections::HashSet};
+use std::{borrow::Cow, collections::HashSet, fmt::Display};
 
 type Tokens<'a> = Cow<'a, [usize]>;
 
@@ -30,15 +30,6 @@ macro_rules! maybe_fork {
         } else {
             return Ok(Return::Fork(Cow::Borrowed($outputs.ids())));
         }
-    };
-}
-
-macro_rules! find_flow {
-    ($outputs:expr, $value:expr, $input:expr, $ty:expr) => {
-        $input
-            .process
-            .find_by_name_or_id($value, $outputs)
-            .ok_or_else(|| RuntimeErrorKind::MissingOutput($ty.to_string()))
     };
 }
 
@@ -291,7 +282,7 @@ impl<T> Process<T, Run> {
                                     RuntimeErrorKind::MissingImplementation(gateway.to_string())
                                 })?? {
                                 Exclusive::Flow(value) => {
-                                    find_flow!(outputs, value, input, gateway)?
+                                    input.find_flow(value, outputs, gateway)?
                                 }
                                 Exclusive::Default => gateway.default_path()?,
                             }
@@ -361,15 +352,15 @@ impl<T> Process<T, Run> {
             .map(|index| self.handler.run_inclusive(index, input.data))
             .ok_or_else(|| RuntimeErrorKind::MissingImplementation(gateway.to_string()))??
         {
-            Inclusive::Flow(value) => find_flow!(outputs, value, input, gateway)?,
+            Inclusive::Flow(value) => input.find_flow(value, outputs, gateway)?,
             Inclusive::Fork(values) => match values.as_slice() {
                 [] => gateway.default_path()?,
-                [value] => find_flow!(outputs, value, input, gateway)?,
+                [value] => input.find_flow(value, outputs, gateway)?,
                 [..] => {
                     let mut tokens = HashSet::with_capacity(values.len());
                     for value in values {
                         // Breaks on first error
-                        if !tokens.insert(*find_flow!(outputs, value, input, gateway)?) {
+                        if !tokens.insert(*input.find_flow(value, outputs, gateway)?) {
                             // The flow has already been used, we just log an warning and continue.
                             warn!(
                                 "{gateway} used flow {value} multiple times. Discarded the duplicates."
@@ -399,5 +390,18 @@ impl<'a, T> ExecuteInput<'a, T> {
             is_subprocess,
             data,
         }
+    }
+
+    #[inline]
+    fn find_flow(
+        &self,
+        value: &str,
+        outputs: &'a Outputs,
+        message: impl Display,
+    ) -> Result<&'a usize, RuntimeError> {
+        Ok(self
+            .process
+            .find_by_name_or_id(value, outputs)
+            .ok_or_else(|| RuntimeErrorKind::MissingOutput(message.to_string()))?)
     }
 }
