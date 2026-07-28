@@ -19,7 +19,24 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
 - Updated Inclusive API. Renamed Enum `With` to `Inclusive`.
 - Updated Exclusive API. New enum type `Exclusive`.
 - Updated Task API. New enum type `Task`. Slightly less verbose when a Task Boundary is used.
-- Error redesign.
+- Error redesign. Example output below from anyhow crate.
+
+    New
+    ```
+    Error: error reading `examples/example.bpmn`
+
+    Caused by:
+        0: error parsing
+        1: error on line 16
+        2: could not create bpmn type
+        3: tag `sequenceFlow` missing attribute id
+    ```
+
+    Old
+    ```
+    Error: BPMN type sequenceFlow missing id
+    ```
+
 - Removed Arc and Mutex usage in Snurr and let the user choose. Callbacks now use `&T` instead of `Arc<Mutex<T>>`.
     - Change your process type to `Process::<Arc<Mutex<YourModel>>>::new` to maintain compatibility with existing code.
     - And to extract result
