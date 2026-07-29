@@ -1,8 +1,8 @@
 use snurr::{
     Exclusive, Process, Result, Symbol, Task,
     process::{
-        BpmnFileError, BpmnFileErrorKind, ParseError, ParseErrorKind, RuntimeError,
-        RuntimeErrorKind,
+        BpmnFileError, BpmnFileErrorKind, DiagramError, DiagramErrorKind, ParseError,
+        ParseErrorKind, RuntimeError, RuntimeErrorKind,
     },
 };
 use std::sync::Mutex;
@@ -228,7 +228,10 @@ fn inclusive_gateway_no_output() -> Result<()> {
             matches!(
                 error,
                 RuntimeError {
-                    source: RuntimeErrorKind::MissingOutput(_),
+                    source: RuntimeErrorKind::Diagram(DiagramError {
+                        source: DiagramErrorKind::MissingOutput(_),
+                        ..
+                    }),
                     ..
                 }
             ),
@@ -396,7 +399,13 @@ fn subprocess_external_link_fail() -> Result<()> {
         Process::<Counter>::new("tests/files/subprocess_external_link_fail.bpmn")?.build()?;
     match bpmn.run(Default::default()) {
         Err(error) => assert!(
-            matches!(error, RuntimeError {source: RuntimeErrorKind::MissingIntermediateCatchEvent(symbol, name), ..} if symbol == "Link" && name == "Link 2"),
+            matches!(error, RuntimeError {
+                    source: RuntimeErrorKind::Diagram(DiagramError {
+                        source: DiagramErrorKind::MissingIntermediateCatchEvent(symbol, name),
+                        ..
+                    }),
+                    ..
+                } if symbol == "Link" && name == "Link 2"),
             "Expected Link Symbol with name Link 2"
         ),
         _ => panic!("Expected an error"),
@@ -676,7 +685,10 @@ fn parallel_stalled_execution() -> Result<()> {
             matches!(
                 error,
                 RuntimeError {
-                    source: RuntimeErrorKind::BpmnRequirement(_),
+                    source: RuntimeErrorKind::Diagram(DiagramError {
+                        source: DiagramErrorKind::BpmnRequirement(_),
+                        ..
+                    }),
                     ..
                 }
             ),
@@ -699,7 +711,10 @@ fn parallel_unbalanced() -> Result<()> {
             matches!(
                 error,
                 RuntimeError {
-                    source: RuntimeErrorKind::NotSupported(_),
+                    source: RuntimeErrorKind::Diagram(DiagramError {
+                        source: DiagramErrorKind::NotSupported(_),
+                        ..
+                    }),
                     ..
                 }
             ),
@@ -722,7 +737,10 @@ fn parallel_unbalanced2() -> Result<()> {
             matches!(
                 error,
                 RuntimeError {
-                    source: RuntimeErrorKind::NotSupported(_),
+                    source: RuntimeErrorKind::Diagram(DiagramError {
+                        source: DiagramErrorKind::NotSupported(_),
+                        ..
+                    }),
                     ..
                 }
             ),

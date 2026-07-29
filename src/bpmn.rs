@@ -1,6 +1,6 @@
 use crate::{
     diagram::{Id, Outputs},
-    process::{RuntimeError, RuntimeErrorKind},
+    process::{DiagramErrorKind, RuntimeError},
 };
 use core::fmt;
 use std::{collections::HashMap, fmt::Display};
@@ -228,7 +228,7 @@ impl Gateway {
         self.default
             .as_ref()
             .map(Id::local)
-            .ok_or_else(|| RuntimeErrorKind::MissingDefault(self.to_string()).into())
+            .ok_or_else(|| DiagramErrorKind::MissingDefault(self.to_string()).into())
     }
 }
 

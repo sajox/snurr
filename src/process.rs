@@ -256,6 +256,22 @@ pub struct RuntimeError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum RuntimeErrorKind {
+    #[error(transparent)]
+    Diagram(#[from] DiagramError),
+    #[error("engine failure `{0}`")]
+    Engine(String),
+}
+
+#[derive(thiserror::Error, Debug)]
+#[error("error bpmn diagram")]
+#[non_exhaustive]
+pub struct DiagramError {
+    #[from]
+    pub source: DiagramErrorKind,
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum DiagramErrorKind {
     #[error("{0} has no output. (Used correct name or id?)")]
     MissingOutput(String),
     #[error("{0} has no default flow")]
@@ -276,8 +292,14 @@ pub enum RuntimeErrorKind {
     NotSupported(String),
     #[error("{0}")]
     BpmnRequirement(String),
-    #[error("engine failure `{0}`")]
-    Engine(String),
+}
+
+impl From<DiagramErrorKind> for RuntimeError {
+    fn from(source: DiagramErrorKind) -> Self {
+        RuntimeError {
+            source: RuntimeErrorKind::Diagram(DiagramError { source }),
+        }
+    }
 }
 
 /// Errors that can occur while trying to make a process runnable

@@ -6,7 +6,7 @@ use crate::{
     api::{Exclusive, Inclusive, Task},
     bpmn::{Activity, ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Symbol},
     diagram::{Outputs, ProcessData},
-    process::{RuntimeError, RuntimeErrorKind},
+    process::{DiagramErrorKind, RuntimeError, RuntimeErrorKind},
 };
 use execute_handler::ExecuteHandler;
 use log::{debug, warn};
@@ -26,7 +26,7 @@ macro_rules! maybe_fork {
         if $outputs.len() <= 1 {
             $outputs
                 .first()
-                .ok_or_else(|| RuntimeErrorKind::MissingOutput($ty.to_string()))?
+                .ok_or_else(|| DiagramErrorKind::MissingOutput($ty.to_string()))?
         } else {
             return Ok(Return::Fork(Cow::Borrowed($outputs.ids())));
         }
@@ -46,7 +46,7 @@ impl<T> Process<T, Run> {
         loop {
             let active_tokens = handler.active_tokens();
             if active_tokens.is_empty() {
-                return last_visited_end.ok_or(RuntimeErrorKind::MissingEndEvent.into());
+                return last_visited_end.ok_or(DiagramErrorKind::MissingEndEvent.into());
             }
 
             let flows_iter = {
@@ -167,7 +167,7 @@ impl<T> Process<T, Run> {
                                 (Some(_), _) => {
                                     maybe_fork!(outputs, event)
                                 }
-                                _ => Err(RuntimeErrorKind::MissingIntermediateThrowEventName(
+                                _ => Err(DiagramErrorKind::MissingIntermediateThrowEventName(
                                     id.bpmn().into(),
                                 ))?,
                             }
@@ -209,7 +209,7 @@ impl<T> Process<T, Run> {
                                     .process
                                     .find_boundary(id, name, symbol)
                                     .ok_or_else(|| {
-                                        RuntimeErrorKind::MissingBoundary(
+                                        DiagramErrorKind::MissingBoundary(
                                             boundary.to_string(),
                                             activity.to_string(),
                                         )
@@ -249,7 +249,7 @@ impl<T> Process<T, Run> {
                                     .process
                                     .find_boundary(id, name.as_deref(), symbol)
                                     .ok_or_else(|| {
-                                        RuntimeErrorKind::MissingBoundary(
+                                        DiagramErrorKind::MissingBoundary(
                                             symbol.to_string(),
                                             activity.to_string(),
                                         )
@@ -273,7 +273,7 @@ impl<T> Process<T, Run> {
                     debug!("{gateway}");
                     match gateway_type {
                         _ if outputs.len() == 0 => {
-                            Err(RuntimeErrorKind::MissingOutput(gateway.to_string()))?
+                            Err(DiagramErrorKind::MissingOutput(gateway.to_string()))?
                         }
                         // Handle 1 to 1, probably a temporary design or mistake
                         _ if outputs.len() == 1 && *inputs == 1 => outputs.first().unwrap(),
@@ -306,7 +306,7 @@ impl<T> Process<T, Run> {
                             ));
                         }
                         GatewayType::EventBased if outputs.len() == 1 => {
-                            Err(RuntimeErrorKind::BpmnRequirement(
+                            Err(DiagramErrorKind::BpmnRequirement(
                                 "Event gateway must have at least two outgoing sequence flows"
                                     .into(),
                             ))?
@@ -325,7 +325,7 @@ impl<T> Process<T, Run> {
                                 .process
                                 .find_by_intermediate_event(&value, outputs)
                                 .ok_or_else(|| {
-                                    RuntimeErrorKind::MissingIntermediateEvent(
+                                    DiagramErrorKind::MissingIntermediateEvent(
                                         gateway.to_string(),
                                         value.to_string(),
                                     )
@@ -412,6 +412,6 @@ impl<'a, T> ExecuteInput<'a, T> {
         Ok(self
             .process
             .find_by_name_or_id(value, outputs)
-            .ok_or_else(|| RuntimeErrorKind::MissingOutput(message.to_string()))?)
+            .ok_or_else(|| DiagramErrorKind::MissingOutput(message.to_string()))?)
     }
 }

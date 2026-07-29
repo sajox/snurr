@@ -6,7 +6,7 @@ use crate::{
     bpmn::{Activity, ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Symbol},
     diagram::events::Events,
     process::{
-        ParseError, ParseErrorKind, RuntimeError, RuntimeErrorKind,
+        DiagramErrorKind, ParseError, ParseErrorKind, RuntimeError,
         handler::{HandlerMap, HandlerType},
     },
 };
@@ -163,7 +163,7 @@ impl ProcessData {
     }
 
     pub fn start(&self) -> Result<usize, RuntimeError> {
-        self.start.ok_or(RuntimeErrorKind::MissingStartEvent.into())
+        self.start.ok_or(DiagramErrorKind::MissingStartEvent.into())
     }
 
     pub fn get(&self, index: usize) -> Option<&Bpmn> {
