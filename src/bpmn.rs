@@ -169,7 +169,7 @@ impl Display for GatewayType {
 }
 
 /// BPMN Symbols
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub enum Symbol {
     Cancel,
     Compensation,

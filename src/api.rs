@@ -1,5 +1,4 @@
 use crate::bpmn::Symbol;
-use std::fmt::Display;
 
 /// Inclusive gateway return type
 #[derive(Default, Debug)]
@@ -11,6 +10,8 @@ pub enum Inclusive {
     Flow(&'static str),
     /// Collection of outgoing sequence flow by name or id. An empty Vec selects the default sequence flow.
     Fork(Vec<&'static str>),
+    /// Terminate process early and return specified error
+    Panic(Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl From<&'static str> for Inclusive {
@@ -33,6 +34,8 @@ pub enum Exclusive {
     Default,
     /// Outgoing sequence flow by name or id
     Flow(&'static str),
+    /// Terminate process early and return specified error
+    Panic(Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl From<&'static str> for Exclusive {
@@ -49,6 +52,8 @@ pub enum Task {
     Default,
     /// Use a task boundary with optional name and a symbol
     Boundary(Option<&'static str>, Symbol),
+    /// Terminate process early and return specified error
+    Panic(Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl From<(&'static str, Symbol)> for Task {
@@ -63,29 +68,17 @@ impl From<Symbol> for Task {
     }
 }
 
-impl Display for Task {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Task::Default => write!(f, "Default"),
-            Task::Boundary(name, symbol) => {
-                write!(f, "({}, {symbol})", name.unwrap_or_default())
-            }
-        }
-    }
-}
-
 /// Event based gateway return type
 #[derive(Debug)]
-pub struct IntermediateEvent(pub &'static str, pub Symbol);
+pub enum IntermediateEvent {
+    /// Throw intermediate event to correlate to matching catch
+    Throw(&'static str, Symbol),
+    /// Terminate process early and return specified error
+    Panic(Box<dyn std::error::Error + Send + Sync>),
+}
 
 impl From<(&'static str, Symbol)> for IntermediateEvent {
     fn from(value: (&'static str, Symbol)) -> Self {
-        Self(value.0, value.1)
-    }
-}
-
-impl Display for IntermediateEvent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({}, {})", self.0, self.1)
+        Self::Throw(value.0, value.1)
     }
 }

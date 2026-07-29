@@ -631,7 +631,7 @@ fn process_multiple_startevent_none() -> Result<()> {
                     ..
                 }
             ),
-            "Expected BpmnRequirement"
+            "Expected NotSupported"
         ),
         _ => panic!("Expected an error"),
     }
@@ -653,7 +653,7 @@ fn subprocess_multiple_startevent_none() -> Result<()> {
                     ..
                 }
             ),
-            "Expected BpmnRequirement"
+            "Expected NotSupported"
         ),
         _ => panic!("Expected an error"),
     }
@@ -693,6 +693,30 @@ fn parallel_stalled_execution() -> Result<()> {
                 }
             ),
             "Expected BpmnRequirement"
+        ),
+        _ => panic!("Expected an error"),
+    }
+    Ok(())
+}
+
+#[test]
+fn panic() -> Result<()> {
+    let bpmn = Process::<()>::new("tests/files/one_task.bpmn")?
+        .task(COUNT_1, |_| {
+            Task::Panic("RAM very expensive. Goodbye.".into())
+        })
+        .build()?;
+
+    match bpmn.run(Default::default()) {
+        Err(error) => assert!(
+            matches!(
+                error,
+                RuntimeError {
+                    source: RuntimeErrorKind::Panic(_),
+                    ..
+                }
+            ),
+            "Expected Panic"
         ),
         _ => panic!("Expected an error"),
     }

@@ -256,10 +256,15 @@ pub struct RuntimeError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum RuntimeErrorKind {
+    /// Bpmn diagram design error or user specified wrong value
     #[error(transparent)]
     Diagram(#[from] DiagramError),
+    /// Engine problems, should not happen :)
     #[error("engine failure `{0}`")]
     Engine(String),
+    /// User triggered a Panic inside some of the process steps with the attached error
+    #[error("user triggered panic")]
+    Panic(Box<dyn std::error::Error + Send + Sync>),
 }
 
 /// Design flaws in bpmn or incorrect use of the diagram

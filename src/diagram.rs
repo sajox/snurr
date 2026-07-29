@@ -2,7 +2,6 @@ mod events;
 pub mod reader;
 
 use crate::{
-    api::IntermediateEvent,
     bpmn::{Activity, ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Symbol},
     diagram::events::Events,
     process::{
@@ -215,7 +214,8 @@ impl ProcessData {
 
     pub fn find_by_intermediate_event<'a>(
         &self,
-        search: &IntermediateEvent,
+        name: &str,
+        symbol: Symbol,
         outputs: &'a Outputs,
     ) -> Option<&'a usize> {
         outputs.iter().find(|index| {
@@ -226,20 +226,20 @@ impl ProcessData {
                     // We can target both ReceiveTask or Events.
                     Bpmn::Activity(Activity {
                         activity_type: ActivityType::ReceiveTask,
-                        name: Some(name),
+                        name: Some(name_check),
                         ..
-                    }) => search.1 == Symbol::Message && name.as_str() == search.0,
+                    }) => symbol == Symbol::Message && name_check.as_str() == name,
                     Bpmn::Event(Event {
                         symbol:
                             Some(
-                                symbol @ (Symbol::Message
+                                symbol_check @ (Symbol::Message
                                 | Symbol::Signal
                                 | Symbol::Timer
                                 | Symbol::Conditional),
                             ),
-                        name: Some(name),
+                        name: Some(name_check),
                         ..
-                    }) => symbol == &search.1 && name.as_str() == search.0,
+                    }) => symbol_check == &symbol && name_check.as_str() == name,
                     _ => false,
                 };
             }

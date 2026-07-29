@@ -2,7 +2,7 @@ mod execute_handler;
 
 use super::Run;
 use crate::{
-    Process,
+    IntermediateEvent, Process,
     api::{Exclusive, Inclusive, Task},
     bpmn::{Activity, ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Symbol},
     diagram::{Outputs, ProcessData},
@@ -96,7 +96,7 @@ impl<T> Process<T, Run> {
                             }
                         }
                         Ok(Return::Fork(item)) => handler.pending_fork(item),
-                        Err(value) => Err(value)?,
+                        Err(value) => return Err(value),
                     }
                 }
 
@@ -205,16 +205,17 @@ impl<T> Process<T, Run> {
                                         activity
                                     ))
                                 })?? {
-                                ref boundary @ Task::Boundary(name, ref symbol) => input
+                                Task::Boundary(name, ref symbol) => input
                                     .process
                                     .find_boundary(id, name, symbol)
                                     .ok_or_else(|| {
                                         DiagramErrorKind::MissingBoundary(
-                                            boundary.to_string(),
+                                            format!("({name:?},{symbol})"),
                                             activity.to_string(),
                                         )
                                     })?,
                                 Task::Default => maybe_fork!(outputs, activity),
+                                Task::Panic(e) => Err(RuntimeErrorKind::Panic(e))?,
                             }
                         }
                         ActivityType::SubProcess { data_index } => {
@@ -291,6 +292,7 @@ impl<T> Process<T, Run> {
                                     input.find_flow(value, outputs, gateway)?
                                 }
                                 Exclusive::Default => gateway.default_path()?,
+                                Exclusive::Panic(e) => Err(RuntimeErrorKind::Panic(e))?,
                             }
                         }
                         // Handle a regular Join or a JoinFork. In both cases, we need to wait for all tokens.
@@ -312,24 +314,25 @@ impl<T> Process<T, Run> {
                             ))?
                         }
                         GatewayType::EventBased => {
-                            let value = func_idx
+                            match func_idx
                                 .map(|index| self.handler.run_eventbased(index, input.data))
                                 .ok_or_else(|| {
                                     RuntimeErrorKind::Engine(format!(
                                         "missing function {:?}",
                                         gateway
                                     ))
-                                })??;
-
-                            input
-                                .process
-                                .find_by_intermediate_event(&value, outputs)
-                                .ok_or_else(|| {
-                                    DiagramErrorKind::MissingIntermediateEvent(
-                                        gateway.to_string(),
-                                        value.to_string(),
-                                    )
-                                })?
+                                })?? {
+                                IntermediateEvent::Throw(name, symbol) => input
+                                    .process
+                                    .find_by_intermediate_event(name, symbol, outputs)
+                                    .ok_or_else(|| {
+                                        DiagramErrorKind::MissingIntermediateEvent(
+                                            gateway.to_string(),
+                                            format!("({name},{symbol})"),
+                                        )
+                                    })?,
+                                IntermediateEvent::Panic(e) => Err(RuntimeErrorKind::Panic(e))?,
+                            }
                         }
                     }
                 }
@@ -381,6 +384,7 @@ impl<T> Process<T, Run> {
                 }
             },
             Inclusive::Default => gateway.default_path()?,
+            Inclusive::Panic(e) => Err(RuntimeErrorKind::Panic(e))?,
         };
         Ok(Cow::Owned(vec![*value]))
     }
