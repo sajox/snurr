@@ -16,9 +16,12 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
 ### Main branch (BREAKING CHANGES)
 
 - Updated documentation.
-- Updated Inclusive API. Renamed Enum `With` to `Inclusive`.
-- Updated Exclusive API. New enum type `Exclusive`.
-- Updated Task API. New enum type `Task`. Slightly less verbose when a Task Boundary is used.
+- API changes
+  - Renamed Enum `With` to `Inclusive`
+  - New enum type `Exclusive`
+  - New enum type `Task`. Slightly less verbose when a Task Boundary is used.
+  - New enum type `IntermediateEvent`
+  - Support for `Panic`. Enables terminating the process from task and gateways. The process returns a RunTimeError::Panic containing the specified error.
 - Error redesign. Example output below from anyhow crate.
 
     New
