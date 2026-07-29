@@ -262,6 +262,7 @@ pub enum RuntimeErrorKind {
     Engine(String),
 }
 
+/// Design flaws in bpmn or incorrect use of the diagram
 #[derive(thiserror::Error, Debug)]
 #[error("error bpmn diagram")]
 #[non_exhaustive]
