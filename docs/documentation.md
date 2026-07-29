@@ -276,8 +276,8 @@ Collapsed, expanded subprocess or transaction can be used.
 
 ### Conditional Sequence Flows
 
-Use an explicit gateway instead. Snurr return an `ParseError::NotSupported` if present.
+Use an explicit gateway instead. Snurr return an `ParseError` if present.
 
 ### Unbalanced Inclusive or Parallel gateway construction
 
-Re-write the process with balanced/symmetric gateway pairs. Snurr return an `RuntimeError::NotSupported` if occured while running the process. The check is only active in debug mode.
+Re-write the process with balanced/symmetric gateway pairs. Snurr return an `RuntimeError` if occured while running the process. The check is only active in debug mode.
