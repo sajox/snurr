@@ -137,11 +137,12 @@ impl<T> Process<T, Run> {
         T: Send + Sync,
     {
         loop {
-            current_id = match input
-                .process
-                .get(*current_id)
-                .ok_or_else(|| RuntimeErrorKind::MisssingBpmnData(current_id.to_string()))?
-            {
+            current_id = match input.process.get(*current_id).ok_or_else(|| {
+                RuntimeErrorKind::Engine(format!(
+                    "could not fetch bpmn data with index {}",
+                    current_id
+                ))
+            })? {
                 Bpmn::Event(
                     event @ Event {
                         event_type,
@@ -199,7 +200,10 @@ impl<T> Process<T, Run> {
                             match func_idx
                                 .map(|index| self.handler.run_task(index, input.data))
                                 .ok_or_else(|| {
-                                    RuntimeErrorKind::MissingImplementation(activity.to_string())
+                                    RuntimeErrorKind::Engine(format!(
+                                        "missing function {:?}",
+                                        activity
+                                    ))
                                 })?? {
                                 ref boundary @ Task::Boundary(name, ref symbol) => input
                                     .process
@@ -219,7 +223,10 @@ impl<T> Process<T, Run> {
                             {
                                 process_data
                             } else {
-                                Err(RuntimeErrorKind::MissingProcessData(id.bpmn().into()))?
+                                Err(RuntimeErrorKind::Engine(format!(
+                                    "missing subprocess data with bpmn id {:?}",
+                                    activity
+                                )))?
                             };
 
                             if let Event {
@@ -275,7 +282,10 @@ impl<T> Process<T, Run> {
                             match func_idx
                                 .map(|index| self.handler.run_exclusive(index, input.data))
                                 .ok_or_else(|| {
-                                    RuntimeErrorKind::MissingImplementation(gateway.to_string())
+                                    RuntimeErrorKind::Engine(format!(
+                                        "missing function {:?}",
+                                        gateway
+                                    ))
                                 })?? {
                                 Exclusive::Flow(value) => {
                                     input.find_flow(value, outputs, gateway)?
@@ -305,7 +315,10 @@ impl<T> Process<T, Run> {
                             let value = func_idx
                                 .map(|index| self.handler.run_eventbased(index, input.data))
                                 .ok_or_else(|| {
-                                    RuntimeErrorKind::MissingImplementation(gateway.to_string())
+                                    RuntimeErrorKind::Engine(format!(
+                                        "missing function {:?}",
+                                        gateway
+                                    ))
                                 })??;
 
                             input
@@ -329,7 +342,11 @@ impl<T> Process<T, Run> {
                     debug!("SequenceFlow `{}`", name.as_deref().unwrap_or(id.bpmn()));
                     target_ref.local()
                 }
-                bpmn => Err(RuntimeErrorKind::TypeNotImplemented(format!("{bpmn:?}")))?,
+                bpmn @ (Bpmn::Definitions { .. } | Bpmn::Direction(_) | Bpmn::Process { .. }) => {
+                    Err(RuntimeErrorKind::Engine(format!(
+                        "unexpected usage of {bpmn:?}"
+                    )))?
+                }
             };
         }
     }
@@ -343,7 +360,7 @@ impl<T> Process<T, Run> {
     ) -> Result<Tokens<'a>, RuntimeError> {
         let value = match func_idx
             .map(|index| self.handler.run_inclusive(index, input.data))
-            .ok_or_else(|| RuntimeErrorKind::MissingImplementation(gateway.to_string()))??
+            .ok_or_else(|| RuntimeErrorKind::Engine(format!("missing function {:?}", gateway)))??
         {
             Inclusive::Flow(value) => input.find_flow(value, outputs, gateway)?,
             Inclusive::Fork(values) => match values.as_slice() {

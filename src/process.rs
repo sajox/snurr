@@ -184,19 +184,17 @@ impl<T> Process<T, Run> {
         for bpmn in self
             .diagram
             .get_definition()
-            .ok_or(RuntimeErrorKind::MissingDefinitionsId)?
+            .ok_or(RuntimeErrorKind::Engine("no process data available".into()))?
             .iter()
         {
             if let Bpmn::Process {
-                id,
                 data_index: Some(index),
                 ..
             } = bpmn
             {
-                let process_data = self
-                    .diagram
-                    .get_process(*index)
-                    .ok_or_else(|| RuntimeErrorKind::MissingProcessData(id.bpmn().into()))?;
+                let process_data = self.diagram.get_process(*index).ok_or_else(|| {
+                    RuntimeErrorKind::Engine(format!("missing process data {:?}", bpmn))
+                })?;
                 self.execute(ExecuteInput::new(process_data, false, &data))?;
             }
         }
@@ -260,18 +258,8 @@ pub struct RuntimeError {
 pub enum RuntimeErrorKind {
     #[error("{0} has no output. (Used correct name or id?)")]
     MissingOutput(String),
-    #[error("{0} has no implementation")]
-    MissingImplementation(String),
     #[error("{0} has no default flow")]
     MissingDefault(String),
-    #[error("could not find bpmn data with id {0}")]
-    MisssingBpmnData(String),
-    #[error("could not find process data with id {0}")]
-    MissingProcessData(String),
-    #[error("missing definitions id")]
-    MissingDefinitionsId,
-    #[error("type {0} not implemented")]
-    TypeNotImplemented(String),
     #[error("could not find {0} boundary symbol attached to {1}")]
     MissingBoundary(String, String),
     #[error("event gateway {0} could not find intermediate catch event {1}")]
@@ -288,6 +276,8 @@ pub enum RuntimeErrorKind {
     NotSupported(String),
     #[error("{0}")]
     BpmnRequirement(String),
+    #[error("engine failure `{0}`")]
+    Engine(String),
 }
 
 /// Errors that can occur while trying to make a process runnable
