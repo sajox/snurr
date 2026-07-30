@@ -10,7 +10,9 @@ pub enum Inclusive {
     Flow(&'static str),
     /// Collection of outgoing sequence flow by name or id. An empty Vec selects the default sequence flow.
     Fork(Vec<&'static str>),
-    /// Terminate process early and return specified error
+    /// Terminate the process prematurely and have it return the specified error.
+    /// Instead of doing this, you should ensure that the BPMN diagram is always modeled
+    /// with an error path whenever possible.
     Panic(Box<dyn std::error::Error + Send + Sync>),
 }
 
@@ -34,7 +36,9 @@ pub enum Exclusive {
     Default,
     /// Outgoing sequence flow by name or id
     Flow(&'static str),
-    /// Terminate process early and return specified error
+    /// Terminate the process prematurely and have it return the specified error.
+    /// Instead of doing this, you should ensure that the BPMN diagram is always modeled
+    /// with an error path whenever possible.
     Panic(Box<dyn std::error::Error + Send + Sync>),
 }
 
@@ -52,7 +56,9 @@ pub enum Task {
     Default,
     /// Use a task boundary with optional name and a symbol
     Boundary(Option<&'static str>, Symbol),
-    /// Terminate process early and return specified error
+    /// Terminate the process prematurely and have it return the specified error.
+    /// Instead of doing this, you should ensure that the BPMN diagram is always modeled
+    /// with an error path whenever possible.
     Panic(Box<dyn std::error::Error + Send + Sync>),
 }
 
@@ -73,7 +79,9 @@ impl From<Symbol> for Task {
 pub enum IntermediateEvent {
     /// Throw intermediate event to correlate to matching catch
     Throw(&'static str, Symbol),
-    /// Terminate process early and return specified error
+    /// Terminate the process prematurely and have it return the specified error.
+    /// Instead of doing this, you should ensure that the BPMN diagram is always modeled
+    /// with an error path whenever possible.
     Panic(Box<dyn std::error::Error + Send + Sync>),
 }
 
