@@ -409,13 +409,13 @@ impl<'a, T> ExecuteInput<'a, T> {
     #[inline]
     fn find_flow(
         &self,
-        value: &str,
+        search: &str,
         outputs: &'a Outputs,
         message: impl Display,
     ) -> Result<&'a usize, RuntimeError> {
         Ok(self
             .process
-            .find_by_name_or_id(value, outputs)
+            .find_by_name_or_id(search, outputs)
             .ok_or_else(|| DiagramErrorKind::MissingOutput(message.to_string()))?)
     }
 }

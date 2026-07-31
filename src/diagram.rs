@@ -198,15 +198,10 @@ impl ProcessData {
             })
     }
 
-    pub fn find_by_name_or_id<'a>(
-        &self,
-        search: impl AsRef<str>,
-        outputs: &'a Outputs,
-    ) -> Option<&'a usize> {
+    pub fn find_by_name_or_id<'a>(&self, search: &str, outputs: &'a Outputs) -> Option<&'a usize> {
         outputs.iter().find(|index| {
             if let Some(Bpmn::SequenceFlow { id, name, .. }) = self.get(**index) {
-                return name.as_deref().is_some_and(|name| name == search.as_ref())
-                    || id.bpmn() == search.as_ref();
+                return name.as_deref().is_some_and(|name| name == search) || id.bpmn() == search;
             }
             false
         })
