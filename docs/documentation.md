@@ -22,6 +22,8 @@ This is not a complete implementation of the BPMN 2.0 specification but intend t
   - New enum type `Task`. Slightly less verbose when a Task Boundary is used.
   - New enum type `IntermediateEvent`
   - Support for `Panic`. Enables terminating the process from task and gateways. The process returns a RunTimeError::Panic containing the specified error.
+  - Using `Cow<'static, str>` instead of `&'static str` to be more flexible with different types of strings.
+  - Added convenient factory methods for cases where conversions via `From` are not used.
 - Error redesign. Example output below from anyhow crate.
 
     New
