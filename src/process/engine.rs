@@ -207,7 +207,7 @@ impl<T> Process<T, Run> {
                                 })?? {
                                 Task::Boundary(name, ref symbol) => input
                                     .process
-                                    .find_boundary(id, name, symbol)
+                                    .find_boundary(id, name.as_deref(), symbol)
                                     .ok_or_else(|| {
                                         DiagramErrorKind::MissingBoundary(
                                             format!("({name:?},{symbol})"),
@@ -289,7 +289,7 @@ impl<T> Process<T, Run> {
                                     ))
                                 })?? {
                                 Exclusive::Flow(value) => {
-                                    input.find_flow(value, outputs, gateway)?
+                                    input.find_flow(&value, outputs, gateway)?
                                 }
                                 Exclusive::Default => gateway.default_path()?,
                                 Exclusive::Panic(e) => Err(RuntimeErrorKind::Panic(e))?,
@@ -324,7 +324,7 @@ impl<T> Process<T, Run> {
                                 })?? {
                                 IntermediateEvent::Throw(name, symbol) => input
                                     .process
-                                    .find_by_intermediate_event(name, symbol, outputs)
+                                    .find_by_intermediate_event(&name, symbol, outputs)
                                     .ok_or_else(|| {
                                         DiagramErrorKind::MissingIntermediateEvent(
                                             gateway.to_string(),
@@ -365,7 +365,7 @@ impl<T> Process<T, Run> {
             .map(|index| self.handler.run_inclusive(index, input.data))
             .ok_or_else(|| RuntimeErrorKind::Engine(format!("missing function {:?}", gateway)))??
         {
-            Inclusive::Flow(value) => input.find_flow(value, outputs, gateway)?,
+            Inclusive::Flow(value) => input.find_flow(&value, outputs, gateway)?,
             Inclusive::Fork(values) => match values.as_slice() {
                 [] => gateway.default_path()?,
                 [value] => input.find_flow(value, outputs, gateway)?,
@@ -373,7 +373,7 @@ impl<T> Process<T, Run> {
                     let mut tokens = HashSet::with_capacity(values.len());
                     for value in values {
                         // Breaks on first error
-                        if !tokens.insert(*input.find_flow(value, outputs, gateway)?) {
+                        if !tokens.insert(*input.find_flow(&value, outputs, gateway)?) {
                             // The flow has already been used, we just log an warning and continue.
                             warn!(
                                 "{gateway} used flow {value} multiple times. Discarded the duplicates."
@@ -406,7 +406,6 @@ impl<'a, T> ExecuteInput<'a, T> {
         }
     }
 
-    #[inline]
     fn find_flow(
         &self,
         search: &str,

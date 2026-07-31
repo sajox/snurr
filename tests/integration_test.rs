@@ -5,15 +5,15 @@ use snurr::{
         ParseErrorKind, RuntimeError, RuntimeErrorKind,
     },
 };
-use std::sync::Mutex;
+use std::{borrow::Cow, sync::Mutex};
 
 const COUNT_1: &str = "Count 1";
 const COUNT_2: &str = "Count 2";
 const COUNT_3: &str = "Count 3";
 const COUNT_4: &str = "Count 4";
 
-const A: Exclusive = Exclusive::Flow("A");
-const B: Exclusive = Exclusive::Flow("B");
+const A: Exclusive = Exclusive::Flow(Cow::Borrowed("A"));
+const B: Exclusive = Exclusive::Flow(Cow::Borrowed("B"));
 
 #[derive(Debug, Default)]
 struct Counter {
