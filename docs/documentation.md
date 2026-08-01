@@ -162,9 +162,7 @@ An event-based gateway can select a flow with an intermediate throw event, where
 
 ### Inclusive gateway
 
-An inclusive gateway can select one or many flows named after the outgoing sequence flow. A default flow should always be available. Do not forget to merge the flows using a converging gateway.
-
-One or more flows is returned and processed. Inclusive gateway should always have a default flow in the BPMN diagram.
+An inclusive gateway can select one or many flows named after the outgoing sequence flow. A default flow should always be available in the BPMN diagram. Do not forget to merge the flows using a converging gateway. Only balanced gateway construction supported. See `Not Supported` section.
 
 #### One flow
 
@@ -192,7 +190,7 @@ One or more flows is returned and processed. Inclusive gateway should always hav
 
 ### Parallel gateway
 
-**Parallel gateways** run **all** available flows. No need to add gateway code. (And you can't).
+**Parallel gateways** run **all** available flows. No need to add gateway code. (And you can't). Only balanced gateway construction supported. See `Not Supported` section.
 
 ## Events
 
