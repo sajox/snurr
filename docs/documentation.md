@@ -1,4 +1,4 @@
-# Documentation
+# Snurr
 
 **Snurr** can run the process flow from a Business Process Model and Notation (BPMN) 2.0 file created by <https://demo.bpmn.io/new> or the [BPMN Editor](https://github.com/bpmn-io/vs-code-bpmn-io) plugin in VS Code.
 
@@ -10,56 +10,6 @@
 - Single or multithreaded (opt in)
 
 This is not a complete implementation of the BPMN 2.0 specification but intend to be a light weight subset of it.
-
-## Changes
-
-### Main branch (BREAKING CHANGES)
-
-- Updated documentation.
-- API changes
-  - Renamed Enum `With` to `Inclusive`
-  - New enum type `Exclusive`
-  - New enum type `Task`. Slightly less verbose when a Task Boundary is used.
-  - New enum type `IntermediateEvent`
-  - Support for `Panic`. Enables terminating the process from task and gateways. The process returns a RunTimeError::Panic containing the specified error.
-  - Using `Cow<'static, str>` instead of `&'static str` to be more flexible with different types of strings.
-  - Added convenient factory methods for cases where conversions via `From` are not used.
-- Error redesign. Example output below from anyhow crate.
-
-    New
-    ```
-    Error: error reading `examples/example.bpmn`
-
-    Caused by:
-        0: error parsing
-        1: error on line 16
-        2: could not create bpmn type
-        3: tag `sequenceFlow` missing attribute id
-    ```
-
-    Old
-    ```
-    Error: BPMN type sequenceFlow missing id
-    ```
-
-- Removed Arc and Mutex usage in Snurr and let the user choose. Callbacks now use `&T` instead of `Arc<Mutex<T>>`.
-    - Change your process type to `Process::<Arc<Mutex<YourModel>>>::new` to maintain compatibility with existing code.
-    - And to extract result
-        ```rust
-        let data = Arc::into_inner(process_result) // FAIL if Arc has more than one strong reference
-                    .ok_or(YourError::NoProcessResult)? 
-                    .into_inner() // FAIL if Mutex is poisoned
-                    .map_err(|_| YourError::NoProcessResult)?;
-        ```
-- Removed `Data<T>` type as it was `Arc<Mutex<T>>`.
-
-### Version 0.14
-
-- Make the parallel join less permissive for BPMN design errors and respect the number of tokens required before proceeding. Returns an error if gateway is stalled.
-- Added support for cancel event. Used in transactions.
-- Early detection if multiple none start events is found in same process.
-- Removed unused errors.
-- Added documentation and images in crates.io release
 
 ## Lib
 
@@ -87,13 +37,13 @@ Use scaffold to generate code from the read BPMN file as a good starting point. 
 
 Use your own model in the process. It must be **Send + Sync**, regardless of the "parallel" feature is enabled or not. If your model is not `Sync`, you can wrap it in a `Mutex` by specifying `Process::<Mutex<YourModel>>::new`.
 
-```rust
+```rust ignore
 #[derive(Debug, Default)]
 struct Counter(AtomicU32);
 ```
 Read the bpmn file, add the behavior and run the process.
 
-```rust
+```rust ignore
 let bpmn = Process::<Counter>::new("examples/example.bpmn")?
     .task("Count 1", |input| {
         input.0.fetch_add(1, Relaxed);
@@ -115,14 +65,14 @@ let result = bpmn.run(Default::default())?;
 
 Generate code from all the task and gateways to the given file path with scaffold. Remove scaffold method after file is created.
 
-```rust
+```rust ignore
 let bpmn = Process::<Counter>::new("example.bpmn")?;
 bpmn.scaffold("scaffold.rs")?;
 ```
 
 Output file: **scaffold.rs**
 
-```rust scaffold.rs
+```rust ignore
 use snurr::{Error, Process, Run};
 
 // Replace () with your type
@@ -141,28 +91,32 @@ All tasks is used in the same way regardless of which icon is used in the BPMN d
 
 Two or more outgoing sequence flows from a task create a fork of the flow. It is recommended to use a parallel gateway after the task instead, for the sake of clarity.
 
-### Usage
+### Task
 
-Return **Default** if no boundary is used and follow regular flow.
+#### Default flow
 
-```rust
+Return `Default` if no boundary is used and follow regular flow.
+
+```rust ignore
 .task("Name or id", |input| {
     Default::default()
 })
 ```
 
+#### Boundary flow
+
 If one or more boundaries exist on a task, then a boundary can be returned. If a name exist it must match.
 
-Boundary with no name
+##### Boundary with no name
 
-```rust
+```rust ignore
 .task("Name or id", |input| {
     Symbol::Error.into()
 })
 ```
-Boundary with name
+##### Boundary with name
 
-```rust
+```rust ignore
 .task("Name or id", |input| {
     ("Not good", Symbol::Error).into()
 })
@@ -176,18 +130,19 @@ Same gateway can do both join and fork instead of using two separate gateways. T
 
 ### Exclusive gateway
 
-![Exclusive gateway](/assets/images/exclusive-gateway.png)
+An exclusive gateway can select a flow named after the outgoing sequence flow.
 
-One flow
+#### One flow
 
-```rust
+```rust ignore
 .exclusive("CHOOSE", |input| {
     "YES".into()
 })
 ```
-Default flow
 
-```rust
+#### Default flow
+
+```rust ignore
 .exclusive("CHOOSE", |input| {
     Default::default()
 })
@@ -195,11 +150,11 @@ Default flow
 
 ### Event-based gateway
 
-![Event-based gateway](/assets/images/event-based-gateway.png)
+An event-based gateway can select a flow with an intermediate throw event, where the name and symbol must match those of the intermediate catching event. Event-based gateways require at least 2 outputs.
 
-One flow
+#### One flow
 
-```rust
+```rust ignore
 .event_based("CHOOSE", |input| {
      ("Message", Symbol::Message).into()
 })
@@ -207,27 +162,29 @@ One flow
 
 ### Inclusive gateway
 
-![Inclusive gateway](/assets/images/inclusive-gateway.png)
+An inclusive gateway can select one or many flows named after the outgoing sequence flow. A default flow should always be available. Do not forget to merge the flows using a converging gateway.
 
 One or more flows is returned and processed. Inclusive gateway should always have a default flow in the BPMN diagram.
 
-One flow
+#### One flow
 
-```rust
+```rust ignore
 .inclusive("CHOOSE", |input| {
     "YES".into()
 })
 ```
-Many flows
 
-```rust
+#### Many flows
+
+```rust ignore
 .inclusive("CHOOSE", |input| {
     vec!["YES", "NO"].into()
 })
 ```
-Default flow
 
-```rust
+#### Default flow
+
+```rust ignore
 .inclusive("CHOOSE", |input| {
     Default::default()
 })
@@ -235,9 +192,7 @@ Default flow
 
 ### Parallel gateway
 
-![Parallel gateway](/assets/images/parallel-gateway.png)
-
-**Parallel gateways** run **all** available flows. No need to add gateway code. (And you can't)
+**Parallel gateways** run **all** available flows. No need to add gateway code. (And you can't).
 
 ## Events
 

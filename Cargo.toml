@@ -10,7 +10,7 @@ license = "MIT"
 repository = "https://github.com/sajox/snurr"
 keywords = ["BPMN", "process"]
 
-include = ["Cargo.toml", "LICENSE", "/src", "/examples", "/assets", "/docs"]
+include = ["Cargo.toml", "LICENSE", "/src", "/examples", "/docs"]
 
 [lints.rust]
 unsafe_code = "forbid"

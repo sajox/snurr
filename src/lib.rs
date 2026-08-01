@@ -1,4 +1,4 @@
-#![doc = include_str!("../README.md")]
+#![doc = include_str!("../docs/documentation.md")]
 
 mod api;
 mod bpmn;
