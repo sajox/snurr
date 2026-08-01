@@ -29,7 +29,7 @@ snurr = { version = "x.xx", features = ["parallel"] }
 
 ## Process
 
-Create a process by providing a path to a bpmn file. Add tasks and gateways. When `.build()` is called, the BPMN process validates that the required functions are installed. You cannot run a process before `.build()` is called. If `.build()` returns an error, it contains the required functions that are missing. The created process can be run multiple times. 
+Create a process by specifying the path to a BPMN file. Add the tasks and gateways specified in your BPMN diagram. When `.build()` is called, the process validates that the required functions/closures are installed. You cannot run a process before `.build()` is called. If `.build()` returns an error, it contains the required functions that are missing. The created process can be run multiple times. 
 
 Use scaffold to generate code from the read BPMN file as a good starting point. Described below.
 
@@ -63,7 +63,7 @@ let result = bpmn.run(Default::default())?;
 
 ### Scaffold
 
-Generate code from all the task and gateways to the given file path with scaffold. Remove scaffold method after file is created.
+Generate code from all the task and gateways to the given file path with scaffold. Returns an error message if the file already exists. Remove scaffold call after file is created.
 
 ```rust ignore
 let bpmn = Process::<Counter>::new("example.bpmn")?;

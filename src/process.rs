@@ -29,7 +29,8 @@ where
 }
 
 impl<T> Process<T> {
-    /// Create new process and initialize it from the BPMN file path.
+    /// Create new process and initialize it from the BPMN file path. Returns an error if
+    /// the file was not found or if there were problems with the file content.
     /// ```
     /// use snurr::{Build, Process};
     ///
@@ -143,7 +144,7 @@ impl<T> FromStr for Process<T> {
 }
 
 impl<T> Process<T, Run> {
-    /// Run the process and return the `T` or an `Error`.
+    /// Run the process and return the `T` or an `RuntimeError`.
     /// ```
     /// use snurr::Process;
     /// use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
