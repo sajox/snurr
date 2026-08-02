@@ -37,46 +37,62 @@ Use scaffold to generate code from the read BPMN file as a good starting point. 
 
 Use your own model in the process. It must be **Send + Sync**, regardless of the "parallel" feature is enabled or not. If your model is not `Sync`, you can wrap it in a `Mutex` by specifying `Process::<Mutex<YourModel>>::new`.
 
-```rust ignore
-#[derive(Debug, Default)]
-struct Counter(AtomicU32);
-```
 Read the bpmn file, add the behavior and run the process.
 
-```rust ignore
-let bpmn = Process::<Counter>::new("examples/example.bpmn")?
-    .task("Count 1", |input| {
-        input.0.fetch_add(1, Relaxed);
-        Default::default()
-    })
-    .exclusive("equal to 3", |input| {
-        match input.0.load(Relaxed) {
-            3 => "YES",
-            _ => "NO",
-        }
-        .into()
-    })
-    .build()?;
+```rust
+use snurr::Process;
+use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
 
-let result = bpmn.run(Default::default())?;
+#[derive(Debug, Default)]
+struct Counter(AtomicU32);
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+
+    // Create process from BPMN file
+    let bpmn = Process::<Counter>::new("examples/example.bpmn")?
+        .task("Count 1", |input| {
+            input.0.fetch_add(1, Relaxed);
+            Default::default()
+        })
+        .exclusive("equal to 3", |input| {
+            match input.0.load(Relaxed) {
+                3 => "YES",
+                _ => "NO",
+            }
+            .into()
+        })
+        .build()?;
+
+    // Run the process with input data
+    let result = bpmn.run(Default::default())?;
+
+    // Print the result.
+    println!("{result:?}");
+    Ok(())
+}
 ```
 
 ### Scaffold
 
 Generate code from all the task and gateways to the given file path with scaffold. Returns an error message if the file already exists. Remove scaffold call after file is created.
 
-```rust ignore
-let bpmn = Process::<Counter>::new("example.bpmn")?;
-bpmn.scaffold("scaffold.rs")?;
+```rust no_run
+use snurr::Process;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let bpmn: Process<()> = Process::new("examples/example.bpmn")?;
+    bpmn.scaffold("examples/scaffold.rs")?;
+    Ok(())
+}
 ```
 
 Output file: **scaffold.rs**
 
-```rust ignore
-use snurr::{Error, Process, Run};
+```rust no_run
+use snurr::{Process, Run, process::BuildError};
 
 // Replace () with your type
-pub fn build(process: Process<()>) -> Result<Process<(), Run>, Error> {
+pub fn build(process: Process<()>) -> Result<Process<(), Run>, BuildError> {
     process
         .task("Count 1", |input| Default::default())
         // Names: YES, NO. Ids: Flow_1h0jtl6, Flow_0rsqhpi.
@@ -97,10 +113,15 @@ Two or more outgoing sequence flows from a task create a fork of the flow. It is
 
 Return `Default` if no boundary is used and follow regular flow.
 
-```rust ignore
-.task("Name or id", |input| {
+```rust no_run
+# use snurr::Process;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+#   Process::<()>::new("examples/example.bpmn")?
+.task("name or id", |input| {
     Default::default()
-})
+});
+# Ok(())
+# }
 ```
 
 #### Boundary flow
@@ -109,17 +130,28 @@ If one or more boundaries exist on a task, then a boundary can be returned. If a
 
 ##### Boundary with no name
 
-```rust ignore
-.task("Name or id", |input| {
+```rust no_run
+# use snurr::{Process, Symbol};
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+#   Process::<()>::new("examples/example.bpmn")?
+.task("name or id", |input| {
     Symbol::Error.into()
-})
+});
+# Ok(())
+# }
 ```
+
 ##### Boundary with name
 
-```rust ignore
-.task("Name or id", |input| {
+```rust no_run
+# use snurr::{Process, Symbol};
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+#   Process::<()>::new("examples/example.bpmn")?
+.task("name or id", |input| {
     ("Not good", Symbol::Error).into()
-})
+});
+# Ok(())
+# }
 ```
 
 ## Gateways
@@ -134,18 +166,28 @@ An exclusive gateway can select a flow named after the outgoing sequence flow.
 
 #### One flow
 
-```rust ignore
-.exclusive("CHOOSE", |input| {
+```rust no_run
+# use snurr::Process;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+#   Process::<()>::new("examples/example.bpmn")?
+.exclusive("name or id", |input| {
     "YES".into()
-})
+});
+# Ok(())
+# }
 ```
 
 #### Default flow
 
-```rust ignore
-.exclusive("CHOOSE", |input| {
+```rust no_run
+# use snurr::Process;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+#   Process::<()>::new("examples/example.bpmn")?
+.exclusive("name or id", |input| {
     Default::default()
-})
+});
+# Ok(())
+# }
 ```
 
 ### Event-based gateway
@@ -154,10 +196,15 @@ An event-based gateway can select a flow with an intermediate throw event, where
 
 #### One flow
 
-```rust ignore
-.event_based("CHOOSE", |input| {
+```rust no_run
+# use snurr::{Process, Symbol};
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+#   Process::<()>::new("examples/example.bpmn")?
+.event_based("name or id", |input| {
      ("Message", Symbol::Message).into()
-})
+});
+# Ok(())
+# }
 ```
 
 ### Inclusive gateway
@@ -166,26 +213,41 @@ An inclusive gateway can select one or many flows named after the outgoing seque
 
 #### One flow
 
-```rust ignore
-.inclusive("CHOOSE", |input| {
+```rust no_run
+# use snurr::Process;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+#   Process::<()>::new("examples/example.bpmn")?
+.inclusive("name or id", |input| {
     "YES".into()
-})
+});
+# Ok(())
+# }
 ```
 
 #### Many flows
 
-```rust ignore
-.inclusive("CHOOSE", |input| {
+```rust no_run
+# use snurr::Process;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+#   Process::<()>::new("examples/example.bpmn")?
+.inclusive("name or id", |input| {
     vec!["YES", "NO"].into()
-})
+});
+# Ok(())
+# }
 ```
 
 #### Default flow
 
-```rust ignore
-.inclusive("CHOOSE", |input| {
+```rust no_run
+# use snurr::Process;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+#   Process::<()>::new("examples/example.bpmn")?
+.inclusive("name or id", |input| {
     Default::default()
-})
+});
+# Ok(())
+# }
 ```
 
 ### Parallel gateway

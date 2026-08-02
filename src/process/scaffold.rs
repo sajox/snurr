@@ -109,9 +109,9 @@ impl<'a> Scaffold<'a> {
     // No file is allowed to exist at the target location.
     fn create(&mut self, path: impl AsRef<Path>) -> Result<(), std::io::Error> {
         let mut content = vec![
-            "use snurr::{Error, Process, Run};\n".into(),
+            "use snurr::{Process, Run, process::BuildError};\n".into(),
             "// Replace () with your type".into(),
-            "pub fn build(process: Process<()>) -> Result<Process<(), Run>, Error> {".into(),
+            "pub fn build(process: Process<()>) -> Result<Process<(), Run>, BuildError> {".into(),
             r#"  process"#.into(),
         ];
 
