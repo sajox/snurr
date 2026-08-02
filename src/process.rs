@@ -35,7 +35,7 @@ impl<T> Process<T> {
     /// use snurr::{Build, Process};
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let bpmn: Process<()> = Process::new("examples/example.bpmn")?;
+    ///     let bpmn: Process<()> = Process::new("examples/counter.bpmn")?;
     ///     Ok(())
     /// }
     /// ```
@@ -127,7 +127,7 @@ impl<T> FromStr for Process<T> {
     /// ```
     /// use snurr::{Build, Process};
     ///
-    /// static BPMN_DATA: &str = include_str!("../examples/example.bpmn");
+    /// static BPMN_DATA: &str = include_str!("../examples/counter.bpmn");
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let bpmn: Process<()> = BPMN_DATA.parse()?;
@@ -155,7 +155,7 @@ impl<T> Process<T, Run> {
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///
     ///     // Create process from BPMN file
-    ///     let bpmn = Process::<Counter>::new("examples/example.bpmn")?
+    ///     let bpmn = Process::<Counter>::new("examples/counter.bpmn")?
     ///         .task("Count 1", |input| {
     ///             input.0.fetch_add(1, Relaxed);
     ///             Default::default()
@@ -322,7 +322,7 @@ mod tests {
 
     #[test]
     fn create_and_run() -> Result<(), Box<dyn std::error::Error>> {
-        let bpmn = Process::new("examples/example.bpmn")?
+        let bpmn = Process::new("examples/counter.bpmn")?
             .task("Count 1", |_| Default::default())
             .exclusive("equal to 3", |_| Default::default())
             .build()?;

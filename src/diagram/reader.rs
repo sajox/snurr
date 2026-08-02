@@ -177,7 +177,7 @@ mod tests {
     fn load_file() -> Result<(), Box<dyn std::error::Error>> {
         println!(
             "{:#?}",
-            read_bpmn(quick_xml::Reader::from_file("examples/example.bpmn")?)
+            read_bpmn(quick_xml::Reader::from_file("examples/counter.bpmn")?)
         );
         Ok(())
     }

@@ -15,7 +15,7 @@
 
     New
     ```text
-    Error: error reading `examples/example.bpmn`
+    Error: error reading `examples/counter.bpmn`
 
     Caused by:
         0: error parsing

@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 // Create an external process that is used by another process.
 fn run_counter_process() -> Result<impl Fn(&Mutex<Manager>) -> Task, Box<dyn std::error::Error>> {
     // Build up the counter process
-    let counter_process = Process::<Counter>::new("examples/example.bpmn")?
+    let counter_process = Process::<Counter>::new("examples/counter.bpmn")?
         .task(COUNT_1, |input| {
             input.0.fetch_add(1, Relaxed);
             Default::default()

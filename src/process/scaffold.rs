@@ -12,7 +12,7 @@ impl<T> Process<T> {
     /// use snurr::Process;
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let bpmn: Process<()> = Process::new("examples/example.bpmn")?;
+    ///     let bpmn: Process<()> = Process::new("examples/counter.bpmn")?;
     ///     bpmn.scaffold("examples/scaffold.rs")?;
     ///     Ok(())
     /// }

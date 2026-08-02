@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     pretty_env_logger::init();
 
     // Create process from BPMN file
-    let bpmn = Process::<Counter>::new("examples/example.bpmn")?
+    let bpmn = Process::<Counter>::new("examples/counter.bpmn")?
         .task("Count 1", |input| {
             input.0.fetch_add(1, Relaxed);
             Default::default()

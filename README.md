@@ -21,7 +21,7 @@ This is not intended to be a full-fledged BPMN 2.0 solution, but rather a soluti
 
 ### BPMN diagram
 
-![image of example.bpmn](https://github.com/sajox/snurr/blob/main/assets/images/example.png?raw=true)
+![image of counter.bpmn](https://github.com/sajox/snurr/blob/main/assets/images/example.png?raw=true)
 
 ### Usage
 
@@ -43,7 +43,7 @@ struct Counter(AtomicU32);
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     pretty_env_logger::init();
 
-    let bpmn = Process::<Counter>::new("examples/example.bpmn")?
+    let bpmn = Process::<Counter>::new("examples/counter.bpmn")?
         .task("Count 1", |input| {
             input.0.fetch_add(1, Relaxed);
             Default::default()
