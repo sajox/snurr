@@ -38,6 +38,16 @@ fn one_task() -> Result<()> {
 }
 
 #[test]
+fn one_task_register_with_bpmn_id() -> Result<()> {
+    let bpmn = Process::new("tests/files/one_task.bpmn")?
+        .task("Activity_1x3acv7", func_cnt(1))
+        .build()?;
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 1);
+    Ok(())
+}
+
+#[test]
 fn two_task() -> Result<()> {
     let bpmn = Process::new("tests/files/two_task.bpmn")?
         .task(COUNT_1, func_cnt(1))

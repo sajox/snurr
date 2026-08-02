@@ -107,7 +107,7 @@ pub fn build(process: Process<()>) -> Result<Process<(), Run>, BuildError> {
 
 ## Tasks
 
-All tasks is used in the same way regardless of which icon is used in the BPMN diagram. If a task name is given then every task with same name will use the same closure. Register a task by **name** (if it exist) or by **id** if no name was given. 
+All tasks is used in the same way regardless of which icon is used in the BPMN diagram. If a task name is given then every task with same name will use the same closure. Register a task by **name** or by **id**. A name is preferable, since an id can be regenerated in the BPMN tool (if elements are deleted and re-added).
 
 Two or more outgoing sequence flows from a task create a fork of the flow. It is recommended to use a parallel gateway after the task instead, for the sake of clarity.
 
@@ -160,7 +160,7 @@ If one or more boundaries exist on a task, then a boundary can be returned. If a
 
 ## Gateways
 
-Only branching/forking exclusive, event-based and inclusive gateways need to be added. If a gateway name is given then every gateway with same name and type will use the same closure. Register a gateway by **name** (if it exist) or by **id** if no name was given, and return the outgoing sequence flow taken by **name** or **id**. No merging/joining gateway need to be added from the BPMN diagram with only one output.
+Only branching/forking exclusive, event-based and inclusive gateways need to be added. If a gateway name is given then every gateway with same name and type will use the same closure. Register a gateway by **name** or by **id**, and return the outgoing sequence flow taken by **name** or **id**. No merging/joining gateway need to be added from the BPMN diagram with only one output.
 
 Same gateway can do both join and fork instead of using two separate gateways. The latter is recommended for clarity. (i.e two gateways)
 

@@ -62,11 +62,15 @@ impl Diagram {
                             | ActivityType::BusinessRuleTask),
                         ..
                     }) => {
-                        let name_or_id = name.as_deref().unwrap_or(id.bpmn());
-                        if let Some(id) = handler_map.get(HandlerType::Task, name_or_id) {
+                        if let Some(id) =
+                            get_func_id(id, name.as_deref(), HandlerType::Task, &handler_map)
+                        {
                             func_idx.replace(*id);
                         } else {
-                            missing.insert(format!("{activity_type}: {name_or_id}"));
+                            missing.insert(format!(
+                                "{activity_type}: {}",
+                                name.as_deref().unwrap_or(id.bpmn())
+                            ));
                         }
                     }
                     Bpmn::Gateway(Gateway {
@@ -86,12 +90,15 @@ impl Diagram {
                             GatewayType::EventBased => HandlerType::EventBased,
                             _ => continue,
                         };
-
-                        let name_or_id = name.as_deref().unwrap_or(id.bpmn());
-                        if let Some(id) = handler_map.get(handler_type, name_or_id) {
+                        if let Some(id) =
+                            get_func_id(id, name.as_deref(), handler_type, &handler_map)
+                        {
                             func_idx.replace(*id);
                         } else {
-                            missing.insert(format!("{gateway_type}: {name_or_id}"));
+                            missing.insert(format!(
+                                "{gateway_type}: {}",
+                                name.as_deref().unwrap_or(id.bpmn())
+                            ));
                         }
                     }
                     _ => {}
@@ -100,6 +107,20 @@ impl Diagram {
         }
         missing
     }
+}
+
+// Check if bpmn id or name should be installed. Begin with bpmn id as it is unique and
+// then try with the name if it exist.
+fn get_func_id<'a>(
+    id: &Id,
+    name: Option<&str>,
+    handler_type: HandlerType,
+    handler_map: &'a HandlerMap,
+) -> Option<&'a usize> {
+    [Some(id.bpmn()), name]
+        .into_iter()
+        .flatten()
+        .find_map(|s| handler_map.get(handler_type, s))
 }
 
 #[derive(Default, Debug)]
