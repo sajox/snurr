@@ -1,15 +1,19 @@
-# Snurr
+**Snurr** is a lightweight workflow engine that can run the process flow from a Business Process Model and Notation (BPMN) 2.0 file created by <https://demo.bpmn.io/new> or the [BPMN Editor](https://github.com/bpmn-io/vs-code-bpmn-io) plugin in VS Code.
 
-**Snurr** can run the process flow from a Business Process Model and Notation (BPMN) 2.0 file created by <https://demo.bpmn.io/new> or the [BPMN Editor](https://github.com/bpmn-io/vs-code-bpmn-io) plugin in VS Code.
+How to:
 
-- Add your own behavior with Rust code from a small API. The wiring is already setup from the file.
-- Easy to update the BPMN diagram with new Task and Gateways without the need to refactor your old code.
+1. Create your BPMN diagram.
+2. Scaffold the initial BPMN diagram so you don't have to do the boilerplate code.
+3. Add custom behavior using [Rust](https://rust-lang.org) code from a small API. The wiring is already setup from the file.
+4. Run your process in single or multi-threaded mode.
+
+Maintainability:
+
+- Update the BPMN diagram with new activities and gateways to meet changing requirements. The code is loosely coupled.
 - The BPMN file is the actual design. Forget outdated documentation.
-- Scaffold the initial BPMN diagram so you don't have to do the boilerplate code.
-- Contains no database.
-- Single or multithreaded (opt in)
+- No complicated configuration or database requirements. You simply use it.
 
-This is not a complete implementation of the BPMN 2.0 specification but intend to be a light weight subset of it.
+This is not intended to be a full-fledged BPMN 2.0 solution, but rather a solution that is easy to embed and use. Read the documentation on what is supported.
 
 ## Lib
 
