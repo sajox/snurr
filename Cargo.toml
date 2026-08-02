@@ -22,7 +22,7 @@ name = "simple"
 name = "reusable"
 
 [dependencies]
-quick-xml = "0.41"
+quick-xml = { git = "https://github.com/tafia/quick-xml.git", rev = "daa7b91b872a3c78a3a3b6eecb48a44f33911d59" }
 log = "0.4"
 thiserror = "2"
 rayon = { version = "1", optional = true }

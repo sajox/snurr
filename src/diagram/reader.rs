@@ -109,11 +109,7 @@ pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, ParseErro
                 _ => {}
             },
             Ok(Event::Text(bt)) => {
-                builder.add_text(
-                    bt.decode()
-                        .map_err(|e| ParseErrorKind::Encoding(e.into()))?
-                        .into_owned(),
-                );
+                builder.add_text(bt.into_inner());
             }
             // Ignore other XML events
             _ => (),
@@ -122,16 +118,17 @@ pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, ParseErro
     Ok(builder.into())
 }
 
-fn collect_attributes<'a>(bs: &'a quick_xml::events::BytesStart<'_>) -> HashMap<&'a [u8], String> {
+fn collect_attributes<'a>(bs: &'a quick_xml::events::BytesStart<'_>) -> HashMap<&'a str, String> {
     bs.attributes()
         .filter_map(Result::ok)
-        .filter_map(|attribute| {
-            std::str::from_utf8(&attribute.value)
-                .ok()
-                .filter(|value| !value.is_empty())
-                .map(|value| (attribute.key.local_name().into_inner(), value.into()))
+        .filter(|attribute| !attribute.value.is_empty())
+        .map(|attribute| {
+            (
+                attribute.key.local_name().into_inner(),
+                attribute.value.into(),
+            )
         })
-        .collect::<HashMap<&'a [u8], String>>()
+        .collect::<HashMap<&'a str, String>>()
 }
 
 fn create_parse_error<T>(source: BpmnError, reader: &Reader<T>, buf: &[u8]) -> ParseError {

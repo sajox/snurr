@@ -46,13 +46,13 @@ impl DataBuilder {
         Ok(())
     }
 
-    pub(super) fn update_symbol(&mut self, bpmn_type: &[u8]) {
+    pub(super) fn update_symbol(&mut self, bpmn_type: &str) {
         if let Some(Bpmn::Event(Event { symbol, .. })) = self.stack.last_mut() {
             *symbol = bpmn_type.try_into().ok();
         }
     }
 
-    pub(super) fn add_direction(&mut self, direction: &[u8]) {
+    pub(super) fn add_direction(&mut self, direction: &str) {
         if let Some(Bpmn::Direction(Some(value))) = self.stack.pop()
             && let Some(parent) = self.stack.last_mut()
         {
@@ -63,9 +63,9 @@ impl DataBuilder {
         }
     }
 
-    pub(super) fn add_text(&mut self, value: String) {
+    pub(super) fn add_text(&mut self, value: impl Into<String>) {
         if let Some(Bpmn::Direction(text)) = self.stack.last_mut() {
-            text.replace(value);
+            text.replace(value.into());
         }
     }
 

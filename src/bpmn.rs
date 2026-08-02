@@ -5,64 +5,64 @@ use crate::{
 use core::fmt;
 use std::{collections::HashMap, fmt::Display};
 
-pub(crate) const DEFINITIONS: &[u8] = b"definitions";
-pub(crate) const PROCESS: &[u8] = b"process";
+pub(crate) const DEFINITIONS: &str = "definitions";
+pub(crate) const PROCESS: &str = "process";
 
 // Event
-pub(crate) const START_EVENT: &[u8] = b"startEvent";
-pub(crate) const END_EVENT: &[u8] = b"endEvent";
-pub(crate) const BOUNDARY_EVENT: &[u8] = b"boundaryEvent";
-pub(crate) const INTERMEDIATE_CATCH_EVENT: &[u8] = b"intermediateCatchEvent";
-pub(crate) const INTERMEDIATE_THROW_EVENT: &[u8] = b"intermediateThrowEvent";
+pub(crate) const START_EVENT: &str = "startEvent";
+pub(crate) const END_EVENT: &str = "endEvent";
+pub(crate) const BOUNDARY_EVENT: &str = "boundaryEvent";
+pub(crate) const INTERMEDIATE_CATCH_EVENT: &str = "intermediateCatchEvent";
+pub(crate) const INTERMEDIATE_THROW_EVENT: &str = "intermediateThrowEvent";
 
 // Event symbol
-pub(crate) const CANCEL_EVENT_DEFINITION: &[u8] = b"cancelEventDefinition";
-pub(crate) const COMPENSATE_EVENT_DEFINITION: &[u8] = b"compensateEventDefinition";
-pub(crate) const CONDITIONAL_EVENT_DEFINITION: &[u8] = b"conditionalEventDefinition";
-pub(crate) const ERROR_EVENT_DEFINITION: &[u8] = b"errorEventDefinition";
-pub(crate) const ESCALATION_EVENT_DEFINITION: &[u8] = b"escalationEventDefinition";
-pub(crate) const MESSAGE_EVENT_DEFINITION: &[u8] = b"messageEventDefinition";
-pub(crate) const LINK_EVENT_DEFINITION: &[u8] = b"linkEventDefinition";
-pub(crate) const SIGNAL_EVENT_DEFINITION: &[u8] = b"signalEventDefinition";
-pub(crate) const TERMINATE_EVENT_DEFINITION: &[u8] = b"terminateEventDefinition";
-pub(crate) const TIMER_EVENT_DEFINITION: &[u8] = b"timerEventDefinition";
+pub(crate) const CANCEL_EVENT_DEFINITION: &str = "cancelEventDefinition";
+pub(crate) const COMPENSATE_EVENT_DEFINITION: &str = "compensateEventDefinition";
+pub(crate) const CONDITIONAL_EVENT_DEFINITION: &str = "conditionalEventDefinition";
+pub(crate) const ERROR_EVENT_DEFINITION: &str = "errorEventDefinition";
+pub(crate) const ESCALATION_EVENT_DEFINITION: &str = "escalationEventDefinition";
+pub(crate) const MESSAGE_EVENT_DEFINITION: &str = "messageEventDefinition";
+pub(crate) const LINK_EVENT_DEFINITION: &str = "linkEventDefinition";
+pub(crate) const SIGNAL_EVENT_DEFINITION: &str = "signalEventDefinition";
+pub(crate) const TERMINATE_EVENT_DEFINITION: &str = "terminateEventDefinition";
+pub(crate) const TIMER_EVENT_DEFINITION: &str = "timerEventDefinition";
 
 // Task
-pub(crate) const TASK: &[u8] = b"task";
-pub(crate) const SERVICE_TASK: &[u8] = b"serviceTask";
-pub(crate) const USER_TASK: &[u8] = b"userTask";
-pub(crate) const SCRIPT_TASK: &[u8] = b"scriptTask";
-pub(crate) const RECEIVE_TASK: &[u8] = b"receiveTask";
-pub(crate) const SEND_TASK: &[u8] = b"sendTask";
-pub(crate) const MANUAL_TASK: &[u8] = b"manualTask";
-pub(crate) const BUSINESS_RULE_TASK: &[u8] = b"businessRuleTask";
-pub(crate) const CALL_ACTIVITY: &[u8] = b"callActivity";
-pub(crate) const SUB_PROCESS: &[u8] = b"subProcess";
-pub(crate) const TRANSACTION: &[u8] = b"transaction";
+pub(crate) const TASK: &str = "task";
+pub(crate) const SERVICE_TASK: &str = "serviceTask";
+pub(crate) const USER_TASK: &str = "userTask";
+pub(crate) const SCRIPT_TASK: &str = "scriptTask";
+pub(crate) const RECEIVE_TASK: &str = "receiveTask";
+pub(crate) const SEND_TASK: &str = "sendTask";
+pub(crate) const MANUAL_TASK: &str = "manualTask";
+pub(crate) const BUSINESS_RULE_TASK: &str = "businessRuleTask";
+pub(crate) const CALL_ACTIVITY: &str = "callActivity";
+pub(crate) const SUB_PROCESS: &str = "subProcess";
+pub(crate) const TRANSACTION: &str = "transaction";
 
 // Direction
-pub(crate) const OUTGOING: &[u8] = b"outgoing";
-pub(crate) const INCOMING: &[u8] = b"incoming";
+pub(crate) const OUTGOING: &str = "outgoing";
+pub(crate) const INCOMING: &str = "incoming";
 
 // Flow
-pub(crate) const SEQUENCE_FLOW: &[u8] = b"sequenceFlow";
+pub(crate) const SEQUENCE_FLOW: &str = "sequenceFlow";
 
 // Gateway
-pub(crate) const EXCLUSIVE_GATEWAY: &[u8] = b"exclusiveGateway";
-pub(crate) const PARALLEL_GATEWAY: &[u8] = b"parallelGateway";
-pub(crate) const INCLUSIVE_GATEWAY: &[u8] = b"inclusiveGateway";
-pub(crate) const EVENT_BASED_GATEWAY: &[u8] = b"eventBasedGateway";
+pub(crate) const EXCLUSIVE_GATEWAY: &str = "exclusiveGateway";
+pub(crate) const PARALLEL_GATEWAY: &str = "parallelGateway";
+pub(crate) const INCLUSIVE_GATEWAY: &str = "inclusiveGateway";
+pub(crate) const EVENT_BASED_GATEWAY: &str = "eventBasedGateway";
 
 // Attributes
-pub(crate) const ATTRIB_ID: &[u8] = b"id";
-pub(crate) const _ATTRIB_IS_EXECUTABLE: &[u8] = b"isExecutable";
-pub(crate) const ATTRIB_NAME: &[u8] = b"name";
-pub(crate) const _ATTRIB_SOURCE_REF: &[u8] = b"sourceRef";
-pub(crate) const ATTRIB_TARGET_REF: &[u8] = b"targetRef";
-pub(crate) const ATTRIB_DEFAULT: &[u8] = b"default";
-pub(crate) const _ATTRIB_EXPORTER_VERSION: &[u8] = b"exporterVersion";
-pub(crate) const ATTRIB_ATTACHED_TO_REF: &[u8] = b"attachedToRef";
-pub(crate) const _ATTRIB_CANCEL_ACTIVITY: &[u8] = b"cancelActivity";
+pub(crate) const ATTRIB_ID: &str = "id";
+pub(crate) const _ATTRIB_IS_EXECUTABLE: &str = "isExecutable";
+pub(crate) const ATTRIB_NAME: &str = "name";
+pub(crate) const _ATTRIB_SOURCE_REF: &str = "sourceRef";
+pub(crate) const ATTRIB_TARGET_REF: &str = "targetRef";
+pub(crate) const ATTRIB_DEFAULT: &str = "default";
+pub(crate) const _ATTRIB_EXPORTER_VERSION: &str = "exporterVersion";
+pub(crate) const ATTRIB_ATTACHED_TO_REF: &str = "attachedToRef";
+pub(crate) const _ATTRIB_CANCEL_ACTIVITY: &str = "cancelActivity";
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum EventType {
@@ -73,19 +73,17 @@ pub(crate) enum EventType {
     Start,
 }
 
-impl TryFrom<&[u8]> for EventType {
+impl TryFrom<&str> for EventType {
     type Error = BpmnError;
 
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
         Ok(match value {
             BOUNDARY_EVENT => EventType::Boundary,
             END_EVENT => EventType::End,
             INTERMEDIATE_CATCH_EVENT => EventType::IntermediateCatch,
             INTERMEDIATE_THROW_EVENT => EventType::IntermediateThrow,
             START_EVENT => EventType::Start,
-            _ => Err(BpmnErrorKind::TypeNotImplemented(
-                std::str::from_utf8(value)?.into(),
-            ))?,
+            _ => Err(BpmnErrorKind::TypeNotImplemented(value.into()))?,
         })
     }
 }
@@ -110,10 +108,10 @@ pub(crate) enum ActivityType {
     BusinessRuleTask,
 }
 
-impl TryFrom<&[u8]> for ActivityType {
+impl TryFrom<&str> for ActivityType {
     type Error = BpmnError;
 
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
         Ok(match value {
             SUB_PROCESS | TRANSACTION => ActivityType::SubProcess { data_index: None },
             TASK => ActivityType::Task,
@@ -125,9 +123,7 @@ impl TryFrom<&[u8]> for ActivityType {
             SEND_TASK => ActivityType::SendTask,
             MANUAL_TASK => ActivityType::ManualTask,
             BUSINESS_RULE_TASK => ActivityType::BusinessRuleTask,
-            _ => Err(BpmnErrorKind::TypeNotImplemented(
-                std::str::from_utf8(value)?.into(),
-            ))?,
+            _ => Err(BpmnErrorKind::TypeNotImplemented(value.into()))?,
         })
     }
 }
@@ -146,18 +142,16 @@ pub(crate) enum GatewayType {
     EventBased,
 }
 
-impl TryFrom<&[u8]> for GatewayType {
+impl TryFrom<&str> for GatewayType {
     type Error = BpmnError;
 
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
         Ok(match value {
             EXCLUSIVE_GATEWAY => GatewayType::Exclusive,
             INCLUSIVE_GATEWAY => GatewayType::Inclusive,
             PARALLEL_GATEWAY => GatewayType::Parallel,
             EVENT_BASED_GATEWAY => GatewayType::EventBased,
-            _ => Err(BpmnErrorKind::TypeNotImplemented(
-                std::str::from_utf8(value)?.into(),
-            ))?,
+            _ => Err(BpmnErrorKind::TypeNotImplemented(value.into()))?,
         })
     }
 }
@@ -189,10 +183,10 @@ impl Display for Symbol {
     }
 }
 
-impl TryFrom<&[u8]> for Symbol {
+impl TryFrom<&str> for Symbol {
     type Error = BpmnError;
 
-    fn try_from(value: &[u8]) -> Result<Self, BpmnError> {
+    fn try_from(value: &str) -> Result<Self, BpmnError> {
         let ty = match value {
             CANCEL_EVENT_DEFINITION => Symbol::Cancel,
             COMPENSATE_EVENT_DEFINITION => Symbol::Compensation,
@@ -204,9 +198,7 @@ impl TryFrom<&[u8]> for Symbol {
             SIGNAL_EVENT_DEFINITION => Symbol::Signal,
             TERMINATE_EVENT_DEFINITION => Symbol::Terminate,
             TIMER_EVENT_DEFINITION => Symbol::Timer,
-            _ => Err(BpmnErrorKind::TypeNotImplemented(
-                std::str::from_utf8(value)?.into(),
-            ))?,
+            _ => Err(BpmnErrorKind::TypeNotImplemented(value.into()))?,
         };
         Ok(ty)
     }
@@ -304,24 +296,23 @@ pub(crate) enum Bpmn {
     },
 }
 
-impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
+impl TryFrom<(&str, HashMap<&str, String>)> for Bpmn {
     type Error = BpmnError;
 
     fn try_from(
-        (bpmn_type, mut attributes): (&[u8], HashMap<&[u8], String>),
+        (bpmn_type, mut attributes): (&str, HashMap<&str, String>),
     ) -> Result<Self, Self::Error> {
-        let bpmn_type_str = std::str::from_utf8(bpmn_type)?;
         let ty = match bpmn_type {
             DEFINITIONS => Bpmn::Definitions {
                 id: attributes
                     .remove(ATTRIB_ID)
-                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type_str.into()))?
+                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
                     .into(),
             },
             PROCESS => Bpmn::Process {
                 id: attributes
                     .remove(ATTRIB_ID)
-                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type_str.into()))?
+                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
                     .into(),
                 data_index: None,
             },
@@ -334,7 +325,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                 symbol: None,
                 id: attributes
                     .remove(ATTRIB_ID)
-                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type_str.into()))?
+                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
                     .into(),
                 name: attributes.remove(ATTRIB_NAME),
                 attached_to_ref: attributes.remove(ATTRIB_ATTACHED_TO_REF).map(Into::into),
@@ -346,7 +337,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     activity_type: bpmn_type.try_into()?,
                     id: attributes
                         .remove(ATTRIB_ID)
-                        .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type_str.into()))?
+                        .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
                         .into(),
                     func_idx: None,
                     name: attributes.remove(ATTRIB_NAME),
@@ -358,7 +349,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     gateway_type: bpmn_type.try_into()?,
                     id: attributes
                         .remove(ATTRIB_ID)
-                        .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type_str.into()))?
+                        .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
                         .into(),
                     func_idx: None,
                     name: attributes.remove(ATTRIB_NAME),
@@ -370,7 +361,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
             SEQUENCE_FLOW => Bpmn::SequenceFlow {
                 id: attributes
                     .remove(ATTRIB_ID)
-                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type_str.into()))?
+                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
                     .into(),
                 name: attributes.remove(ATTRIB_NAME),
                 target_ref: attributes
@@ -379,7 +370,7 @@ impl TryFrom<(&[u8], HashMap<&[u8], String>)> for Bpmn {
                     .into(),
             },
             INCOMING | OUTGOING => Bpmn::Direction(None),
-            _ => Err(BpmnErrorKind::TypeNotImplemented(bpmn_type_str.into()))?,
+            _ => Err(BpmnErrorKind::TypeNotImplemented(bpmn_type.into()))?,
         };
         Ok(ty)
     }
@@ -404,12 +395,4 @@ pub enum BpmnErrorKind {
     TypeNotImplemented(String),
     #[error(transparent)]
     Encoding(Box<dyn std::error::Error + Send + Sync>),
-}
-
-impl From<std::str::Utf8Error> for BpmnError {
-    fn from(value: std::str::Utf8Error) -> Self {
-        BpmnError {
-            source: BpmnErrorKind::Encoding(value.into()),
-        }
-    }
 }
