@@ -120,7 +120,7 @@ Return `Default` if no boundary is used and follow regular flow.
 ```rust no_run
 # use snurr::Process;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("examples/counter.bpmn")?
+#   Process::<()>::new("dummy.bpmn")?
 .task("name or id", |input| {
     Default::default()
 });
@@ -137,7 +137,7 @@ If one or more boundaries exist on a task, then a boundary can be returned. If a
 ```rust no_run
 # use snurr::{Process, Symbol};
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("examples/counter.bpmn")?
+#   Process::<()>::new("dummy.bpmn")?
 .task("name or id", |input| {
     Symbol::Error.into()
 });
@@ -150,7 +150,7 @@ If one or more boundaries exist on a task, then a boundary can be returned. If a
 ```rust no_run
 # use snurr::{Process, Symbol};
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("examples/counter.bpmn")?
+#   Process::<()>::new("dummy.bpmn")?
 .task("name or id", |input| {
     ("Not good", Symbol::Error).into()
 });
@@ -173,7 +173,7 @@ An exclusive gateway can select a flow named after the outgoing sequence flow.
 ```rust no_run
 # use snurr::Process;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("examples/counter.bpmn")?
+#   Process::<()>::new("dummy.bpmn")?
 .exclusive("name or id", |input| {
     "YES".into()
 });
@@ -186,7 +186,7 @@ An exclusive gateway can select a flow named after the outgoing sequence flow.
 ```rust no_run
 # use snurr::Process;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("examples/counter.bpmn")?
+#   Process::<()>::new("dummy.bpmn")?
 .exclusive("name or id", |input| {
     Default::default()
 });
@@ -203,7 +203,7 @@ An event-based gateway can select a flow with an intermediate throw event, where
 ```rust no_run
 # use snurr::{Process, Symbol};
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("examples/counter.bpmn")?
+#   Process::<()>::new("dummy.bpmn")?
 .event_based("name or id", |input| {
      ("Message", Symbol::Message).into()
 });
@@ -220,7 +220,7 @@ An inclusive gateway can select one or many flows named after the outgoing seque
 ```rust no_run
 # use snurr::Process;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("examples/counter.bpmn")?
+#   Process::<()>::new("dummy.bpmn")?
 .inclusive("name or id", |input| {
     "YES".into()
 });
@@ -233,7 +233,7 @@ An inclusive gateway can select one or many flows named after the outgoing seque
 ```rust no_run
 # use snurr::Process;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("examples/counter.bpmn")?
+#   Process::<()>::new("dummy.bpmn")?
 .inclusive("name or id", |input| {
     vec!["YES", "NO"].into()
 });
@@ -246,7 +246,7 @@ An inclusive gateway can select one or many flows named after the outgoing seque
 ```rust no_run
 # use snurr::Process;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("examples/counter.bpmn")?
+#   Process::<()>::new("dummy.bpmn")?
 .inclusive("name or id", |input| {
     Default::default()
 });

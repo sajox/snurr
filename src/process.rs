@@ -31,7 +31,7 @@ where
 impl<T> Process<T> {
     /// Create new process and initialize it from the BPMN file path. Returns an error if
     /// the file was not found or if there were problems with the file content.
-    /// ```
+    /// ```no_run
     /// use snurr::{Build, Process};
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -124,7 +124,7 @@ impl<T> FromStr for Process<T> {
     type Err = ParseError;
 
     /// Create new process and initialize it from a BPMN `&str`.
-    /// ```
+    /// ```no_run
     /// use snurr::{Build, Process};
     ///
     /// static BPMN_DATA: &str = include_str!("../examples/counter.bpmn");

@@ -32,11 +32,11 @@
 - Removed Arc and Mutex usage in Snurr and let the user choose. Callbacks now use `&T` instead of `Arc<Mutex<T>>`.
     - Change your process type to `Process::<Arc<Mutex<YourModel>>>::new` to maintain compatibility with existing code.
     - And to extract result
-        ```rust ignore
-        let data = Arc::into_inner(process_result) // FAIL if Arc has more than one strong reference
-                    .ok_or(YourError::NoProcessResult)? 
-                    .into_inner() // FAIL if Mutex is poisoned
-                    .map_err(|_| YourError::NoProcessResult)?;
+        ```rust
+        let data = Arc::into_inner(process_result)
+            .ok_or("arc has more than one strong reference")?
+            .into_inner()
+            .map_err(|_| "mutex is poisoned")?;
         ```
 - Removed `Data<T>` type as it was `Arc<Mutex<T>>`.
 
