@@ -101,11 +101,13 @@ impl<T> Process<T> {
     /// Install and check that all required functions have been registered. You cannot run a process before `build` is called.
     /// If `build` returns an error, it contains the missing functions. Will panic if called again after an error.
     pub fn build(mut self) -> Result<Process<T, Run>, BuildError> {
-        let result = self.diagram.install_and_check(
-            self.handler
-                .build()
-                .expect("handler map already consumed and cannot proceed, add missing implementations and retry"),
-        );
+        let func_map = self
+            .handler
+            .finished()
+            .expect("function map already consumed and cannot proceed, add missing implementations and retry");
+        log::trace!("{func_map:?}");
+
+        let result = self.diagram.install_and_check(&func_map);
         if result.is_empty() {
             Ok(Process {
                 diagram: self.diagram,

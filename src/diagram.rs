@@ -6,7 +6,7 @@ use crate::{
     diagram::events::Events,
     process::{
         DiagramErrorKind, ParseError, ParseErrorKind, RuntimeError,
-        handler::{HandlerMap, HandlerType},
+        handler::{FuncMap, FuncType},
     },
 };
 
@@ -41,7 +41,7 @@ impl Diagram {
         self.data.as_slice()
     }
 
-    pub fn install_and_check(&mut self, handler_map: HandlerMap) -> HashSet<String> {
+    pub fn install_and_check(&mut self, func_map: &FuncMap) -> HashSet<String> {
         let mut missing = HashSet::new();
         for process_data in self.data.iter_mut() {
             for bpmn in &mut process_data.data {
@@ -50,22 +50,11 @@ impl Diagram {
                         id,
                         name,
                         func_idx,
-                        activity_type:
-                            activity_type @ (ActivityType::Task
-                            | ActivityType::ScriptTask
-                            | ActivityType::UserTask
-                            | ActivityType::ServiceTask
-                            | ActivityType::CallActivity
-                            | ActivityType::ReceiveTask
-                            | ActivityType::SendTask
-                            | ActivityType::ManualTask
-                            | ActivityType::BusinessRuleTask),
+                        activity_type,
                         ..
-                    }) => {
-                        if let Some(id) =
-                            get_func_id(id, name.as_deref(), HandlerType::Task, &handler_map)
-                        {
-                            func_idx.replace(*id);
+                    }) if !matches!(activity_type, ActivityType::SubProcess { .. }) => {
+                        if let Some(id) = func_map.get_id(FuncType::Task, id, name.as_deref()) {
+                            func_idx.replace(id);
                         } else {
                             missing.insert(format!(
                                 "{activity_type}: {}",
@@ -84,16 +73,10 @@ impl Diagram {
                         outputs,
                         ..
                     }) if outputs.len() > 1 => {
-                        let handler_type = match gateway_type {
-                            GatewayType::Exclusive => HandlerType::Exclusive,
-                            GatewayType::Inclusive => HandlerType::Inclusive,
-                            GatewayType::EventBased => HandlerType::EventBased,
-                            _ => continue,
-                        };
                         if let Some(id) =
-                            get_func_id(id, name.as_deref(), handler_type, &handler_map)
+                            func_map.get_id((*gateway_type).into(), id, name.as_deref())
                         {
-                            func_idx.replace(*id);
+                            func_idx.replace(id);
                         } else {
                             missing.insert(format!(
                                 "{gateway_type}: {}",
@@ -107,20 +90,6 @@ impl Diagram {
         }
         missing
     }
-}
-
-// Check if bpmn id or name should be installed. Begin with bpmn id as it is unique and
-// then try with the name if it exist.
-fn get_func_id<'a>(
-    id: &Id,
-    name: Option<&str>,
-    handler_type: HandlerType,
-    handler_map: &'a HandlerMap,
-) -> Option<&'a usize> {
-    [Some(id.bpmn()), name]
-        .into_iter()
-        .flatten()
-        .find_map(|s| handler_map.get(handler_type, s))
 }
 
 #[derive(Default, Debug)]
