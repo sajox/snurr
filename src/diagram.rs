@@ -167,27 +167,6 @@ impl ProcessData {
         &self.events
     }
 
-    pub fn find_boundary<'a>(
-        &'a self,
-        activity_id: &Id,
-        search_name: Option<&str>,
-        search_symbol: &Symbol,
-    ) -> Option<&'a usize> {
-        self.events
-            .boundaries(activity_id)?
-            .iter()
-            .filter_map(|index| self.data.get(*index))
-            .find_map(|bpmn| match bpmn {
-                Bpmn::Event(Event {
-                    symbol: Some(symbol),
-                    id,
-                    name,
-                    ..
-                }) if symbol == search_symbol && search_name == name.as_deref() => Some(id.local()),
-                _ => None,
-            })
-    }
-
     pub fn find_by_name_or_id<'a>(&self, search: &str, outputs: &'a Outputs) -> Option<&'a usize> {
         outputs.iter().find(|index| {
             if let Some(Bpmn::SequenceFlow { id, name, .. }) = self.get(**index) {

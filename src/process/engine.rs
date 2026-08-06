@@ -205,9 +205,10 @@ impl<T> Process<T, Run> {
                                         activity
                                     ))
                                 })?? {
-                                Task::Boundary(name, ref symbol) => input
+                                Task::Boundary(name, symbol) => input
                                     .process
-                                    .find_boundary(id, name.as_deref(), symbol)
+                                    .events()
+                                    .boundary(id, symbol, name.as_deref())
                                     .ok_or_else(|| {
                                         DiagramErrorKind::MissingBoundary(
                                             format!("({name:?},{symbol})"),
@@ -248,7 +249,8 @@ impl<T> Process<T, Run> {
                                 // Jump to boundary
                                 input
                                     .process
-                                    .find_boundary(id, name.as_deref(), symbol)
+                                    .events()
+                                    .boundary(id, *symbol, name.as_deref())
                                     .ok_or_else(|| {
                                         DiagramErrorKind::MissingBoundary(
                                             symbol.to_string(),

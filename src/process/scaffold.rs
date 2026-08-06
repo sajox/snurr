@@ -2,7 +2,7 @@ use std::{collections::HashSet, io::Write, path::Path};
 
 use crate::{
     Process,
-    bpmn::{Activity, ActivityType, Bpmn, Event, Gateway, GatewayType, Symbol},
+    bpmn::{Activity, ActivityType, Bpmn, Gateway, GatewayType, Symbol},
 };
 
 impl<T> Process<T> {
@@ -20,6 +20,7 @@ impl<T> Process<T> {
     pub fn scaffold(&self, path: impl AsRef<Path>) -> Result<(), std::io::Error> {
         let mut scaffold = Scaffold::default();
         for process in self.diagram.data() {
+            let mut boundaries = process.events().boundaries();
             for bpmn in process.iter() {
                 match bpmn {
                     Bpmn::Activity(Activity {
@@ -27,26 +28,7 @@ impl<T> Process<T> {
                         id,
                         ..
                     }) => {
-                        let symbols = process
-                            .events()
-                            .boundaries(id)
-                            .unwrap_or(&Default::default())
-                            .iter()
-                            .filter_map(|index| process.get(*index))
-                            .filter_map(|bpmn| {
-                                if let Bpmn::Event(Event {
-                                    symbol: Some(symbol),
-                                    name,
-                                    ..
-                                }) = bpmn
-                                {
-                                    return Some((name, symbol));
-                                }
-                                None
-                            })
-                            .collect();
-
-                        scaffold.add_task(bpmn, symbols);
+                        scaffold.add_task(bpmn, boundaries.remove(id.local()).unwrap_or_default());
                     }
                     Bpmn::Gateway(
                         gateway @ Gateway {
@@ -87,7 +69,7 @@ struct GatewayInner<'a> {
 #[derive(Debug)]
 struct Task<'a> {
     bpmn: &'a Bpmn,
-    symbols: Vec<(&'a Option<String>, &'a Symbol)>,
+    symbols: Vec<(Option<String>, Symbol)>,
 }
 
 #[derive(Debug, Default)]
@@ -97,7 +79,7 @@ struct Scaffold<'a> {
 }
 
 impl<'a> Scaffold<'a> {
-    fn add_task(&mut self, bpmn: &'a Bpmn, symbols: Vec<(&'a Option<String>, &'a Symbol)>) {
+    fn add_task(&mut self, bpmn: &'a Bpmn, symbols: Vec<(Option<String>, Symbol)>) {
         self.tasks.push(Task { bpmn, symbols });
     }
 
