@@ -11,7 +11,7 @@ Maintainability:
 
 - Update the BPMN diagram with new activities and gateways to meet changing requirements. The code is loosely coupled.
 - The BPMN file is the actual design. Forget outdated documentation.
-- No complicated configuration or database requirements. You simply use it.
+- No complicated configuration or database requirements.
 
 This is not intended to be a full-fledged BPMN 2.0 solution, but rather a solution that is easy to embed and use. Read the documentation on what is supported.
 

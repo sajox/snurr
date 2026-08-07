@@ -20,7 +20,7 @@ impl<T> Process<T> {
     pub fn scaffold(&self, path: impl AsRef<Path>) -> Result<(), std::io::Error> {
         let mut scaffold = Scaffold::default();
         for process in self.diagram.data() {
-            let mut boundaries = process.events().boundaries();
+            let mut boundaries = process.events.boundaries();
             for bpmn in process.iter() {
                 match bpmn {
                     Bpmn::Activity(Activity {

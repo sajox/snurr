@@ -97,7 +97,7 @@ pub struct ProcessData {
     // Start event in the process
     start: Option<usize>,
     data: Vec<Bpmn>,
-    events: Events,
+    pub events: Events,
 }
 
 impl ProcessData {
@@ -161,10 +161,6 @@ impl ProcessData {
 
     pub fn iter(&self) -> impl Iterator<Item = &Bpmn> {
         self.data.iter()
-    }
-
-    pub fn events(&self) -> &Events {
-        &self.events
     }
 
     pub fn find_by_name_or_id<'a>(&self, search: &str, outputs: &'a Outputs) -> Option<&'a usize> {

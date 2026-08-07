@@ -161,7 +161,7 @@ impl<T> Process<T, Run> {
                         EventType::IntermediateThrow => {
                             match (name.as_ref(), symbol.as_ref()) {
                                 (Some(name), Some(Symbol::Link)) => {
-                                    input.process.events().catch_event_link(name)?
+                                    input.process.events.catch_event_link(name)?
                                 }
                                 // Follow outputs for other throw events
                                 (Some(_), _) => {
@@ -207,7 +207,7 @@ impl<T> Process<T, Run> {
                                 })?? {
                                 Task::Boundary(name, symbol) => input
                                     .process
-                                    .events()
+                                    .events
                                     .boundary(id, symbol, name.as_deref())
                                     .ok_or_else(|| {
                                         DiagramErrorKind::MissingBoundary(
@@ -249,7 +249,7 @@ impl<T> Process<T, Run> {
                                 // Jump to boundary
                                 input
                                     .process
-                                    .events()
+                                    .events
                                     .boundary(id, *symbol, name.as_deref())
                                     .ok_or_else(|| {
                                         DiagramErrorKind::MissingBoundary(
