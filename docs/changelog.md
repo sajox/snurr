@@ -2,12 +2,16 @@
 
 ## Main branch (BREAKING CHANGES)
 
-- Updated documentation.
-- API changes
-  - Renamed Enum `With` to `Inclusive`
-  - New enum type `Exclusive`
-  - New enum type `Task`. Slightly less verbose when a Task Boundary is used.
-  - New enum type `IntermediateEvent`
+### Updated documentation
+
+  - Removed pictures.
+  - Include documentation.md in crate doc.
+  - Added changelog.
+
+### API changes
+
+  - Renamed Enum `With` to `Inclusive`.
+  - New enum types `Exclusive`, `Task`, `IntermediateEvent`.
   - Support for `Panic`. Enables terminating the process from task and gateways. The process returns a RunTimeError::Panic containing the specified error.
   - Using `Cow<'static, str>` instead of `&'static str` to be more flexible with different types of strings.
   - Added convenient factory methods for cases where conversions via `From` are not used.
@@ -29,7 +33,7 @@
     Error: BPMN type sequenceFlow missing id
     ```
 
-- Removed Arc and Mutex usage in Snurr and let the user choose. Callbacks now use `&T` instead of `Arc<Mutex<T>>`.
+- Removed `Arc` and `Mutex` usage in Snurr and let the user choose. Callbacks now use `&T` instead of `Arc<Mutex<T>>`.
     - Change your process type to `Process::<Arc<Mutex<YourModel>>>::new` to maintain compatibility with existing code.
     - And to extract result
         ```rust
@@ -39,6 +43,21 @@
             .map_err(|_| "mutex is poisoned")?;
         ```
 - Removed `Data<T>` type as it was `Arc<Mutex<T>>`.
+
+### Example
+
+- Added an example how to create a task that use an external snurr process.
+
+### Fixes
+
+- Subprocess now terminates the process prematurely and triggers the interrupting boundary event on end events with a symbol.
+- When a task or gateways had been assigned a `name` in BPMN, it was not possible to use the BPMN `id` instead when register functions.
+    - Using an BPMN `id` can be fragile as it can regenerate depending on what you do in the BPMN tool.
+- Return an Error on XML errors. (did just log before)
+
+### Dependencies
+
+- Updated to quick-xml new API
 
 ## Version 0.14
 
