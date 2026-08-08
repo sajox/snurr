@@ -18,11 +18,11 @@ use std::{
 
 #[derive(Debug)]
 pub struct Diagram {
-    data: Vec<ProcessData>,
+    data: Box<[ProcessData]>,
 }
 
 impl Diagram {
-    fn new(data: Vec<ProcessData>) -> Self {
+    fn new(data: Box<[ProcessData]>) -> Self {
         Self { data }
     }
 
@@ -38,7 +38,7 @@ impl Diagram {
     }
 
     pub fn data(&self) -> &[ProcessData] {
-        self.data.as_slice()
+        &self.data
     }
 
     pub fn install_and_check(&mut self, func_map: &FuncMap) -> HashSet<String> {

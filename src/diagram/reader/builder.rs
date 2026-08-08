@@ -99,7 +99,7 @@ impl DataBuilder {
 
 impl From<DataBuilder> for Diagram {
     fn from(builder: DataBuilder) -> Self {
-        Diagram::new(builder.data)
+        Diagram::new(builder.data.into_boxed_slice())
     }
 }
 
