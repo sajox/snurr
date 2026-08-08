@@ -42,7 +42,7 @@ impl<T> Process<T, Run> {
         T: Send + Sync,
     {
         let mut last_visited_end = None;
-        let mut handler = ExecuteHandler::new(input.process.start()?);
+        let mut handler = ExecuteHandler::new(input.process.start());
         loop {
             let active_tokens = handler.active_tokens();
             if active_tokens.is_empty() {

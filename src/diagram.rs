@@ -2,12 +2,9 @@ mod events;
 pub mod reader;
 
 use crate::{
-    bpmn::{Activity, ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Symbol},
+    bpmn::{Activity, ActivityType, Bpmn, Event, Gateway, GatewayType, Symbol},
     diagram::events::Events,
-    process::{
-        DiagramErrorKind, ParseError, ParseErrorKind, RuntimeError,
-        handler::{FuncMap, FuncType},
-    },
+    process::handler::{FuncMap, FuncType},
 };
 
 use std::{
@@ -18,18 +15,17 @@ use std::{
 
 #[derive(Debug)]
 pub struct Diagram {
+    definition: Box<[Bpmn]>,
     data: Box<[ProcessData]>,
 }
 
 impl Diagram {
-    fn new(data: Box<[ProcessData]>) -> Self {
-        Self { data }
+    fn new(definition: Box<[Bpmn]>, data: Box<[ProcessData]>) -> Self {
+        Self { definition, data }
     }
 
-    // All top level processes defined in Definitions.
-    // Always last in the Vec as it is a top level construct in the XML.
-    pub fn get_definition(&self) -> Option<&ProcessData> {
-        self.data.last()
+    pub fn definition(&self) -> &[Bpmn] {
+        &self.definition
     }
 
     // Can be a process or sub process
@@ -95,64 +91,14 @@ impl Diagram {
 #[derive(Default, Debug)]
 pub struct ProcessData {
     // Start event in the process
-    start: Option<usize>,
-    data: Vec<Bpmn>,
+    start: usize,
+    data: Box<[Bpmn]>,
     pub events: Events,
 }
 
 impl ProcessData {
-    fn add(&mut self, mut bpmn: Bpmn) -> Result<(), ParseError> {
-        let len = self.data.len();
-        if let Bpmn::Event(Event {
-            event_type: EventType::Start,
-            symbol: None,
-            ..
-        }) = bpmn
-            && self.start.replace(len).is_some()
-        {
-            Err(ParseErrorKind::NotSupported("multiple start event".into()))?
-        }
-
-        bpmn.update_local_id(len);
-        self.data.push(bpmn);
-        Ok(())
-    }
-
-    // Everything in the process has been collected. Update local IDs with correct index.
-    fn finalize(&mut self) {
-        // Collect Bpmn id to index in array
-        let bpmn_index: HashMap<String, usize> = self
-            .data
-            .iter()
-            .enumerate()
-            .filter_map(|(index, bpmn)| bpmn.id().map(|id| (id.into(), index)))
-            .collect();
-
-        self.data.iter_mut().for_each(|bpmn| match bpmn {
-            Bpmn::Activity(Activity { outputs, .. }) => outputs.update_local_ids(&bpmn_index),
-            Bpmn::Event(event) => {
-                event.outputs.update_local_ids(&bpmn_index);
-                if let Some(attached_to_ref) = &mut event.attached_to_ref {
-                    attached_to_ref.update_local_id(&bpmn_index);
-                }
-
-                self.events.register(event);
-            }
-            Bpmn::Gateway(Gateway {
-                default, outputs, ..
-            }) => {
-                outputs.update_local_ids(&bpmn_index);
-                if let Some(default) = default {
-                    default.update_local_id(&bpmn_index)
-                }
-            }
-            Bpmn::SequenceFlow { target_ref, .. } => target_ref.update_local_id(&bpmn_index),
-            _ => {}
-        });
-    }
-
-    pub fn start(&self) -> Result<usize, RuntimeError> {
-        self.start.ok_or(DiagramErrorKind::MissingStartEvent.into())
+    pub fn start(&self) -> usize {
+        self.start
     }
 
     pub fn get(&self, index: usize) -> Option<&Bpmn> {

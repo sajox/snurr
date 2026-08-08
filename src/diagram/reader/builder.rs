@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use crate::{
     bpmn::{Event, *},
-    diagram::{Diagram, ProcessData},
+    diagram::{Diagram, ProcessData, events::Events},
     process::{ParseError, ParseErrorKind},
 };
 
@@ -24,8 +26,12 @@ use crate::{
 
 #[derive(Default)]
 pub(super) struct DataBuilder {
+    // Top level processes collected in definition
+    definition: Vec<Bpmn>,
+
+    // Process and subprocess data
     data: Vec<ProcessData>,
-    process_stack: Vec<ProcessData>,
+    process_stack: Vec<ProcessConstruction>,
     stack: Vec<Bpmn>,
 }
 
@@ -83,23 +89,28 @@ impl DataBuilder {
             Err(ParseErrorKind::ProcessBuild)?
         };
 
-        // Definitions collect all Processes
-        // Processes collect all related sub processes
-        if let Some(parent_process_data) = self.process_stack.last_mut() {
-            // Process or sub process use index to point to data.
-            bpmn.update_data_index(self.data.len());
-            parent_process_data.add(bpmn)?;
+        // Process or sub process use index to point to data.
+        bpmn.update_data_index(self.data.len());
+
+        match self.process_stack.last_mut() {
+            // Processes collect all related subprocesses
+            Some(parent_process_data) => parent_process_data.add(bpmn)?,
+            // Definitions collect all processes
+            None => self.definition.push(bpmn),
         }
 
         process_data.finalize();
-        self.data.push(process_data);
+        self.data.push(process_data.try_into()?);
         Ok(())
     }
 }
 
 impl From<DataBuilder> for Diagram {
     fn from(builder: DataBuilder) -> Self {
-        Diagram::new(builder.data.into_boxed_slice())
+        Diagram::new(
+            builder.definition.into_boxed_slice(),
+            builder.data.into_boxed_slice(),
+        )
     }
 }
 
@@ -113,4 +124,81 @@ fn check_unsupported(bpmn: &Bpmn) -> Result<(), ParseError> {
         )),
         _ => return Ok(()),
     })?
+}
+
+#[derive(Default, Debug)]
+struct ProcessConstruction {
+    start: Option<usize>,
+    data: Vec<Bpmn>,
+    events: Events,
+}
+
+impl ProcessConstruction {
+    fn add(&mut self, mut bpmn: Bpmn) -> Result<(), ParseError> {
+        let len = self.data.len();
+        if let Bpmn::Event(Event {
+            event_type: EventType::Start,
+            symbol: None,
+            ..
+        }) = bpmn
+            && self.start.replace(len).is_some()
+        {
+            Err(ParseErrorKind::NotSupported("multiple start event".into()))?
+        }
+
+        bpmn.update_local_id(len);
+        self.data.push(bpmn);
+        Ok(())
+    }
+
+    // Everything in the process has been collected. Update local IDs with correct index.
+    fn finalize(&mut self) {
+        // Collect Bpmn id to index in array
+        let bpmn_index: HashMap<String, usize> = self
+            .data
+            .iter()
+            .enumerate()
+            .filter_map(|(index, bpmn)| bpmn.id().map(|id| (id.into(), index)))
+            .collect();
+
+        self.data.iter_mut().for_each(|bpmn| match bpmn {
+            Bpmn::Activity(Activity { outputs, .. }) => outputs.update_local_ids(&bpmn_index),
+            Bpmn::Event(event) => {
+                event.outputs.update_local_ids(&bpmn_index);
+                if let Some(attached_to_ref) = &mut event.attached_to_ref {
+                    attached_to_ref.update_local_id(&bpmn_index);
+                }
+
+                self.events.register(event);
+            }
+            Bpmn::Gateway(Gateway {
+                default, outputs, ..
+            }) => {
+                outputs.update_local_ids(&bpmn_index);
+                if let Some(default) = default {
+                    default.update_local_id(&bpmn_index)
+                }
+            }
+            Bpmn::SequenceFlow { target_ref, .. } => target_ref.update_local_id(&bpmn_index),
+            _ => {}
+        });
+    }
+}
+
+impl TryFrom<ProcessConstruction> for ProcessData {
+    type Error = ParseErrorKind;
+
+    fn try_from(
+        ProcessConstruction {
+            start,
+            data,
+            events,
+        }: ProcessConstruction,
+    ) -> Result<Self, Self::Error> {
+        Ok(ProcessData {
+            start: start.ok_or(ParseErrorKind::MissingStartEvent)?,
+            data: data.into_boxed_slice(),
+            events,
+        })
+    }
 }

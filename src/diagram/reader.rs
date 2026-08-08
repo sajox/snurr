@@ -53,11 +53,10 @@ pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, ParseErro
                     Bpmn::try_from((bpmn_type, collect_attributes(&bs)))
                         .map_err(|e| create_parse_error(e, &reader, &buf))?,
                 ),
-                bpmn_type @ (DEFINITIONS | PROCESS | SUB_PROCESS | TRANSACTION) => builder
-                    .add_new_process(
-                        Bpmn::try_from((bpmn_type, collect_attributes(&bs)))
-                            .map_err(|e| create_parse_error(e, &reader, &buf))?,
-                    ),
+                bpmn_type @ (PROCESS | SUB_PROCESS | TRANSACTION) => builder.add_new_process(
+                    Bpmn::try_from((bpmn_type, collect_attributes(&bs)))
+                        .map_err(|e| create_parse_error(e, &reader, &buf))?,
+                ),
                 _ => {}
             },
             Ok(Event::Empty(bs)) => {
@@ -105,7 +104,7 @@ pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, ParseErro
                 | INCLUSIVE_GATEWAY
                 | EVENT_BASED_GATEWAY
                 | SEQUENCE_FLOW => builder.end()?,
-                DEFINITIONS | PROCESS | SUB_PROCESS | TRANSACTION => builder.end_process()?,
+                PROCESS | SUB_PROCESS | TRANSACTION => builder.end_process()?,
                 _ => {}
             },
             Ok(Event::Text(bt)) => {

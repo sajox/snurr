@@ -184,12 +184,7 @@ impl<T> Process<T, Run> {
         T: Send + Sync,
     {
         // Run every process specified in the diagram
-        for bpmn in self
-            .diagram
-            .get_definition()
-            .ok_or(RuntimeErrorKind::Engine("no process data available".into()))?
-            .iter()
-        {
+        for bpmn in self.diagram.definition().iter() {
             if let Bpmn::Process {
                 data_index: Some(index),
                 ..
@@ -236,6 +231,8 @@ pub enum ParseErrorKind {
     Bpmn { line: usize, source: BpmnError },
     #[error("could not build the snurr process")]
     ProcessBuild,
+    #[error("missing start event")]
+    MissingStartEvent,
     #[error("{0} not supported")]
     NotSupported(String),
     #[error(transparent)]
@@ -295,8 +292,6 @@ pub enum DiagramErrorKind {
     MissingIntermediateCatchEvent(String, String),
     #[error("missing end event")]
     MissingEndEvent,
-    #[error("missing start event")]
-    MissingStartEvent,
     #[error("{0} not supported")]
     NotSupported(String),
     #[error("{0}")]
