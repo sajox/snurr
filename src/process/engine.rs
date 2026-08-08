@@ -10,7 +10,7 @@ use crate::{
 };
 use execute_handler::ExecuteHandler;
 use log::{debug, warn};
-use std::{borrow::Cow, collections::HashSet, fmt::Display};
+use std::{borrow::Cow, fmt::Display};
 
 type Tokens<'a> = Cow<'a, [usize]>;
 
@@ -368,21 +368,23 @@ impl<T> Process<T, Run> {
             .ok_or_else(|| RuntimeErrorKind::Engine(format!("missing function {:?}", gateway)))??
         {
             Inclusive::Flow(value) => input.find_flow(&value, outputs, gateway)?,
-            Inclusive::Fork(values) => match values.as_slice() {
+            Inclusive::Fork(mut values) => match values.as_slice() {
                 [] => gateway.default_path()?,
                 [value] => input.find_flow(value, outputs, gateway)?,
                 [..] => {
-                    let mut tokens = HashSet::with_capacity(values.len());
-                    for value in values {
-                        // Breaks on first error
-                        if !tokens.insert(*input.find_flow(&value, outputs, gateway)?) {
-                            // The flow has already been used, we just log an warning and continue.
-                            warn!(
-                                "{gateway} used flow {value} multiple times. Discarded the duplicates."
-                            );
-                        }
+                    let len_before_dedup = values.len();
+                    values.sort();
+                    values.dedup();
+
+                    if len_before_dedup != values.len() {
+                        warn!("{gateway} used flow(s) multiple times. Discarded the duplicates.");
                     }
-                    return Ok(Cow::Owned(tokens.into_iter().collect()));
+
+                    let result = values
+                        .into_iter()
+                        .map(|value| input.find_flow(&value, outputs, gateway).copied())
+                        .collect::<Result<Vec<usize>, _>>();
+                    return Ok(Cow::Owned(result?));
                 }
             },
             Inclusive::Default => gateway.default_path()?,
