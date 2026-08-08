@@ -393,6 +393,4 @@ pub enum BpmnErrorKind {
     MissingTargetRef,
     #[error("tag `{0}` not implemented")]
     TypeNotImplemented(String),
-    #[error(transparent)]
-    Encoding(Box<dyn std::error::Error + Send + Sync>),
 }
