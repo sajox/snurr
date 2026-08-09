@@ -27,8 +27,8 @@ use crate::{
 
 #[derive(Default)]
 pub(super) struct DataBuilder {
-    // Top level processes collected in definition
-    definition: Vec<Bpmn>,
+    // Top level processes collected in definitions
+    definitions: Vec<Bpmn>,
 
     // Process and subprocess data
     data: Vec<ProcessData>,
@@ -97,7 +97,7 @@ impl DataBuilder {
             // Processes collect all related subprocesses
             Some(parent_process_data) => parent_process_data.add(bpmn)?,
             // Definitions collect all processes
-            None => self.definition.push(bpmn),
+            None => self.definitions.push(bpmn),
         }
 
         process_data.finalize();
@@ -109,7 +109,7 @@ impl DataBuilder {
 impl From<DataBuilder> for Diagram {
     fn from(builder: DataBuilder) -> Self {
         Diagram::new(
-            builder.definition.into_boxed_slice(),
+            builder.definitions.into_boxed_slice(),
             builder.data.into_boxed_slice(),
         )
     }

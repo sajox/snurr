@@ -15,17 +15,17 @@ use std::{
 
 #[derive(Debug)]
 pub struct Diagram {
-    definition: Box<[Bpmn]>,
+    definitions: Box<[Bpmn]>,
     data: Box<[ProcessData]>,
 }
 
 impl Diagram {
-    fn new(definition: Box<[Bpmn]>, data: Box<[ProcessData]>) -> Self {
-        Self { definition, data }
+    fn new(definitions: Box<[Bpmn]>, data: Box<[ProcessData]>) -> Self {
+        Self { definitions, data }
     }
 
     pub fn definition(&self) -> &[Bpmn] {
-        &self.definition
+        &self.definitions
     }
 
     // Can be a process or sub process
@@ -240,7 +240,6 @@ impl Bpmn {
             Bpmn::Event(Event { id, .. })
             | Bpmn::SequenceFlow { id, .. }
             | Bpmn::Activity(Activity { id, .. })
-            | Bpmn::Definitions { id, .. }
             | Bpmn::Gateway(Gateway { id, .. })
             | Bpmn::Process { id, .. } => Some(id.bpmn()),
             _ => None,
@@ -252,7 +251,6 @@ impl Bpmn {
             Bpmn::Event(Event { id, .. })
             | Bpmn::SequenceFlow { id, .. }
             | Bpmn::Activity(Activity { id, .. })
-            | Bpmn::Definitions { id, .. }
             | Bpmn::Gateway(Gateway { id, .. })
             | Bpmn::Process { id, .. } => id.local_id = value,
             _ => {}

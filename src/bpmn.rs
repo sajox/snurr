@@ -5,7 +5,7 @@ use crate::{
 use core::fmt;
 use std::{collections::HashMap, fmt::Display};
 
-pub(crate) const DEFINITIONS: &str = "definitions";
+pub(crate) const _DEFINITIONS: &str = "definitions";
 pub(crate) const PROCESS: &str = "process";
 
 // Event
@@ -279,9 +279,6 @@ impl Display for Activity {
 #[derive(Debug)]
 pub(crate) enum Bpmn {
     Activity(Activity),
-    Definitions {
-        id: Id,
-    },
     Direction(Option<String>),
     Event(Event),
     Gateway(Gateway),
@@ -303,12 +300,6 @@ impl TryFrom<(&str, HashMap<&str, String>)> for Bpmn {
         (bpmn_type, mut attributes): (&str, HashMap<&str, String>),
     ) -> Result<Self, Self::Error> {
         let ty = match bpmn_type {
-            DEFINITIONS => Bpmn::Definitions {
-                id: attributes
-                    .remove(ATTRIB_ID)
-                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
-                    .into(),
-            },
             PROCESS => Bpmn::Process {
                 id: attributes
                     .remove(ATTRIB_ID)
