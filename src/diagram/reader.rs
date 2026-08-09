@@ -43,8 +43,6 @@ pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, ParseErro
                 | SEND_TASK
                 | MANUAL_TASK
                 | BUSINESS_RULE_TASK
-                | OUTGOING
-                | INCOMING
                 | EXCLUSIVE_GATEWAY
                 | PARALLEL_GATEWAY
                 | INCLUSIVE_GATEWAY
@@ -84,7 +82,7 @@ pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, ParseErro
                 }
             }
             Ok(Event::End(be)) => match be.local_name().as_ref() {
-                direction @ (OUTGOING | INCOMING) => builder.add_direction(direction),
+                bpmn_type @ (OUTGOING | INCOMING) => builder.add_text_to_parent(bpmn_type),
                 START_EVENT
                 | END_EVENT
                 | BOUNDARY_EVENT

@@ -34,6 +34,9 @@ pub(super) struct DataBuilder {
     data: Vec<ProcessData>,
     process_stack: Vec<ProcessConstruction>,
     stack: Vec<Bpmn>,
+
+    // Temporary text from XML
+    text: Option<String>,
 }
 
 impl DataBuilder {
@@ -59,21 +62,19 @@ impl DataBuilder {
         }
     }
 
-    pub(super) fn add_direction(&mut self, direction: &str) {
-        if let Some(Bpmn::Direction(Some(value))) = self.stack.pop()
-            && let Some(parent) = self.stack.last_mut()
+    pub(super) fn add_text_to_parent(&mut self, bpmn_type: &str) {
+        if let Some(parent) = self.stack.last_mut()
+            && let Some(text) = self.text.take()
         {
-            match direction {
-                OUTGOING => parent.add_output(value),
+            match bpmn_type {
+                OUTGOING => parent.add_output(text),
                 _ => parent.add_input(),
             }
         }
     }
 
     pub(super) fn add_text(&mut self, value: impl Into<String>) {
-        if let Some(Bpmn::Direction(text)) = self.stack.last_mut() {
-            text.replace(value.into());
-        }
+        self.text.replace(value.into());
     }
 
     pub(super) fn end(&mut self) -> Result<(), ParseError> {
@@ -159,7 +160,7 @@ impl ProcessConstruction {
             .data
             .iter()
             .enumerate()
-            .filter_map(|(index, bpmn)| bpmn.id().map(|id| (id.into(), index)))
+            .map(|(index, bpmn)| (bpmn.id().into(), index))
             .collect();
 
         self.data.iter_mut().for_each(|bpmn| match bpmn {

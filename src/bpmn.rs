@@ -279,7 +279,6 @@ impl Display for Activity {
 #[derive(Debug)]
 pub(crate) enum Bpmn {
     Activity(Activity),
-    Direction(Option<String>),
     Event(Event),
     Gateway(Gateway),
     Process {
@@ -360,7 +359,6 @@ impl TryFrom<(&str, HashMap<&str, String>)> for Bpmn {
                     .ok_or(BpmnErrorKind::MissingTargetRef)?
                     .into(),
             },
-            INCOMING | OUTGOING => Bpmn::Direction(None),
             _ => Err(BpmnErrorKind::TypeNotImplemented(bpmn_type.into()))?,
         };
         Ok(ty)

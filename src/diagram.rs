@@ -235,14 +235,13 @@ impl From<String> for Id {
 }
 
 impl Bpmn {
-    fn id(&self) -> Option<&str> {
+    fn id(&self) -> &str {
         match self {
             Bpmn::Event(Event { id, .. })
             | Bpmn::SequenceFlow { id, .. }
             | Bpmn::Activity(Activity { id, .. })
             | Bpmn::Gateway(Gateway { id, .. })
-            | Bpmn::Process { id, .. } => Some(id.bpmn()),
-            _ => None,
+            | Bpmn::Process { id, .. } => id.bpmn(),
         }
     }
 
@@ -253,7 +252,6 @@ impl Bpmn {
             | Bpmn::Activity(Activity { id, .. })
             | Bpmn::Gateway(Gateway { id, .. })
             | Bpmn::Process { id, .. } => id.local_id = value,
-            _ => {}
         }
     }
 
