@@ -182,6 +182,7 @@ impl<T> Process<T, Run> {
                         activity_type,
                         id,
                         func_idx,
+                        data_index,
                         outputs,
                         ..
                     },
@@ -219,7 +220,7 @@ impl<T> Process<T, Run> {
                                 Task::Panic(e) => Err(RuntimeErrorKind::Panic(e))?,
                             }
                         }
-                        ActivityType::SubProcess { data_index } => {
+                        ActivityType::SubProcess => {
                             let subprocess = if let Some(index) = data_index
                                 && let Some(process_data) = self.diagram.get_process(*index)
                             {
@@ -308,12 +309,6 @@ impl<T> Process<T, Run> {
                             return Ok(Return::Fork(
                                 self.handle_inclusive_gateway(input, gateway)?,
                             ));
-                        }
-                        GatewayType::EventBased if outputs.len() == 1 => {
-                            Err(DiagramErrorKind::BpmnRequirement(
-                                "Event gateway must have at least two outgoing sequence flows"
-                                    .into(),
-                            ))?
                         }
                         GatewayType::EventBased => {
                             match func_idx

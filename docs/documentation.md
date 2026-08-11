@@ -93,7 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 Output file: **scaffold.rs**
 
 ```rust no_run
-use snurr::{Process, Run, process::BuildError};
+use snurr::{Process, Run, error::BuildError};
 
 // Replace () with your type
 pub fn build(process: Process<()>) -> Result<Process<(), Run>, BuildError> {

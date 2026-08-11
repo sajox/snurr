@@ -10,7 +10,6 @@ use crate::{
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
-    ops::AddAssign,
 };
 
 #[derive(Debug)]
@@ -48,7 +47,7 @@ impl Diagram {
                         func_idx,
                         activity_type,
                         ..
-                    }) if !matches!(activity_type, ActivityType::SubProcess { .. }) => {
+                    }) if !matches!(activity_type, ActivityType::SubProcess) => {
                         if let Some(id) = func_map.get_id(FuncType::Task, id, name.as_deref()) {
                             func_idx.replace(id);
                         } else {
@@ -156,8 +155,8 @@ impl ProcessData {
 
 #[derive(Debug, Default)]
 pub(crate) struct Outputs {
-    bpmn_ids: Vec<String>,
-    local_ids: Vec<usize>,
+    bpmn_ids: Box<[String]>,
+    local_ids: Box<[usize]>,
 }
 
 impl Display for Outputs {
@@ -167,9 +166,12 @@ impl Display for Outputs {
 }
 
 impl Outputs {
-    fn add(&mut self, output_id: impl Into<String>) {
-        self.bpmn_ids.push(output_id.into());
-        self.local_ids.push(0);
+    fn new(bpmn_ids: Vec<String>) -> Outputs {
+        let len = bpmn_ids.len();
+        Self {
+            bpmn_ids: bpmn_ids.into_boxed_slice(),
+            local_ids: vec![0; len].into_boxed_slice(),
+        }
     }
 
     pub(crate) fn ids(&self) -> &[usize] {
@@ -252,34 +254,6 @@ impl Bpmn {
             | Bpmn::Activity(Activity { id, .. })
             | Bpmn::Gateway(Gateway { id, .. })
             | Bpmn::Process { id, .. } => id.local_id = value,
-        }
-    }
-
-    fn update_data_index(&mut self, value: usize) {
-        match self {
-            Bpmn::Activity(Activity {
-                activity_type: ActivityType::SubProcess { data_index },
-                ..
-            })
-            | Bpmn::Process { data_index, .. } => {
-                data_index.replace(value);
-            }
-            _ => {}
-        }
-    }
-
-    fn add_output(&mut self, text: String) {
-        match self {
-            Bpmn::Event(Event { outputs, .. })
-            | Bpmn::Gateway(Gateway { outputs, .. })
-            | Bpmn::Activity(Activity { outputs, .. }) => outputs.add(text),
-            _ => {}
-        }
-    }
-
-    fn add_input(&mut self) {
-        if let Bpmn::Gateway(Gateway { inputs, .. }) = self {
-            inputs.add_assign(1);
         }
     }
 }

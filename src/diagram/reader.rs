@@ -1,4 +1,6 @@
 mod builder;
+pub use builder::BpmnError;
+pub use builder::BpmnErrorKind;
 
 use super::Diagram;
 use crate::{
@@ -20,7 +22,7 @@ pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, ParseErro
     loop {
         match reader.read_event_into(&mut buf) {
             Err(e) => {
-                let (line, column) = reader.line_and_column(&buf, true)?;
+                let (line, column) = reader.line_and_column(&buf)?;
                 Err(ParseErrorKind::Xml {
                     line,
                     column,
@@ -47,14 +49,12 @@ pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, ParseErro
                 | PARALLEL_GATEWAY
                 | INCLUSIVE_GATEWAY
                 | EVENT_BASED_GATEWAY
-                | SEQUENCE_FLOW) => builder.add(
-                    Bpmn::try_from((bpmn_type, collect_attributes(&bs)))
-                        .map_err(|e| create_parse_error(e, &reader, &buf))?,
-                ),
-                bpmn_type @ (PROCESS | SUB_PROCESS | TRANSACTION) => builder.add_new_process(
-                    Bpmn::try_from((bpmn_type, collect_attributes(&bs)))
-                        .map_err(|e| create_parse_error(e, &reader, &buf))?,
-                ),
+                | SEQUENCE_FLOW) => {
+                    builder.add(RawData::new(bpmn_type, collect_attributes(&bs)));
+                }
+                bpmn_type @ (PROCESS | SUB_PROCESS | TRANSACTION) => {
+                    builder.add_new_process(RawData::new(bpmn_type, collect_attributes(&bs)));
+                }
                 _ => {}
             },
             Ok(Event::Empty(bs)) => {
@@ -73,10 +73,7 @@ pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, ParseErro
                         builder.update_symbol(bpmn_type);
                     }
                     bpmn_type @ SEQUENCE_FLOW => {
-                        builder.add_to_process(
-                            Bpmn::try_from((bpmn_type, collect_attributes(&bs)))
-                                .map_err(|e| create_parse_error(e, &reader, &buf))?,
-                        )?;
+                        builder.add_to_process(RawData::new(bpmn_type, collect_attributes(&bs)))?;
                     }
                     _ => {}
                 }
@@ -115,41 +112,26 @@ pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, ParseErro
     Ok(builder.into())
 }
 
-fn collect_attributes<'a>(bs: &'a quick_xml::events::BytesStart<'_>) -> HashMap<&'a str, String> {
+fn collect_attributes(bs: &quick_xml::events::BytesStart<'_>) -> HashMap<Attrib, String> {
     bs.attributes()
         .filter_map(Result::ok)
         .filter(|attribute| !attribute.value.is_empty())
-        .map(|attribute| {
-            (
-                attribute.key.local_name().into_inner(),
+        .filter_map(|attribute| {
+            Some((
+                attribute.key.local_name().into_inner().try_into().ok()?,
                 attribute.value.into(),
-            )
+            ))
         })
-        .collect::<HashMap<&'a str, String>>()
-}
-
-fn create_parse_error<T>(source: BpmnError, reader: &Reader<T>, buf: &[u8]) -> ParseError {
-    // This is not an XML error an thus set to false
-    let result = reader.line_and_column(buf, false);
-    if let Ok((line, _)) = result {
-        ParseErrorKind::Bpmn { line, source }.into()
-    } else {
-        result.unwrap_err()
-    }
+        .collect::<HashMap<Attrib, String>>()
 }
 
 trait LineAndColumn {
-    fn line_and_column(&self, data: &[u8], xml_error: bool) -> Result<(usize, usize), ParseError>;
+    fn line_and_column(&self, data: &[u8]) -> Result<(usize, usize), ParseError>;
 }
 
 impl<T> LineAndColumn for Reader<T> {
-    fn line_and_column(&self, data: &[u8], xml_error: bool) -> Result<(usize, usize), ParseError> {
-        let end_pos = if xml_error {
-            self.error_position()
-        } else {
-            self.buffer_position()
-        } as usize;
-
+    fn line_and_column(&self, data: &[u8]) -> Result<(usize, usize), ParseError> {
+        let end_pos = self.error_position() as usize;
         let content = String::from_utf8(data[0..end_pos].to_owned())
             .map_err(|e| ParseErrorKind::Encoding(e.into()))?;
         let mut line = 1;
@@ -163,6 +145,35 @@ impl<T> LineAndColumn for Reader<T> {
             }
         }
         Ok((line, column))
+    }
+}
+
+// Temporary objekt to collect the complete element (start and end-tag) before trying to create the Bpmn type.
+#[derive(Debug, Default)]
+struct RawData {
+    bpmn_type: String,
+    attributes: HashMap<Attrib, String>,
+    symbol: Option<Symbol>,
+    data_index: Option<usize>,
+    outputs: Vec<String>,
+    inputs: Vec<String>,
+}
+
+impl RawData {
+    fn new(bpmn_type: impl Into<String>, attributes: HashMap<Attrib, String>) -> RawData {
+        Self {
+            bpmn_type: bpmn_type.into(),
+            attributes,
+            ..Default::default()
+        }
+    }
+
+    fn name_or_id(&self) -> Result<&str, BpmnError> {
+        Ok(self
+            .attributes
+            .get(&Attrib::Name)
+            .or_else(|| self.attributes.get(&Attrib::Id))
+            .ok_or_else(|| BpmnErrorKind::MissingId(self.bpmn_type.clone()))?)
     }
 }
 

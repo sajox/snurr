@@ -4,8 +4,11 @@ mod scaffold;
 
 use crate::{
     api::{Exclusive, Inclusive, IntermediateEvent, Task},
-    bpmn::{Bpmn, BpmnError},
-    diagram::{Diagram, reader::read_bpmn},
+    bpmn::Bpmn,
+    diagram::{
+        Diagram,
+        reader::{BpmnError, read_bpmn},
+    },
     process::handler::Callback,
 };
 use engine::ExecuteInput;
@@ -227,8 +230,8 @@ pub struct ParseError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ParseErrorKind {
-    #[error("error on line {line}")]
-    Bpmn { line: usize, source: BpmnError },
+    #[error(transparent)]
+    Bpmn(BpmnError),
     #[error("could not build the snurr process")]
     ProcessBuild,
     #[error("missing start event")]
@@ -258,7 +261,7 @@ pub struct RuntimeError {
 pub enum RuntimeErrorKind {
     /// Bpmn diagram design error or user specified wrong value
     #[error(transparent)]
-    Diagram(#[from] DiagramError),
+    Diagram(DiagramError),
     /// Engine problems, should not happen :)
     #[error("engine failure `{0}`")]
     Engine(String),
@@ -278,7 +281,7 @@ pub struct DiagramError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum DiagramErrorKind {
-    #[error("{0} has no output. (Used correct name or id?)")]
+    #[error("{0} has no matching output. (Used correct name or id?)")]
     MissingOutput(String),
     #[error("{0} has no default flow")]
     MissingDefault(String),

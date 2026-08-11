@@ -1,8 +1,10 @@
 use snurr::{
-    Exclusive, Process, Result, Symbol, Task,
-    process::{
-        BpmnFileError, BpmnFileErrorKind, DiagramError, DiagramErrorKind, ParseError,
-        ParseErrorKind, RuntimeError, RuntimeErrorKind,
+    Exclusive, Process, Symbol, Task,
+    error::{
+        BpmnError, BpmnErrorKind, BpmnFileError, BpmnFileErrorKind, DiagramError, DiagramErrorKind,
+        ParseError,
+        ParseErrorKind::{self, Bpmn},
+        Result, RuntimeError, RuntimeErrorKind,
     },
 };
 use std::{borrow::Cow, sync::Mutex};
@@ -226,20 +228,17 @@ fn inclusive_gateway_split_end() -> Result<()> {
 
 #[test]
 fn inclusive_gateway_no_output() -> Result<()> {
-    let bpmn = Process::<Counter>::new("tests/files/inclusive_gateway_no_output.bpmn")?
-        .task("A", |_| Default::default())
-        .task("B", |_| Default::default())
-        // Empty vec run default path
-        .inclusive("Gateway_0qmfmmo", |_| Default::default())
-        .build()?;
-
-    match bpmn.run(Default::default()) {
+    match Process::<Counter>::new("tests/files/inclusive_gateway_no_output.bpmn") {
         Err(error) => assert!(
             matches!(
                 error,
-                RuntimeError {
-                    source: RuntimeErrorKind::Diagram(DiagramError {
-                        source: DiagramErrorKind::MissingOutput(_),
+                BpmnFileError {
+                    path: _,
+                    source: BpmnFileErrorKind::Parse(ParseError {
+                        source: Bpmn(BpmnError {
+                            source: BpmnErrorKind::NoOutput(_),
+                            ..
+                        }),
                         ..
                     }),
                     ..

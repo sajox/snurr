@@ -1,4 +1,8 @@
-use crate::process::{BpmnFileError, BuildError, ParseError, RuntimeError};
+pub use crate::diagram::reader::{BpmnError, BpmnErrorKind};
+pub use crate::process::{
+    BpmnFileError, BpmnFileErrorKind, BuildError, DiagramError, DiagramErrorKind, ParseError,
+    ParseErrorKind, RuntimeError, RuntimeErrorKind,
+};
 
 pub type Result<T> = std::result::Result<T, Error>;
 

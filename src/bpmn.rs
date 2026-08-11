@@ -1,9 +1,12 @@
 use crate::{
-    diagram::{Id, Outputs},
+    diagram::{
+        Id, Outputs,
+        reader::{BpmnError, BpmnErrorKind},
+    },
     process::{DiagramErrorKind, RuntimeError},
 };
 use core::fmt;
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
 pub(crate) const _DEFINITIONS: &str = "definitions";
 pub(crate) const PROCESS: &str = "process";
@@ -55,14 +58,46 @@ pub(crate) const EVENT_BASED_GATEWAY: &str = "eventBasedGateway";
 
 // Attributes
 pub(crate) const ATTRIB_ID: &str = "id";
-pub(crate) const _ATTRIB_IS_EXECUTABLE: &str = "isExecutable";
+pub(crate) const ATTRIB_IS_EXECUTABLE: &str = "isExecutable";
 pub(crate) const ATTRIB_NAME: &str = "name";
-pub(crate) const _ATTRIB_SOURCE_REF: &str = "sourceRef";
+pub(crate) const ATTRIB_SOURCE_REF: &str = "sourceRef";
 pub(crate) const ATTRIB_TARGET_REF: &str = "targetRef";
 pub(crate) const ATTRIB_DEFAULT: &str = "default";
-pub(crate) const _ATTRIB_EXPORTER_VERSION: &str = "exporterVersion";
+pub(crate) const ATTRIB_EXPORTER_VERSION: &str = "exporterVersion";
 pub(crate) const ATTRIB_ATTACHED_TO_REF: &str = "attachedToRef";
-pub(crate) const _ATTRIB_CANCEL_ACTIVITY: &str = "cancelActivity";
+pub(crate) const ATTRIB_CANCEL_ACTIVITY: &str = "cancelActivity";
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub(crate) enum Attrib {
+    AttachedToRef,
+    CancelActivity,
+    Default,
+    ExporterVersion,
+    Id,
+    IsExecutable,
+    Name,
+    SourceRef,
+    TargetRef,
+}
+
+impl TryFrom<&str> for Attrib {
+    type Error = BpmnError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(match value {
+            ATTRIB_ATTACHED_TO_REF => Attrib::AttachedToRef,
+            ATTRIB_CANCEL_ACTIVITY => Attrib::CancelActivity,
+            ATTRIB_DEFAULT => Attrib::Default,
+            ATTRIB_EXPORTER_VERSION => Attrib::ExporterVersion,
+            ATTRIB_ID => Attrib::Id,
+            ATTRIB_IS_EXECUTABLE => Attrib::IsExecutable,
+            ATTRIB_NAME => Attrib::Name,
+            ATTRIB_SOURCE_REF => Attrib::SourceRef,
+            ATTRIB_TARGET_REF => Attrib::TargetRef,
+            _ => Err(BpmnErrorKind::TypeNotImplemented(value.into()))?,
+        })
+    }
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum EventType {
@@ -96,7 +131,7 @@ impl Display for EventType {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum ActivityType {
-    SubProcess { data_index: Option<usize> },
+    SubProcess,
     Task,
     ScriptTask,
     UserTask,
@@ -113,7 +148,7 @@ impl TryFrom<&str> for ActivityType {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Ok(match value {
-            SUB_PROCESS | TRANSACTION => ActivityType::SubProcess { data_index: None },
+            SUB_PROCESS | TRANSACTION => ActivityType::SubProcess,
             TASK => ActivityType::Task,
             SCRIPT_TASK => ActivityType::ScriptTask,
             USER_TASK => ActivityType::UserTask,
@@ -235,6 +270,25 @@ impl Display for Gateway {
     }
 }
 
+impl BpmnValidate for Gateway {
+    fn validate(&self) -> Result<(), BpmnError> {
+        match self {
+            Gateway {
+                gateway_type: GatewayType::EventBased,
+                outputs,
+                ..
+            } if outputs.len() < 2 => Err(BpmnErrorKind::BpmnRequirement(format!(
+                "{} must have at least two outgoing sequence flows",
+                self
+            )))?,
+            Gateway { outputs, .. } if outputs.len() == 0 => {
+                Err(BpmnErrorKind::NoOutput(self.to_string()))?
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Event {
     pub(crate) event_type: EventType,
@@ -256,11 +310,35 @@ impl Display for Event {
     }
 }
 
+impl BpmnValidate for Event {
+    fn validate(&self) -> Result<(), BpmnError> {
+        match self {
+            Event {
+                event_type:
+                    event_type @ (EventType::Boundary
+                    | EventType::Start
+                    | EventType::IntermediateCatch
+                    | EventType::IntermediateThrow),
+                symbol,
+                outputs,
+                ..
+            } if !(*event_type == EventType::IntermediateThrow
+                && *symbol == Some(Symbol::Link))
+                && outputs.len() == 0 =>
+            {
+                Err(BpmnErrorKind::NoOutput(self.to_string()))?
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Activity {
     pub(crate) activity_type: ActivityType,
     pub(crate) id: Id,
     pub(crate) func_idx: Option<usize>,
+    pub(crate) data_index: Option<usize>,
     pub(crate) name: Option<String>,
     pub(crate) outputs: Outputs,
 }
@@ -273,6 +351,17 @@ impl Display for Activity {
             self.activity_type,
             self.name.as_deref().unwrap_or(self.id.bpmn())
         )
+    }
+}
+
+impl BpmnValidate for Activity {
+    fn validate(&self) -> Result<(), BpmnError> {
+        match self {
+            Activity { outputs, .. } if outputs.len() == 0 => {
+                Err(BpmnErrorKind::NoOutput(self.to_string()))?
+            }
+            _ => Ok(()),
+        }
     }
 }
 
@@ -292,94 +381,6 @@ pub(crate) enum Bpmn {
     },
 }
 
-impl TryFrom<(&str, HashMap<&str, String>)> for Bpmn {
-    type Error = BpmnError;
-
-    fn try_from(
-        (bpmn_type, mut attributes): (&str, HashMap<&str, String>),
-    ) -> Result<Self, Self::Error> {
-        let ty = match bpmn_type {
-            PROCESS => Bpmn::Process {
-                id: attributes
-                    .remove(ATTRIB_ID)
-                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
-                    .into(),
-                data_index: None,
-            },
-            START_EVENT
-            | END_EVENT
-            | BOUNDARY_EVENT
-            | INTERMEDIATE_CATCH_EVENT
-            | INTERMEDIATE_THROW_EVENT => Bpmn::Event(Event {
-                event_type: bpmn_type.try_into()?,
-                symbol: None,
-                id: attributes
-                    .remove(ATTRIB_ID)
-                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
-                    .into(),
-                name: attributes.remove(ATTRIB_NAME),
-                attached_to_ref: attributes.remove(ATTRIB_ATTACHED_TO_REF).map(Into::into),
-                outputs: Default::default(),
-            }),
-            TASK | SCRIPT_TASK | USER_TASK | SERVICE_TASK | CALL_ACTIVITY | RECEIVE_TASK
-            | SEND_TASK | MANUAL_TASK | BUSINESS_RULE_TASK | SUB_PROCESS | TRANSACTION => {
-                Bpmn::Activity(Activity {
-                    activity_type: bpmn_type.try_into()?,
-                    id: attributes
-                        .remove(ATTRIB_ID)
-                        .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
-                        .into(),
-                    func_idx: None,
-                    name: attributes.remove(ATTRIB_NAME),
-                    outputs: Default::default(),
-                })
-            }
-            EXCLUSIVE_GATEWAY | PARALLEL_GATEWAY | INCLUSIVE_GATEWAY | EVENT_BASED_GATEWAY => {
-                Bpmn::Gateway(Gateway {
-                    gateway_type: bpmn_type.try_into()?,
-                    id: attributes
-                        .remove(ATTRIB_ID)
-                        .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
-                        .into(),
-                    func_idx: None,
-                    name: attributes.remove(ATTRIB_NAME),
-                    default: attributes.remove(ATTRIB_DEFAULT).map(Into::into),
-                    outputs: Default::default(),
-                    inputs: Default::default(),
-                })
-            }
-            SEQUENCE_FLOW => Bpmn::SequenceFlow {
-                id: attributes
-                    .remove(ATTRIB_ID)
-                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
-                    .into(),
-                name: attributes.remove(ATTRIB_NAME),
-                target_ref: attributes
-                    .remove(ATTRIB_TARGET_REF)
-                    .ok_or(BpmnErrorKind::MissingTargetRef)?
-                    .into(),
-            },
-            _ => Err(BpmnErrorKind::TypeNotImplemented(bpmn_type.into()))?,
-        };
-        Ok(ty)
-    }
-}
-
-/// Errors that can occur while constructing bpmn types.
-#[derive(thiserror::Error, Debug)]
-#[error("could not create bpmn type")]
-#[non_exhaustive]
-pub struct BpmnError {
-    #[from]
-    pub source: BpmnErrorKind,
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum BpmnErrorKind {
-    #[error("tag `{0}` missing attribute id")]
-    MissingId(String),
-    #[error("tag `sequenceFlow` missing attribute targetRef")]
-    MissingTargetRef,
-    #[error("tag `{0}` not implemented")]
-    TypeNotImplemented(String),
+pub trait BpmnValidate {
+    fn validate(&self) -> Result<(), BpmnError>;
 }
