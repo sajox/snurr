@@ -151,7 +151,7 @@ impl<T> FromStr for ProcessBuilder<T> {
     }
 }
 
-/// Runnable process that contains information from the BPMN file and registered functions
+/// Runnable process created by `ProcessBuilder::build()`
 pub struct Process<T>
 where
     Self: Sync + Send,
