@@ -4,7 +4,6 @@ mod scaffold;
 
 use crate::{
     api::{Exclusive, Inclusive, IntermediateEvent, Task},
-    bpmn::Bpmn,
     diagram::{
         Diagram,
         reader::{BpmnError, read_bpmn},
@@ -187,17 +186,11 @@ impl<T> Process<T, Run> {
         T: Send + Sync,
     {
         // Run every process specified in the diagram
-        for bpmn in self.diagram.definition().iter() {
-            if let Bpmn::Process {
-                data_index: Some(index),
-                ..
-            } = bpmn
-            {
-                let process_data = self.diagram.get_process(*index).ok_or_else(|| {
-                    RuntimeErrorKind::Engine(format!("missing process data {:?}", bpmn))
-                })?;
-                self.execute(ExecuteInput::new(process_data, false, &data))?;
-            }
+        for index in self.diagram.definition().iter() {
+            let process_data = self.diagram.get_process(*index).ok_or_else(|| {
+                RuntimeErrorKind::Engine(format!("missing process data with index `{}`", index))
+            })?;
+            self.execute(ExecuteInput::new(process_data, false, &data))?;
         }
         Ok(data)
     }

@@ -370,10 +370,6 @@ pub(crate) enum Bpmn {
     Activity(Activity),
     Event(Event),
     Gateway(Gateway),
-    Process {
-        id: Id,
-        data_index: Option<usize>,
-    },
     SequenceFlow {
         id: Id,
         name: Option<String>,

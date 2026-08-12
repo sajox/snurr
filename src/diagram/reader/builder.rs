@@ -28,7 +28,7 @@ use crate::{
 #[derive(Default)]
 pub(super) struct DataBuilder {
     // Top level processes collected in definitions
-    definitions: Vec<Bpmn>,
+    definitions: Vec<usize>,
 
     // Process and subprocess data
     data: Vec<ProcessData>,
@@ -91,15 +91,16 @@ impl DataBuilder {
             Err(ParseErrorKind::ProcessBuild)?
         };
 
-        // Process or sub process use index to point to data.
-        xml_data.data_index = Some(self.data.len());
-
-        let bpmn = Bpmn::try_from(xml_data).map_err(ParseErrorKind::Bpmn)?;
         match self.process_stack.last_mut() {
             // Processes collect all related subprocesses
-            Some(parent_process_data) => parent_process_data.add(bpmn)?,
-            // Definitions collect all processes
-            None => self.definitions.push(bpmn),
+            Some(parent_process_data) => {
+                // sub process use index to point to data.
+                xml_data.data_index = Some(self.data.len());
+                let bpmn = Bpmn::try_from(xml_data).map_err(ParseErrorKind::Bpmn)?;
+                parent_process_data.add(bpmn)?;
+            }
+            // Definitions collect all processes. data.len() is process index.
+            None => self.definitions.push(self.data.len()),
         }
 
         process_data.finalize();
@@ -187,7 +188,6 @@ impl ProcessConstruction {
                 }
             }
             Bpmn::SequenceFlow { target_ref, .. } => target_ref.update_local_id(&bpmn_index),
-            _ => {}
         });
     }
 }
@@ -225,13 +225,6 @@ impl TryFrom<RawData> for Bpmn {
     ) -> Result<Self, Self::Error> {
         let bpmn_type = bpmn_type.as_ref();
         let ty = match bpmn_type {
-            PROCESS => Bpmn::Process {
-                id: attributes
-                    .remove(&Attrib::Id)
-                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
-                    .into(),
-                data_index,
-            },
             START_EVENT
             | END_EVENT
             | BOUNDARY_EVENT

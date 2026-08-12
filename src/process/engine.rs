@@ -342,9 +342,6 @@ impl<T> Process<T, Run> {
                     debug!("SequenceFlow `{}`", name.as_deref().unwrap_or(id.bpmn()));
                     target_ref.local()
                 }
-                bpmn @ Bpmn::Process { .. } => Err(RuntimeErrorKind::Engine(format!(
-                    "unexpected usage of {bpmn:?}"
-                )))?,
             };
         }
     }

@@ -14,16 +14,16 @@ use std::{
 
 #[derive(Debug)]
 pub struct Diagram {
-    definitions: Box<[Bpmn]>,
+    definitions: Box<[usize]>,
     data: Box<[ProcessData]>,
 }
 
 impl Diagram {
-    fn new(definitions: Box<[Bpmn]>, data: Box<[ProcessData]>) -> Self {
+    fn new(definitions: Box<[usize]>, data: Box<[ProcessData]>) -> Self {
         Self { definitions, data }
     }
 
-    pub fn definition(&self) -> &[Bpmn] {
+    pub fn definition(&self) -> &[usize] {
         &self.definitions
     }
 
@@ -242,8 +242,7 @@ impl Bpmn {
             Bpmn::Event(Event { id, .. })
             | Bpmn::SequenceFlow { id, .. }
             | Bpmn::Activity(Activity { id, .. })
-            | Bpmn::Gateway(Gateway { id, .. })
-            | Bpmn::Process { id, .. } => id.bpmn(),
+            | Bpmn::Gateway(Gateway { id, .. }) => id.bpmn(),
         }
     }
 
@@ -252,8 +251,7 @@ impl Bpmn {
             Bpmn::Event(Event { id, .. })
             | Bpmn::SequenceFlow { id, .. }
             | Bpmn::Activity(Activity { id, .. })
-            | Bpmn::Gateway(Gateway { id, .. })
-            | Bpmn::Process { id, .. } => id.local_id = value,
+            | Bpmn::Gateway(Gateway { id, .. }) => id.local_id = value,
         }
     }
 }
