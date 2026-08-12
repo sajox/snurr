@@ -2,9 +2,9 @@ mod events;
 pub mod reader;
 
 use crate::{
-    bpmn::{Activity, ActivityType, Bpmn, Event, Gateway, GatewayType, Symbol},
+    bpmn::{Activity, ActivityType, Bpmn, BpmnType, Event, Gateway, GatewayType, Symbol},
     diagram::events::Events,
-    process::handler::{FuncMap, FuncType},
+    process::func_map::FuncMap,
 };
 
 use std::{
@@ -48,7 +48,7 @@ impl Diagram {
                         activity_type,
                         ..
                     }) if !matches!(activity_type, ActivityType::SubProcess) => {
-                        if let Some(id) = func_map.get_id(FuncType::Task, id, name.as_deref()) {
+                        if let Some(id) = func_map.get_id(BpmnType::Task, id, name.as_deref()) {
                             func_idx.replace(id);
                         } else {
                             missing.insert(format!(

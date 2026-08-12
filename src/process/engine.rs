@@ -1,6 +1,5 @@
 mod execute_handler;
 
-use super::Run;
 use crate::{
     IntermediateEvent, Process,
     api::{Exclusive, Inclusive, Task},
@@ -33,7 +32,7 @@ macro_rules! maybe_fork {
     };
 }
 
-impl<T> Process<T, Run> {
+impl<T> Process<T> {
     pub(super) fn execute<'a>(
         &'a self,
         input: ExecuteInput<'a, T>,

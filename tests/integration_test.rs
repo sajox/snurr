@@ -1,5 +1,5 @@
 use snurr::{
-    Exclusive, Process, Symbol, Task,
+    Exclusive, ProcessBuilder, Symbol, Task,
     error::{
         BpmnError, BpmnErrorKind, BpmnFileError, BpmnFileErrorKind, DiagramError, DiagramErrorKind,
         ParseError,
@@ -31,7 +31,7 @@ fn func_cnt(value: u32) -> impl Fn(&Mutex<Counter>) -> Task {
 
 #[test]
 fn one_task() -> Result<()> {
-    let bpmn = Process::new("tests/files/one_task.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/one_task.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
     let result = bpmn.run(Default::default())?;
@@ -41,7 +41,7 @@ fn one_task() -> Result<()> {
 
 #[test]
 fn one_task_register_with_bpmn_id() -> Result<()> {
-    let bpmn = Process::new("tests/files/one_task.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/one_task.bpmn")?
         .task("Activity_1x3acv7", func_cnt(1))
         .build()?;
     let result = bpmn.run(Default::default())?;
@@ -51,7 +51,7 @@ fn one_task_register_with_bpmn_id() -> Result<()> {
 
 #[test]
 fn two_task() -> Result<()> {
-    let bpmn = Process::new("tests/files/two_task.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/two_task.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .build()?;
@@ -62,7 +62,7 @@ fn two_task() -> Result<()> {
 
 #[test]
 fn subprocess() -> Result<()> {
-    let bpmn = Process::new("tests/files/subprocess.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/subprocess.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .build()?;
@@ -73,7 +73,7 @@ fn subprocess() -> Result<()> {
 
 #[test]
 fn subprocess_nested() -> Result<()> {
-    let bpmn = Process::new("tests/files/subprocess_nested.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/subprocess_nested.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
     let result = bpmn.run(Default::default())?;
@@ -83,7 +83,7 @@ fn subprocess_nested() -> Result<()> {
 
 #[test]
 fn subprocess_message_end() -> Result<()> {
-    let bpmn = Process::new("tests/files/subprocess_message_end.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/subprocess_message_end.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .exclusive("CHOOSE", |_| Default::default())
@@ -95,7 +95,7 @@ fn subprocess_message_end() -> Result<()> {
 
 #[test]
 fn subprocess_error_message_end() -> Result<()> {
-    let bpmn = Process::new("tests/files/subprocess_error_message_end.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/subprocess_error_message_end.bpmn")?
         .task(COUNT_1, |_| ("Overflow", Symbol::Error).into())
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
@@ -107,7 +107,7 @@ fn subprocess_error_message_end() -> Result<()> {
 
 #[test]
 fn exclusive_gateway_default_path() -> Result<()> {
-    let bpmn = Process::new("tests/files/exclusive_gateway.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/exclusive_gateway.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
@@ -120,7 +120,7 @@ fn exclusive_gateway_default_path() -> Result<()> {
 
 #[test]
 fn exclusive_gateway() -> Result<()> {
-    let bpmn = Process::new("tests/files/exclusive_gateway.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/exclusive_gateway.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
@@ -133,7 +133,7 @@ fn exclusive_gateway() -> Result<()> {
 
 #[test]
 fn exclusive_gateway_with_id() -> Result<()> {
-    let bpmn = Process::new("tests/files/exclusive_gateway.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/exclusive_gateway.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
@@ -147,7 +147,7 @@ fn exclusive_gateway_with_id() -> Result<()> {
 
 #[test]
 fn exclusive_gateway_with_gateway_converge() -> Result<()> {
-    let bpmn = Process::new("tests/files/exclusive_gateway_with_gateway_converge.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/exclusive_gateway_with_gateway_converge.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
@@ -161,7 +161,7 @@ fn exclusive_gateway_with_gateway_converge() -> Result<()> {
 
 #[test]
 fn exclusive_gateway_with_task_converge() -> Result<()> {
-    let bpmn = Process::new("tests/files/exclusive_gateway_with_task_converge.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/exclusive_gateway_with_task_converge.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
@@ -175,7 +175,7 @@ fn exclusive_gateway_with_task_converge() -> Result<()> {
 
 #[test]
 fn inclusive_gateway_default_path() -> Result<()> {
-    let bpmn = Process::new("tests/files/inclusive_gateway.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/inclusive_gateway.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
@@ -189,7 +189,7 @@ fn inclusive_gateway_default_path() -> Result<()> {
 
 #[test]
 fn inclusive_gateway() -> Result<()> {
-    let bpmn = Process::new("tests/files/inclusive_gateway.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/inclusive_gateway.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
@@ -202,7 +202,7 @@ fn inclusive_gateway() -> Result<()> {
 
 #[test]
 fn inclusive_gateway_same_flow_used_multiple_times() -> Result<()> {
-    let bpmn = Process::new("tests/files/inclusive_gateway.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/inclusive_gateway.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
@@ -215,7 +215,7 @@ fn inclusive_gateway_same_flow_used_multiple_times() -> Result<()> {
 
 #[test]
 fn inclusive_gateway_split_end() -> Result<()> {
-    let bpmn = Process::new("tests/files/inclusive_gateway_split_end.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/inclusive_gateway_split_end.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
@@ -228,7 +228,7 @@ fn inclusive_gateway_split_end() -> Result<()> {
 
 #[test]
 fn inclusive_gateway_no_output() -> Result<()> {
-    match Process::<Counter>::new("tests/files/inclusive_gateway_no_output.bpmn") {
+    match ProcessBuilder::<Counter>::new("tests/files/inclusive_gateway_no_output.bpmn") {
         Err(error) => assert!(
             matches!(
                 error,
@@ -253,7 +253,7 @@ fn inclusive_gateway_no_output() -> Result<()> {
 
 #[test]
 fn inclusive_join_fork() -> Result<()> {
-    let bpmn = Process::new("tests/files/inclusive_join_fork.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/inclusive_join_fork.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .inclusive("GW A", |_| vec!["A", "B"].into())
         .inclusive("GW B", |_| vec!["A", "B", "C"].into())
@@ -265,7 +265,7 @@ fn inclusive_join_fork() -> Result<()> {
 
 #[test]
 fn inclusive_join_fork_gwb_one_flow() -> Result<()> {
-    let bpmn = Process::new("tests/files/inclusive_join_fork.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/inclusive_join_fork.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .inclusive("GW A", |_| vec!["A", "B"].into())
         .inclusive("GW B", |_| "A".into())
@@ -277,7 +277,7 @@ fn inclusive_join_fork_gwb_one_flow() -> Result<()> {
 
 #[test]
 fn inclusive_join_fork_gateway_verify_sync() -> Result<()> {
-    let bpmn = Process::new("tests/files/inclusive_join_fork.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/inclusive_join_fork.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .inclusive("GW A", |_| vec!["A", "B"].into())
         .inclusive("GW B", |input| {
@@ -293,7 +293,7 @@ fn inclusive_join_fork_gateway_verify_sync() -> Result<()> {
 
 #[test]
 fn parallel_inclusive_join_fork() -> Result<()> {
-    let bpmn = Process::new("tests/files/parallel_inclusive_join_fork.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/parallel_inclusive_join_fork.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .inclusive("GW A", |_| vec!["A", "B"].into())
         .inclusive("GW AA", |_| vec!["A", "B", "C"].into())
@@ -309,7 +309,7 @@ fn parallel_inclusive_join_fork() -> Result<()> {
 
 #[test]
 fn inclusive_with_parallel() -> Result<()> {
-    let bpmn = Process::new("tests/files/inclusive_with_parallel.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/inclusive_with_parallel.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .inclusive("GW A", |_| vec!["A", "B"].into())
         .build()?;
@@ -320,7 +320,7 @@ fn inclusive_with_parallel() -> Result<()> {
 
 #[test]
 fn parallell_gateway() -> Result<()> {
-    let bpmn = Process::new("tests/files/parallell_gateway.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/parallell_gateway.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
@@ -333,7 +333,7 @@ fn parallell_gateway() -> Result<()> {
 
 #[test]
 fn error_handling() -> Result<()> {
-    let bpmn = Process::new("tests/files/error_handling.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/error_handling.bpmn")?
         .task(COUNT_1, |_| Symbol::Error.into())
         .task(COUNT_2, |_| Symbol::Error.into())
         .task(COUNT_3, func_cnt(3))
@@ -345,7 +345,7 @@ fn error_handling() -> Result<()> {
 
 #[test]
 fn two_boundary_timer_thrown() -> Result<()> {
-    let bpmn = Process::new("tests/files/two_boundary.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/two_boundary.bpmn")?
         .task(COUNT_1, |_| ("Timeout", Symbol::Timer).into())
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
@@ -357,7 +357,7 @@ fn two_boundary_timer_thrown() -> Result<()> {
 
 #[test]
 fn two_boundary_error_thrown() -> Result<()> {
-    let bpmn = Process::new("tests/files/two_boundary.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/two_boundary.bpmn")?
         .task(COUNT_1, |_| ("Error", Symbol::Error).into())
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
@@ -369,7 +369,7 @@ fn two_boundary_error_thrown() -> Result<()> {
 
 #[test]
 fn multiple_boundaries_same_symbol() -> Result<()> {
-    let bpmn = Process::new("tests/files/multiple_boundaries_same_symbol.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/multiple_boundaries_same_symbol.bpmn")?
         .task(COUNT_1, |_| ("M2", Symbol::Message).into())
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
@@ -381,7 +381,7 @@ fn multiple_boundaries_same_symbol() -> Result<()> {
 
 #[test]
 fn intermediate_event() -> Result<()> {
-    let bpmn = Process::new("tests/files/intermediate_event.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/intermediate_event.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
@@ -393,7 +393,7 @@ fn intermediate_event() -> Result<()> {
 
 #[test]
 fn two_process_pools() -> Result<()> {
-    let bpmn = Process::new("tests/files/two_process_pools.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/two_process_pools.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .build()?;
@@ -404,8 +404,8 @@ fn two_process_pools() -> Result<()> {
 
 #[test]
 fn subprocess_external_link_fail() -> Result<()> {
-    let bpmn =
-        Process::<Counter>::new("tests/files/subprocess_external_link_fail.bpmn")?.build()?;
+    let bpmn = ProcessBuilder::<Counter>::new("tests/files/subprocess_external_link_fail.bpmn")?
+        .build()?;
     match bpmn.run(Default::default()) {
         Err(error) => assert!(
             matches!(error, RuntimeError {
@@ -424,7 +424,7 @@ fn subprocess_external_link_fail() -> Result<()> {
 
 #[test]
 fn showcase() -> Result<()> {
-    let bpmn = Process::new("tests/files/showcase.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/showcase.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .task("Timeout 1", |_| Symbol::Timer.into())
@@ -439,7 +439,7 @@ fn showcase() -> Result<()> {
 
 #[test]
 fn task_fork() -> Result<()> {
-    let bpmn = Process::new("tests/files/task_fork.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/task_fork.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
     let result = bpmn.run(Default::default())?;
@@ -449,7 +449,7 @@ fn task_fork() -> Result<()> {
 
 #[test]
 fn fork_explosion() -> Result<()> {
-    let bpmn = Process::new("tests/files/fork_explosion.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/fork_explosion.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
     let result = bpmn.run(Default::default())?;
@@ -459,7 +459,8 @@ fn fork_explosion() -> Result<()> {
 
 #[test]
 fn process_end_with_symbol() -> Result<()> {
-    let bpmn = Process::<Counter>::new("tests/files/process_end_with_symbol.bpmn")?.build()?;
+    let bpmn =
+        ProcessBuilder::<Counter>::new("tests/files/process_end_with_symbol.bpmn")?.build()?;
     let result = bpmn.run(Default::default())?;
     assert_eq!(result.count, 0);
     Ok(())
@@ -467,7 +468,7 @@ fn process_end_with_symbol() -> Result<()> {
 
 #[test]
 fn inclusive_gateway_not_all_joined() -> Result<()> {
-    let bpmn = Process::new("tests/files/inclusive_gateway_not_all_joined.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/inclusive_gateway_not_all_joined.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .inclusive("RUN ALL", |_| vec!["A", "B"].into())
         .exclusive("RUN C", |_| "C".into())
@@ -479,7 +480,7 @@ fn inclusive_gateway_not_all_joined() -> Result<()> {
 
 #[test]
 fn parallel_gateway_not_all_joined() -> Result<()> {
-    let bpmn = Process::new("tests/files/parallel_gateway_not_all_joined.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/parallel_gateway_not_all_joined.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
     let result = bpmn.run(Default::default())?;
@@ -489,7 +490,7 @@ fn parallel_gateway_not_all_joined() -> Result<()> {
 
 #[test]
 fn parallel_gateway_not_all_joined_inverse() -> Result<()> {
-    let bpmn = Process::new("tests/files/parallel_gateway_not_all_joined_inverse.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/parallel_gateway_not_all_joined_inverse.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
     let result = bpmn.run(Default::default())?;
@@ -499,7 +500,7 @@ fn parallel_gateway_not_all_joined_inverse() -> Result<()> {
 
 #[test]
 fn parallel_multi() -> Result<()> {
-    let bpmn = Process::new("tests/files/parallel_multi.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/parallel_multi.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
     let result = bpmn.run(Default::default())?;
@@ -509,7 +510,7 @@ fn parallel_multi() -> Result<()> {
 
 #[test]
 fn parallel_join_fork() -> Result<()> {
-    let bpmn = Process::new("tests/files/parallel_join_fork.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/parallel_join_fork.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
     let result = bpmn.run(Default::default())?;
@@ -519,7 +520,7 @@ fn parallel_join_fork() -> Result<()> {
 
 #[test]
 fn parallel_parallel_join_fork() -> Result<()> {
-    let bpmn = Process::new("tests/files/parallel_parallel_join_fork.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/parallel_parallel_join_fork.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
     let result = bpmn.run(Default::default())?;
@@ -529,7 +530,7 @@ fn parallel_parallel_join_fork() -> Result<()> {
 
 #[test]
 fn parallel_one_in_and_out() -> Result<()> {
-    let bpmn = Process::new("tests/files/parallel_one_in_and_out.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/parallel_one_in_and_out.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
     let result = bpmn.run(Default::default())?;
@@ -539,14 +540,15 @@ fn parallel_one_in_and_out() -> Result<()> {
 
 #[test]
 fn conditional_sequence_flows() -> Result<()> {
-    let failed = Process::<Counter>::new("tests/files/conditional_sequence_flows.bpmn").is_err();
+    let failed =
+        ProcessBuilder::<Counter>::new("tests/files/conditional_sequence_flows.bpmn").is_err();
     assert!(failed, "Expected an error");
     Ok(())
 }
 
 #[test]
 fn exclusive_gateway_merging_branching() -> Result<()> {
-    let bpmn = Process::new("tests/files/exclusive_gateway_merging_branching.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/exclusive_gateway_merging_branching.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .exclusive("BRANCHING", |_| A)
@@ -559,7 +561,7 @@ fn exclusive_gateway_merging_branching() -> Result<()> {
 
 #[test]
 fn event_gateway() -> Result<()> {
-    let bpmn = Process::new("tests/files/event_gateway.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/event_gateway.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .task(COUNT_2, func_cnt(2))
         .task(COUNT_3, func_cnt(3))
@@ -576,7 +578,7 @@ fn event_gateway() -> Result<()> {
 
 #[test]
 fn single_flow() -> Result<()> {
-    let bpmn = Process::new("tests/files/single_flow.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/single_flow.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .exclusive("GW A", |_| A)
         .exclusive("GW B", |_| A)
@@ -590,7 +592,7 @@ fn single_flow() -> Result<()> {
 
 #[test]
 fn terminate_event() -> Result<()> {
-    let bpmn = Process::new("tests/files/terminate_event.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/terminate_event.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .exclusive("Terminate?", |_| "YES".into())
         .build()?;
@@ -603,7 +605,7 @@ fn terminate_event() -> Result<()> {
 
 #[test]
 fn terminate_event_sub_process() -> Result<()> {
-    let bpmn = Process::new("tests/files/terminate_event_sub_process.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/terminate_event_sub_process.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .exclusive("Terminate?", |_| "YES".into())
         .build()?;
@@ -617,7 +619,7 @@ fn terminate_event_sub_process() -> Result<()> {
 #[test]
 fn startevent_not_first() -> Result<()> {
     // StartEvent out of order in XML file
-    let bpmn = Process::new("tests/files/startevent_not_first.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/startevent_not_first.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
     let result = bpmn.run(Default::default())?;
@@ -627,7 +629,7 @@ fn startevent_not_first() -> Result<()> {
 
 #[test]
 fn process_multiple_startevent_none() -> Result<()> {
-    match Process::<Counter>::new("tests/files/process_multiple_startevent_none.bpmn") {
+    match ProcessBuilder::<Counter>::new("tests/files/process_multiple_startevent_none.bpmn") {
         Err(error) => assert!(
             matches!(
                 error,
@@ -649,7 +651,7 @@ fn process_multiple_startevent_none() -> Result<()> {
 
 #[test]
 fn subprocess_multiple_startevent_none() -> Result<()> {
-    match Process::<Counter>::new("tests/files/subprocess_multiple_startevent_none.bpmn") {
+    match ProcessBuilder::<Counter>::new("tests/files/subprocess_multiple_startevent_none.bpmn") {
         Err(error) => assert!(
             matches!(
                 error,
@@ -672,7 +674,7 @@ fn subprocess_multiple_startevent_none() -> Result<()> {
 #[test]
 fn cancel_transaction() -> Result<()> {
     // An cancel end event terminates the transaction and use the cancel boundary.
-    let bpmn = Process::new("tests/files/cancel_transaction.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/cancel_transaction.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .exclusive("Cancel?", |_| "YES".into())
         .build()?;
@@ -684,7 +686,7 @@ fn cancel_transaction() -> Result<()> {
 
 #[test]
 fn parallel_stalled_execution() -> Result<()> {
-    let bpmn = Process::new("tests/files/parallel_stalled_execution.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/parallel_stalled_execution.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .exclusive("Message?", |_| "YES".into())
         .build()?;
@@ -710,7 +712,7 @@ fn parallel_stalled_execution() -> Result<()> {
 
 #[test]
 fn panic() -> Result<()> {
-    let bpmn = Process::<()>::new("tests/files/one_task.bpmn")?
+    let bpmn = ProcessBuilder::<()>::new("tests/files/one_task.bpmn")?
         .task(COUNT_1, |_| {
             Task::Panic("RAM very expensive. Goodbye.".into())
         })
@@ -735,7 +737,7 @@ fn panic() -> Result<()> {
 #[test]
 #[cfg(debug_assertions)]
 fn parallel_unbalanced() -> Result<()> {
-    let bpmn = Process::new("tests/files/parallel_unbalanced.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/parallel_unbalanced.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
 
@@ -761,7 +763,7 @@ fn parallel_unbalanced() -> Result<()> {
 #[test]
 #[cfg(debug_assertions)]
 fn parallel_unbalanced2() -> Result<()> {
-    let bpmn = Process::new("tests/files/parallel_unbalanced2.bpmn")?
+    let bpmn = ProcessBuilder::new("tests/files/parallel_unbalanced2.bpmn")?
         .task(COUNT_1, func_cnt(1))
         .build()?;
 

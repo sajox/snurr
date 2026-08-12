@@ -10,6 +10,7 @@
 
 ### API changes
 
+- Removed typestate pattern with regular builder. Now use `ProcessBuilder::new` and `build()` to create the runnable `Process`.
 - Renamed Enum `With` to `Inclusive`.
 - New enum types `Exclusive`, `Task`, `IntermediateEvent`.
 - Support for `Panic`. Enables terminating the process from task and gateways. The process returns a RunTimeError::Panic containing thespecified error.
@@ -17,7 +18,7 @@
 - Added convenient factory methods for cases where conversions via `From` are not used.
 - Error redesign.
 - Removed `Arc` and `Mutex` usage in Snurr and let the user choose. Callbacks now use `&T` instead of `Arc<Mutex<T>>`.
-    - Change your process type to `Process::<Arc<Mutex<YourModel>>>::new` to maintain compatibility with existing code.
+    - Change your process type to `ProcessBuilder::<Arc<Mutex<YourModel>>>::new` to maintain compatibility with existing code.
     - And to extract result
         ```rust
         let data = Arc::into_inner(process_result)

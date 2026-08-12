@@ -1,5 +1,5 @@
 use pretty_env_logger;
-use snurr::{Process, Symbol, Task};
+use snurr::{ProcessBuilder, Symbol, Task};
 use std::sync::{
     Mutex,
     atomic::{AtomicU32, Ordering::Relaxed},
@@ -32,7 +32,7 @@ struct Manager {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     pretty_env_logger::init();
 
-    let manager = Process::<Mutex<Manager>>::new("examples/reusable.bpmn")?
+    let manager = ProcessBuilder::<Mutex<Manager>>::new("examples/reusable.bpmn")?
         .task(RUN_COUNTER_PROCESS, run_counter_process()?)
         .task(HANDLE_ERROR, handle_error)
         .build()?;
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 // Create an external process that is used by another process.
 fn run_counter_process() -> Result<impl Fn(&Mutex<Manager>) -> Task, Box<dyn std::error::Error>> {
     // Build up the counter process
-    let counter_process = Process::<Counter>::new("examples/counter.bpmn")?
+    let counter_process = ProcessBuilder::<Counter>::new("examples/counter.bpmn")?
         .task(COUNT_1, |input| {
             input.0.fetch_add(1, Relaxed);
             Default::default()

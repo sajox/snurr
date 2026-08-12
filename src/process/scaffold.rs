@@ -1,18 +1,18 @@
 use std::{collections::HashSet, io::Write, path::Path};
 
 use crate::{
-    Process,
+    ProcessBuilder,
     bpmn::{Activity, ActivityType, Bpmn, Gateway, GatewayType, Symbol},
 };
 
-impl<T> Process<T> {
+impl<T> ProcessBuilder<T> {
     /// Generate code from all the task and gateways to the given file path.
     /// No file with same name is allowed to exist at the target location.
     /// ```no_run
-    /// use snurr::Process;
+    /// use snurr::ProcessBuilder;
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let bpmn: Process<()> = Process::new("examples/counter.bpmn")?;
+    ///     let bpmn: ProcessBuilder<()> = ProcessBuilder::new("examples/counter.bpmn")?;
     ///     bpmn.scaffold("examples/scaffold.rs")?;
     ///     Ok(())
     /// }
@@ -91,10 +91,10 @@ impl<'a> Scaffold<'a> {
     // No file is allowed to exist at the target location.
     fn create(&mut self, path: impl AsRef<Path>) -> Result<(), std::io::Error> {
         let mut content = vec![
-            "use snurr::{Process, Run, error::BuildError};\n".into(),
+            "use snurr::{Process, ProcessBuilder, error::BuildError};\n".into(),
             "// Replace () with your type".into(),
-            "pub fn build(process: Process<()>) -> Result<Process<(), Run>, BuildError> {".into(),
-            r#"  process"#.into(),
+            "pub fn build(process_builder: ProcessBuilder<()>) -> Result<Process<()>, BuildError> {".into(),
+            r#"  process_builder"#.into(),
         ];
 
         // Do not generate duplicates

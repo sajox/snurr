@@ -34,7 +34,7 @@ pretty_env_logger = "0.5"
 
 ```rust
 use pretty_env_logger;
-use snurr::Process;
+use snurr::ProcessBuilder;
 use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
 
 #[derive(Debug, Default)]
@@ -43,7 +43,7 @@ struct Counter(AtomicU32);
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     pretty_env_logger::init();
 
-    let bpmn = Process::<Counter>::new("examples/counter.bpmn")?
+    let bpmn = ProcessBuilder::<Counter>::new("examples/counter.bpmn")?
         .task("Count 1", |input| {
             input.0.fetch_add(1, Relaxed);
             Default::default()

@@ -8,4 +8,4 @@ mod process;
 
 pub use api::{Exclusive, Inclusive, IntermediateEvent, Task};
 pub use bpmn::Symbol;
-pub use process::{Build, Process, Run};
+pub use process::{Process, ProcessBuilder};

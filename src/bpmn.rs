@@ -67,6 +67,76 @@ pub(crate) const ATTRIB_EXPORTER_VERSION: &str = "exporterVersion";
 pub(crate) const ATTRIB_ATTACHED_TO_REF: &str = "attachedToRef";
 pub(crate) const ATTRIB_CANCEL_ACTIVITY: &str = "cancelActivity";
 
+// All Bpmn types
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+pub(crate) enum BpmnType {
+    Boundary,
+    BusinessRuleTask,
+    CallActivity,
+    End,
+    EventBased,
+    Exclusive,
+    Inclusive,
+    IntermediateCatch,
+    IntermediateThrow,
+    ManualTask,
+    Parallel,
+    ReceiveTask,
+    ScriptTask,
+    SendTask,
+    ServiceTask,
+    Start,
+    SubProcess,
+    Task,
+    UserTask,
+}
+
+impl Display for BpmnType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self, f)
+    }
+}
+
+impl From<EventType> for BpmnType {
+    fn from(value: EventType) -> Self {
+        match value {
+            EventType::Boundary => BpmnType::Boundary,
+            EventType::End => BpmnType::End,
+            EventType::IntermediateCatch => BpmnType::IntermediateCatch,
+            EventType::IntermediateThrow => BpmnType::IntermediateThrow,
+            EventType::Start => BpmnType::Start,
+        }
+    }
+}
+
+impl From<ActivityType> for BpmnType {
+    fn from(value: ActivityType) -> Self {
+        match value {
+            ActivityType::SubProcess => BpmnType::SubProcess,
+            ActivityType::Task => BpmnType::Task,
+            ActivityType::ScriptTask => BpmnType::ScriptTask,
+            ActivityType::UserTask => BpmnType::UserTask,
+            ActivityType::ServiceTask => BpmnType::ServiceTask,
+            ActivityType::CallActivity => BpmnType::CallActivity,
+            ActivityType::ReceiveTask => BpmnType::ReceiveTask,
+            ActivityType::SendTask => BpmnType::SendTask,
+            ActivityType::ManualTask => BpmnType::ManualTask,
+            ActivityType::BusinessRuleTask => BpmnType::BusinessRuleTask,
+        }
+    }
+}
+
+impl From<GatewayType> for BpmnType {
+    fn from(value: GatewayType) -> Self {
+        match value {
+            GatewayType::Exclusive => BpmnType::Exclusive,
+            GatewayType::Inclusive => BpmnType::Inclusive,
+            GatewayType::Parallel => BpmnType::Parallel,
+            GatewayType::EventBased => BpmnType::EventBased,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum Attrib {
     AttachedToRef,

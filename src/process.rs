@@ -1,43 +1,39 @@
 mod engine;
+pub mod func_map;
 pub(crate) mod handler;
 mod scaffold;
 
 use crate::{
     api::{Exclusive, Inclusive, IntermediateEvent, Task},
+    bpmn::BpmnType,
     diagram::{
         Diagram,
         reader::{BpmnError, read_bpmn},
     },
-    process::handler::Callback,
+    process::{func_map::FuncMap, handler::Callback},
 };
 use engine::ExecuteInput;
 use handler::Handler;
-use std::{marker::PhantomData, path::Path, str::FromStr};
+use std::{path::Path, str::FromStr};
 
-/// Process Build state
-pub struct Build;
-
-/// Process Run state
-pub struct Run;
-
-/// Process that contains information from the BPMN file and registered functions
-pub struct Process<T, S = Build>
+/// Process builder that contains information from the BPMN file and registered functions
+pub struct ProcessBuilder<T>
 where
     Self: Sync + Send,
 {
     diagram: Diagram,
     handler: Handler<T>,
-    _marker: PhantomData<S>,
+    func_map: FuncMap,
 }
 
-impl<T> Process<T> {
-    /// Create new process and initialize it from the BPMN file path. Returns an error if
+impl<T> ProcessBuilder<T> {
+    /// Create new process builder and initialize it from the BPMN file path. Returns an error if
     /// the file was not found or if there were problems with the file content.
     /// ```no_run
-    /// use snurr::{Build, Process};
+    /// use snurr::ProcessBuilder;
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let bpmn: Process<()> = Process::new("examples/counter.bpmn")?;
+    ///     let bpmn: ProcessBuilder<()> = ProcessBuilder::new("examples/counter.bpmn")?;
     ///     Ok(())
     /// }
     /// ```
@@ -56,7 +52,7 @@ impl<T> Process<T> {
         Ok(Self {
             diagram,
             handler: Default::default(),
-            _marker: Default::default(),
+            func_map: Default::default(),
         })
     }
 
@@ -65,8 +61,11 @@ impl<T> Process<T> {
     where
         F: Fn(&T) -> Task + 'static + Sync + Send,
     {
-        self.handler
-            .add_callback(name, Callback::Task(Box::new(func)));
+        self.func_map.insert(
+            BpmnType::Task,
+            name.into(),
+            self.handler.add_callback(Callback::Task(Box::new(func))),
+        );
         self
     }
 
@@ -75,8 +74,12 @@ impl<T> Process<T> {
     where
         F: Fn(&T) -> Exclusive + 'static + Sync + Send,
     {
-        self.handler
-            .add_callback(name, Callback::Exclusive(Box::new(func)));
+        self.func_map.insert(
+            BpmnType::Exclusive,
+            name.into(),
+            self.handler
+                .add_callback(Callback::Exclusive(Box::new(func))),
+        );
         self
     }
 
@@ -85,8 +88,12 @@ impl<T> Process<T> {
     where
         F: Fn(&T) -> Inclusive + 'static + Sync + Send,
     {
-        self.handler
-            .add_callback(name, Callback::Inclusive(Box::new(func)));
+        self.func_map.insert(
+            BpmnType::Inclusive,
+            name.into(),
+            self.handler
+                .add_callback(Callback::Inclusive(Box::new(func))),
+        );
         self
     }
 
@@ -95,26 +102,23 @@ impl<T> Process<T> {
     where
         F: Fn(&T) -> IntermediateEvent + 'static + Sync + Send,
     {
-        self.handler
-            .add_callback(name, Callback::EventBased(Box::new(func)));
+        self.func_map.insert(
+            BpmnType::EventBased,
+            name.into(),
+            self.handler
+                .add_callback(Callback::EventBased(Box::new(func))),
+        );
         self
     }
 
-    /// Install and check that all required functions have been registered. You cannot run a process before `build` is called.
-    /// If `build` returns an error, it contains the missing functions. Will panic if called again after an error.
-    pub fn build(mut self) -> Result<Process<T, Run>, BuildError> {
-        let func_map = self
-            .handler
-            .finished()
-            .expect("function map already consumed and cannot proceed, add missing implementations and retry");
-        log::trace!("{func_map:?}");
-
-        let result = self.diagram.install_and_check(&func_map);
+    /// Install and check that all required functions have been registered. Return runnable process if successful.
+    /// If `build` returns an error, it contains the missing functions.
+    pub fn build(mut self) -> Result<Process<T>, BuildError> {
+        let result = self.diagram.install_and_check(&self.func_map);
         if result.is_empty() {
             Ok(Process {
                 diagram: self.diagram,
                 handler: self.handler,
-                _marker: Default::default(),
             })
         } else {
             Err(BuildError::MissingImplementations(
@@ -124,17 +128,17 @@ impl<T> Process<T> {
     }
 }
 
-impl<T> FromStr for Process<T> {
+impl<T> FromStr for ProcessBuilder<T> {
     type Err = ParseError;
 
-    /// Create new process and initialize it from a BPMN `&str`.
+    /// Create new process builder and initialize it from a BPMN `&str`.
     /// ```no_run
-    /// use snurr::{Build, Process};
+    /// use snurr::ProcessBuilder;
     ///
     /// static BPMN_DATA: &str = include_str!("../examples/counter.bpmn");
     ///
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let bpmn: Process<()> = BPMN_DATA.parse()?;
+    ///     let bpmn: ProcessBuilder<()> = BPMN_DATA.parse()?;
     ///     Ok(())
     /// }
     /// ```
@@ -142,15 +146,24 @@ impl<T> FromStr for Process<T> {
         Ok(Self {
             diagram: read_bpmn(quick_xml::Reader::from_str(s))?,
             handler: Default::default(),
-            _marker: Default::default(),
+            func_map: Default::default(),
         })
     }
 }
 
-impl<T> Process<T, Run> {
+/// Runnable process that contains information from the BPMN file and registered functions
+pub struct Process<T>
+where
+    Self: Sync + Send,
+{
+    diagram: Diagram,
+    handler: Handler<T>,
+}
+
+impl<T> Process<T> {
     /// Run the process and return the `T` or an `RuntimeError`.
     /// ```
-    /// use snurr::Process;
+    /// use snurr::ProcessBuilder;
     /// use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
     ///
     /// #[derive(Debug, Default)]
@@ -159,7 +172,7 @@ impl<T> Process<T, Run> {
     /// fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///
     ///     // Create process from BPMN file
-    ///     let bpmn = Process::<Counter>::new("examples/counter.bpmn")?
+    ///     let bpmn = ProcessBuilder::<Counter>::new("examples/counter.bpmn")?
     ///         .task("Count 1", |input| {
     ///             input.0.fetch_add(1, Relaxed);
     ///             Default::default()
@@ -315,7 +328,7 @@ mod tests {
 
     #[test]
     fn create_and_run() -> Result<(), Box<dyn std::error::Error>> {
-        let bpmn = Process::new("examples/counter.bpmn")?
+        let bpmn = ProcessBuilder::new("examples/counter.bpmn")?
             .task("Count 1", |_| Default::default())
             .exclusive("equal to 3", |_| Default::default())
             .build()?;

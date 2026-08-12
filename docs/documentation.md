@@ -33,18 +33,18 @@ snurr = { version = "x.xx", features = ["parallel"] }
 
 ## Process
 
-Create a process by specifying the path to a BPMN file. Add the tasks and gateways specified in your BPMN diagram. When `.build()` is called, the process validates that the required functions/closures are installed. You cannot run a process before `.build()` is called. If `.build()` returns an error, it contains the required functions that are missing. The created process can be run multiple times. 
+Create a process builder by specifying the path to a BPMN file. Add the tasks and gateways specified in your BPMN diagram. When `.build()` is called, the builder validates that the required functions/closures are installed and return a runnable process if successful. If `.build()` returns an error, it contains the required functions that are missing. The created process can be run multiple times. 
 
 Use scaffold to generate code from the read BPMN file as a good starting point. Described below.
 
 ### Create and run process
 
-Use your own model in the process. It must be **Send + Sync**, regardless of the "parallel" feature is enabled or not. If your model is not `Sync`, you can wrap it in a `Mutex` by specifying `Process::<Mutex<YourModel>>::new`.
+Use your own model in the process builder. It must be **Send + Sync**, regardless of the "parallel" feature is enabled or not. If your model is not `Sync`, you can wrap it in a `Mutex` by specifying `ProcessBuilder::<Mutex<YourModel>>::new`.
 
 Read the bpmn file, add the behavior and run the process.
 
 ```rust
-use snurr::Process;
+use snurr::ProcessBuilder;
 use std::sync::atomic::{AtomicU32, Ordering::Relaxed};
 
 #[derive(Debug, Default)]
@@ -53,7 +53,7 @@ struct Counter(AtomicU32);
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create process from BPMN file
-    let bpmn = Process::<Counter>::new("examples/counter.bpmn")?
+    let bpmn = ProcessBuilder::<Counter>::new("examples/counter.bpmn")?
         .task("Count 1", |input| {
             input.0.fetch_add(1, Relaxed);
             Default::default()
@@ -81,10 +81,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 Generate code from all the task and gateways to the given file path with scaffold. Returns an error message if the file already exists. Remove scaffold call after file is created.
 
 ```rust no_run
-use snurr::Process;
+use snurr::ProcessBuilder;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let bpmn: Process<()> = Process::new("examples/counter.bpmn")?;
+    let bpmn: ProcessBuilder<()> = ProcessBuilder::new("examples/counter.bpmn")?;
     bpmn.scaffold("examples/scaffold.rs")?;
     Ok(())
 }
@@ -93,11 +93,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 Output file: **scaffold.rs**
 
 ```rust no_run
-use snurr::{Process, Run, error::BuildError};
+use snurr::{Process, ProcessBuilder, error::BuildError};
 
 // Replace () with your type
-pub fn build(process: Process<()>) -> Result<Process<(), Run>, BuildError> {
-    process
+pub fn build(process_builder: ProcessBuilder<()>) -> Result<Process<()>, BuildError> {
+    process_builder
         .task("Count 1", |input| Default::default())
         // Names: YES, NO. Ids: Flow_1h0jtl6, Flow_0rsqhpi.
         .exclusive("equal to 3", |input| Default::default())
@@ -118,9 +118,9 @@ Two or more outgoing sequence flows from a task create a fork of the flow. It is
 Return `Default` if no boundary is used and follow regular flow.
 
 ```rust no_run
-# use snurr::Process;
+# use snurr::ProcessBuilder;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("dummy.bpmn")?
+#   ProcessBuilder::<()>::new("dummy.bpmn")?
 .task("name or id", |input| {
     Default::default()
 });
@@ -135,9 +135,9 @@ If one or more boundaries exist on a task, then a boundary can be returned. If a
 ##### Boundary with no name
 
 ```rust no_run
-# use snurr::{Process, Symbol};
+# use snurr::{ProcessBuilder, Symbol};
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("dummy.bpmn")?
+#   ProcessBuilder::<()>::new("dummy.bpmn")?
 .task("name or id", |input| {
     Symbol::Error.into()
 });
@@ -148,9 +148,9 @@ If one or more boundaries exist on a task, then a boundary can be returned. If a
 ##### Boundary with name
 
 ```rust no_run
-# use snurr::{Process, Symbol};
+# use snurr::{ProcessBuilder, Symbol};
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("dummy.bpmn")?
+#   ProcessBuilder::<()>::new("dummy.bpmn")?
 .task("name or id", |input| {
     ("Not good", Symbol::Error).into()
 });
@@ -171,9 +171,9 @@ An exclusive gateway can select a flow named after the outgoing sequence flow.
 #### One flow
 
 ```rust no_run
-# use snurr::Process;
+# use snurr::ProcessBuilder;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("dummy.bpmn")?
+#   ProcessBuilder::<()>::new("dummy.bpmn")?
 .exclusive("name or id", |input| {
     "YES".into()
 });
@@ -184,9 +184,9 @@ An exclusive gateway can select a flow named after the outgoing sequence flow.
 #### Default flow
 
 ```rust no_run
-# use snurr::Process;
+# use snurr::ProcessBuilder;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("dummy.bpmn")?
+#   ProcessBuilder::<()>::new("dummy.bpmn")?
 .exclusive("name or id", |input| {
     Default::default()
 });
@@ -201,9 +201,9 @@ An event-based gateway can select a flow with an intermediate throw event, where
 #### One flow
 
 ```rust no_run
-# use snurr::{Process, Symbol};
+# use snurr::{ProcessBuilder, Symbol};
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("dummy.bpmn")?
+#   ProcessBuilder::<()>::new("dummy.bpmn")?
 .event_based("name or id", |input| {
      ("Message", Symbol::Message).into()
 });
@@ -218,9 +218,9 @@ An inclusive gateway can select one or many flows named after the outgoing seque
 #### One flow
 
 ```rust no_run
-# use snurr::Process;
+# use snurr::ProcessBuilder;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("dummy.bpmn")?
+#   ProcessBuilder::<()>::new("dummy.bpmn")?
 .inclusive("name or id", |input| {
     "YES".into()
 });
@@ -231,9 +231,9 @@ An inclusive gateway can select one or many flows named after the outgoing seque
 #### Many flows
 
 ```rust no_run
-# use snurr::Process;
+# use snurr::ProcessBuilder;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("dummy.bpmn")?
+#   ProcessBuilder::<()>::new("dummy.bpmn")?
 .inclusive("name or id", |input| {
     vec!["YES", "NO"].into()
 });
@@ -244,9 +244,9 @@ An inclusive gateway can select one or many flows named after the outgoing seque
 #### Default flow
 
 ```rust no_run
-# use snurr::Process;
+# use snurr::ProcessBuilder;
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-#   Process::<()>::new("dummy.bpmn")?
+#   ProcessBuilder::<()>::new("dummy.bpmn")?
 .inclusive("name or id", |input| {
     Default::default()
 });
