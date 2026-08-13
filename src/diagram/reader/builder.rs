@@ -229,25 +229,20 @@ impl TryFrom<RawData> for Bpmn {
             | END_EVENT
             | BOUNDARY_EVENT
             | INTERMEDIATE_CATCH_EVENT
-            | INTERMEDIATE_THROW_EVENT => {
-                let event = Event {
-                    event_type: bpmn_type.try_into()?,
-                    symbol,
-                    id: attributes
-                        .remove(&Attrib::Id)
-                        .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
-                        .into(),
-                    name: attributes.remove(&Attrib::Name),
-                    attached_to_ref: attributes.remove(&Attrib::AttachedToRef).map(Into::into),
-                    outputs: Outputs::new(outputs),
-                };
-
-                event.validate()?;
-                Bpmn::Event(event)
-            }
+            | INTERMEDIATE_THROW_EVENT => Bpmn::Event(Event {
+                event_type: bpmn_type.try_into()?,
+                symbol,
+                id: attributes
+                    .remove(&Attrib::Id)
+                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
+                    .into(),
+                name: attributes.remove(&Attrib::Name),
+                attached_to_ref: attributes.remove(&Attrib::AttachedToRef).map(Into::into),
+                outputs: Outputs::new(outputs),
+            }),
             TASK | SCRIPT_TASK | USER_TASK | SERVICE_TASK | CALL_ACTIVITY | RECEIVE_TASK
             | SEND_TASK | MANUAL_TASK | BUSINESS_RULE_TASK | SUB_PROCESS | TRANSACTION => {
-                let activity = Activity {
+                Bpmn::Activity(Activity {
                     activity_type: bpmn_type.try_into()?,
                     id: attributes
                         .remove(&Attrib::Id)
@@ -257,13 +252,10 @@ impl TryFrom<RawData> for Bpmn {
                     data_index,
                     name: attributes.remove(&Attrib::Name),
                     outputs: Outputs::new(outputs),
-                };
-
-                activity.validate()?;
-                Bpmn::Activity(activity)
+                })
             }
             EXCLUSIVE_GATEWAY | PARALLEL_GATEWAY | INCLUSIVE_GATEWAY | EVENT_BASED_GATEWAY => {
-                let gateway = Gateway {
+                Bpmn::Gateway(Gateway {
                     gateway_type: bpmn_type.try_into()?,
                     id: attributes
                         .remove(&Attrib::Id)
@@ -274,10 +266,7 @@ impl TryFrom<RawData> for Bpmn {
                     default: attributes.remove(&Attrib::Default).map(Into::into),
                     outputs: Outputs::new(outputs),
                     inputs: inputs.len() as u16,
-                };
-
-                gateway.validate()?;
-                Bpmn::Gateway(gateway)
+                })
             }
             SEQUENCE_FLOW => Bpmn::SequenceFlow {
                 id: attributes
@@ -292,6 +281,8 @@ impl TryFrom<RawData> for Bpmn {
             },
             _ => Err(BpmnErrorKind::TypeNotImplemented(bpmn_type.into()))?,
         };
+
+        ty.validate()?;
         Ok(ty)
     }
 }

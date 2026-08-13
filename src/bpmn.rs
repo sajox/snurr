@@ -447,6 +447,17 @@ pub(crate) enum Bpmn {
     },
 }
 
+impl BpmnValidate for Bpmn {
+    fn validate(&self) -> Result<(), BpmnError> {
+        match self {
+            Bpmn::Activity(activity) => activity.validate(),
+            Bpmn::Event(event) => event.validate(),
+            Bpmn::Gateway(gateway) => gateway.validate(),
+            Bpmn::SequenceFlow { .. } => Ok(()),
+        }
+    }
+}
+
 pub trait BpmnValidate {
     fn validate(&self) -> Result<(), BpmnError>;
 }
