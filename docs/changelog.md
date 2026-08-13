@@ -13,7 +13,7 @@
 - Removed typestate pattern with regular builder. Now use `ProcessBuilder::new` and `build()` to create the runnable `Process`.
 - Renamed Enum `With` to `Inclusive`.
 - New enum types `Exclusive`, `Task`, `IntermediateEvent`.
-- Support for `Panic`. Enables terminating the process from task and gateways. The process returns a RunTimeError::Panic containing thespecified error.
+- Support for `Panic`. Enables terminating the process from task and gateways. The process returns a RunTimeError::Panic containing the specified error.
 - Using `Cow<'static, str>` instead of `&'static str` to be more flexible with different types of strings.
 - Added convenient factory methods for cases where conversions via `From` are not used.
 - Error redesign.
