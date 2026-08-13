@@ -1,4 +1,9 @@
-use std::collections::HashMap;
+use core::fmt;
+use std::{
+    collections::HashMap,
+    error::Error,
+    fmt::{Display, Formatter},
+};
 
 use crate::{
     bpmn::{Event, *},
@@ -288,24 +293,55 @@ impl TryFrom<RawData> for Bpmn {
 }
 
 /// Errors that can occur while constructing bpmn types.
-#[derive(thiserror::Error, Debug)]
-#[error("could not create bpmn type")]
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct BpmnError {
-    #[from]
     pub source: BpmnErrorKind,
 }
 
-#[derive(thiserror::Error, Debug)]
+impl Display for BpmnError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "could not create bpmn type")
+    }
+}
+
+impl Error for BpmnError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
+#[derive(Debug)]
 pub enum BpmnErrorKind {
-    #[error("tag `{0}` missing attribute id")]
     MissingId(String),
-    #[error("tag `sequenceFlow` missing attribute targetRef")]
     MissingTargetRef,
-    #[error("{0} has no output")]
     NoOutput(String),
-    #[error("{0}")]
     BpmnRequirement(String),
-    #[error("tag `{0}` not implemented")]
     TypeNotImplemented(String),
+}
+
+impl Display for BpmnErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            BpmnErrorKind::MissingId(s) => write!(f, "tag `{s}` missing attribute id"),
+            BpmnErrorKind::MissingTargetRef => {
+                f.write_str("tag `sequenceFlow` missing attribute targetRef")
+            }
+            BpmnErrorKind::NoOutput(s) => write!(f, "{s} has no output"),
+            BpmnErrorKind::BpmnRequirement(s) => write!(f, "{s}"),
+            BpmnErrorKind::TypeNotImplemented(s) => write!(f, "tag `{s}` not implemented"),
+        }
+    }
+}
+
+impl Error for BpmnErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
+}
+
+impl From<BpmnErrorKind> for BpmnError {
+    fn from(value: BpmnErrorKind) -> Self {
+        Self { source: value }
+    }
 }

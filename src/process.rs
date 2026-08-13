@@ -12,9 +12,15 @@ use crate::{
     },
     process::{func_map::FuncMap, handler::Callback},
 };
+use core::fmt;
 use engine::ExecuteInput;
 use handler::Handler;
-use std::{path::Path, str::FromStr};
+use std::{
+    error::Error,
+    fmt::{Display, Formatter},
+    path::Path,
+    str::FromStr,
+};
 
 /// Process builder that contains information from the BPMN file and registered functions
 pub struct ProcessBuilder<T>
@@ -210,43 +216,60 @@ impl<T> Process<T> {
 }
 
 /// Errors that can occur while reading a bpmn file
-#[derive(thiserror::Error, Debug)]
-#[error("error reading `{path}`")]
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct BpmnFileError {
     pub path: Box<std::path::Path>,
     pub source: BpmnFileErrorKind,
 }
 
-#[derive(thiserror::Error, Debug)]
-#[error(transparent)]
+impl Display for BpmnFileError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "error reading `{}`", self.path.display())
+    }
+}
+
+impl Error for BpmnFileError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match &self.source {
+            BpmnFileErrorKind::ReadFile(e) => Some(e.as_ref()),
+            BpmnFileErrorKind::Parse(e) => Some(e),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum BpmnFileErrorKind {
     ReadFile(Box<dyn std::error::Error + Send + Sync>),
     Parse(ParseError),
 }
 
 /// Errors that can occur while parsing bpmn data.
-#[derive(thiserror::Error, Debug)]
-#[error("error parsing")]
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct ParseError {
-    #[from]
     pub source: ParseErrorKind,
 }
 
-#[derive(thiserror::Error, Debug)]
+impl Display for ParseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "error parsing")
+    }
+}
+
+impl Error for ParseError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
+#[derive(Debug)]
 pub enum ParseErrorKind {
-    #[error(transparent)]
     Bpmn(BpmnError),
-    #[error("could not build the snurr process")]
     ProcessBuild,
-    #[error("missing start event")]
     MissingStartEvent,
-    #[error("{0} not supported")]
     NotSupported(String),
-    #[error(transparent)]
     Encoding(Box<dyn std::error::Error + Send + Sync>),
-    #[error("xml error on line {line} and column {column}")]
     Xml {
         line: usize,
         column: usize,
@@ -254,57 +277,167 @@ pub enum ParseErrorKind {
     },
 }
 
+impl Display for ParseErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ParseErrorKind::Bpmn(error) => error.fmt(f),
+            ParseErrorKind::ProcessBuild => f.write_str("could not build the snurr process"),
+            ParseErrorKind::MissingStartEvent => f.write_str("missing start event"),
+            ParseErrorKind::NotSupported(s) => write!(f, "{s} not supported"),
+            ParseErrorKind::Encoding(error) => error.fmt(f),
+            ParseErrorKind::Xml { line, column, .. } => {
+                write!(f, "xml error on line {line} and column {column}")
+            }
+        }
+    }
+}
+
+impl Error for ParseErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            ParseErrorKind::Bpmn(bpmn_error) => Some(&bpmn_error.source),
+            ParseErrorKind::Encoding(error) => error.source(),
+            ParseErrorKind::Xml { source, .. } => Some(source.as_ref()),
+            _ => None,
+        }
+    }
+}
+
+impl From<ParseErrorKind> for ParseError {
+    fn from(value: ParseErrorKind) -> Self {
+        Self { source: value }
+    }
+}
+
 /// Errors that can occur while running the process
-#[derive(thiserror::Error, Debug)]
-#[error("error running")]
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct RuntimeError {
-    #[from]
     pub source: RuntimeErrorKind,
 }
 
-#[derive(thiserror::Error, Debug)]
+impl Display for RuntimeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "error running")
+    }
+}
+
+impl Error for RuntimeError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
+#[derive(Debug)]
 pub enum RuntimeErrorKind {
     /// Bpmn diagram design error or user specified wrong value
-    #[error(transparent)]
     Diagram(DiagramError),
     /// Engine problems, should not happen :)
-    #[error("engine failure `{0}`")]
     Engine(String),
     /// User triggered a Panic inside some of the process steps with the attached error
-    #[error("user triggered panic")]
     Panic(Box<dyn std::error::Error + Send + Sync>),
 }
 
+impl Display for RuntimeErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            RuntimeErrorKind::Diagram(..) => f.write_str("diagram error"),
+            RuntimeErrorKind::Engine(s) => write!(f, "engine failure `{s}`"),
+            RuntimeErrorKind::Panic(..) => f.write_str("user triggered panic"),
+        }
+    }
+}
+
+impl Error for RuntimeErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            RuntimeErrorKind::Diagram(diagram_error) => Some(diagram_error),
+            RuntimeErrorKind::Engine(_) => None,
+            RuntimeErrorKind::Panic(error) => Some(error.as_ref()),
+        }
+    }
+}
+
+impl From<RuntimeErrorKind> for RuntimeError {
+    fn from(value: RuntimeErrorKind) -> Self {
+        Self { source: value }
+    }
+}
+
 /// Design flaws in bpmn or incorrect use of the diagram
-#[derive(thiserror::Error, Debug)]
-#[error("error bpmn diagram")]
+#[derive(Debug)]
 #[non_exhaustive]
 pub struct DiagramError {
-    #[from]
     pub source: DiagramErrorKind,
 }
 
-#[derive(thiserror::Error, Debug)]
+impl Display for DiagramError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "error bpmn diagram")
+    }
+}
+
+impl Error for DiagramError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
+#[derive(Debug)]
 pub enum DiagramErrorKind {
-    #[error("{0} has no matching output. (Used correct name or id?)")]
     MissingOutput(String),
-    #[error("{0} has no default flow")]
     MissingDefault(String),
-    #[error("could not find {0} boundary symbol attached to {1}")]
     MissingBoundary(String, String),
-    #[error("event gateway {0} could not find intermediate catch event {1}")]
     MissingIntermediateEvent(String, String),
-    #[error("missing intermediate throw event name on {0}")]
     MissingIntermediateThrowEventName(String),
-    #[error("missing intermediate catch event symbol {0} with name {1}")]
     MissingIntermediateCatchEvent(String, String),
-    #[error("missing end event")]
     MissingEndEvent,
-    #[error("{0} not supported")]
     NotSupported(String),
-    #[error("{0}")]
     BpmnRequirement(String),
+}
+
+impl Display for DiagramErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            DiagramErrorKind::MissingOutput(s) => {
+                write!(f, "{s} has no matching output. (Used correct name or id?)")
+            }
+            DiagramErrorKind::MissingDefault(s) => {
+                write!(f, "{s} has no default flow")
+            }
+            DiagramErrorKind::MissingBoundary(s1, s2) => {
+                write!(f, "could not find {s1} boundary symbol attached to {s2}")
+            }
+            DiagramErrorKind::MissingIntermediateEvent(s1, s2) => {
+                write!(
+                    f,
+                    "event gateway {s1} could not find intermediate catch event {s2}"
+                )
+            }
+            DiagramErrorKind::MissingIntermediateThrowEventName(s) => {
+                write!(f, "missing intermediate throw event name on {s}")
+            }
+            DiagramErrorKind::MissingIntermediateCatchEvent(s1, s2) => {
+                write!(
+                    f,
+                    "missing intermediate catch event symbol {s1} with name {s2}"
+                )
+            }
+            DiagramErrorKind::MissingEndEvent => f.write_str("missing end event"),
+            DiagramErrorKind::NotSupported(s) => {
+                write!(f, "{s} not supported")
+            }
+            DiagramErrorKind::BpmnRequirement(s) => {
+                write!(f, "{s}")
+            }
+        }
+    }
+}
+
+impl Error for DiagramErrorKind {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
 }
 
 impl From<DiagramErrorKind> for RuntimeError {
@@ -316,10 +449,24 @@ impl From<DiagramErrorKind> for RuntimeError {
 }
 
 /// Errors that can occur while trying to make a process runnable
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug)]
 pub enum BuildError {
-    #[error("missing implementations {0}")]
+    // #[error("missing implementations {0}")]
     MissingImplementations(String),
+}
+
+impl Display for BuildError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            BuildError::MissingImplementations(s) => write!(f, "missing implementations {s}"),
+        }
+    }
+}
+
+impl Error for BuildError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
 }
 
 #[cfg(test)]
