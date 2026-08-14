@@ -33,8 +33,8 @@ where
 }
 
 impl<T> ProcessBuilder<T> {
-    /// Create new process builder and initialize it from the BPMN file path. Returns an error if
-    /// the file was not found or if there were problems with the file content.
+    /// Creates a process builder and initialize it from the BPMN file path. Returns an error if
+    /// the file was not found or if there were problems with the BPMN content.
     /// ```no_run
     /// use snurr::ProcessBuilder;
     ///

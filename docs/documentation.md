@@ -33,7 +33,9 @@ snurr = { version = "x.xx", features = ["parallel"] }
 
 ## Process
 
-Create a process builder by specifying the path to a BPMN file. Add the tasks and gateways specified in your BPMN diagram. When `.build()` is called, the builder validates that the required functions/closures are installed and return a runnable process if successful. If `.build()` returns an error, it contains the required functions that are missing. The created process can be run multiple times. 
+Create a process builder and initialize it from the BPMN file path. May return an error if the file was not found or if there were problems with the BPMN content. Add the tasks and gateways specified in your BPMN diagram.
+
+When `.build()` is called, the builder validates that the required functions/closures are installed and return a runnable process if successful. If `.build()` returns an error, it contains the required functions that are missing. The created process can be run multiple times.
 
 Use scaffold to generate code from the read BPMN file as a good starting point. Described below.
 
