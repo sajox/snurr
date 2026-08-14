@@ -68,7 +68,7 @@ pub(crate) const ATTRIB_ATTACHED_TO_REF: &str = "attachedToRef";
 pub(crate) const ATTRIB_CANCEL_ACTIVITY: &str = "cancelActivity";
 
 // All Bpmn types
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum BpmnType {
     Boundary,
     BusinessRuleTask,
@@ -169,7 +169,7 @@ impl TryFrom<&str> for Attrib {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum EventType {
     Boundary,
     End,
@@ -199,7 +199,7 @@ impl Display for EventType {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum ActivityType {
     SubProcess,
     Task,
@@ -239,7 +239,7 @@ impl Display for ActivityType {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum GatewayType {
     Exclusive,
     Inclusive,

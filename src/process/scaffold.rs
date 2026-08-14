@@ -99,7 +99,7 @@ impl<'a> Scaffold<'a> {
 
         // Do not generate duplicates
         let mut seen_tasks: HashSet<&str> = HashSet::new();
-        let mut seen_gateways: HashSet<&str> = HashSet::new();
+        let mut seen_gateways: HashSet<(&GatewayType, &str)> = HashSet::new();
 
         // First all tasks
         for task in self.tasks.iter() {
@@ -115,7 +115,12 @@ impl<'a> Scaffold<'a> {
             if seen_tasks.insert(name_or_id) {
                 if !symbols.is_empty() {
                     content.push(format!(
-                        r#"    // "{name_or_id}" boundary symbols: {symbols:?}"#
+                        r#"    // boundaries: {}"#,
+                        symbols
+                            .iter()
+                            .map(|v| format!("{v:?}"))
+                            .collect::<Vec<_>>()
+                            .join(", ")
                     ));
                 }
 
@@ -133,22 +138,20 @@ impl<'a> Scaffold<'a> {
                     gateway_type,
                     id,
                     name,
-                    outputs,
                     ..
                 },
             names,
         } in self.gateways.iter()
         {
             let name_or_id = name.as_deref().unwrap_or(id.bpmn());
-            if seen_gateways.insert(name_or_id) {
+            if seen_gateways.insert((gateway_type, name_or_id)) {
                 content.push(format!(
-                    r#"    // Names: {}. Ids: {}."#,
+                    r#"    // outputs: {}"#,
                     names
                         .iter()
-                        .map(|value| value.to_string())
+                        .map(|s| s.as_str())
                         .collect::<Vec<_>>()
                         .join(", "),
-                    outputs
                 ));
 
                 match gateway_type {
@@ -159,7 +162,7 @@ impl<'a> Scaffold<'a> {
                         r#"    .inclusive("{name_or_id}", |input| Default::default())"#,
                     )),
                     GatewayType::EventBased => content.push(format!(
-                        r#"    .event_based("{name_or_id}", |input| // Implement)"#,
+                        r#"    .event_based("{name_or_id}", |input| /* TODO */ )"#,
                     )),
                     _ => {}
                 }
