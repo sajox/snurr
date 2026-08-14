@@ -99,7 +99,7 @@ use snurr::{Process, ProcessBuilder, error::BuildError};
 pub fn build(process_builder: ProcessBuilder<()>) -> Result<Process<()>, BuildError> {
     process_builder
         .task("Count 1", |input| Default::default())
-        // Names: YES, NO. Ids: Flow_1h0jtl6, Flow_0rsqhpi.
+        // outputs: YES, NO
         .exclusive("equal to 3", |input| Default::default())
         .build()
 }

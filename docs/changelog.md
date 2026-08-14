@@ -38,10 +38,13 @@
 - When a task or gateways had been assigned a `name` in BPMN, it was not possible to use the BPMN `id` instead when register functions.
     - Using an BPMN `id` can be fragile as it can regenerate depending on what you do in the BPMN tool.
 - Return an Error on XML errors. (did just log before)
+- Different gateway types can have same name when scaffold.
+- Event based gateway generated an row comment instead of inline comment when scaffold.
 
 ### Dependencies
 
 - Updated to quick-xml new API
+- Removed thiserror
 
 ## Version 0.14
 
