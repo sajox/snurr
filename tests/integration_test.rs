@@ -2,9 +2,7 @@ use snurr::{
     Exclusive, ProcessBuilder, Symbol, Task,
     error::{
         BpmnError, BpmnErrorKind, BpmnFileError, BpmnFileErrorKind, DiagramError, DiagramErrorKind,
-        ParseError,
-        ParseErrorKind::{self, Bpmn},
-        Result, RuntimeError, RuntimeErrorKind,
+        ParseError, ParseErrorKind, Result, RuntimeError, RuntimeErrorKind,
     },
 };
 use std::{borrow::Cow, sync::Mutex};
@@ -235,7 +233,7 @@ fn inclusive_gateway_no_output() -> Result<()> {
                 BpmnFileError {
                     path: _,
                     source: BpmnFileErrorKind::Parse(ParseError {
-                        source: Bpmn(BpmnError {
+                        source: ParseErrorKind::Bpmn(BpmnError {
                             source: BpmnErrorKind::NoOutput(_),
                             ..
                         }),
