@@ -1,7 +1,7 @@
 use crate::{
     bpmn::{Event, EventType, Symbol},
     diagram::Id,
-    process::{DiagramErrorKind, RuntimeError},
+    process::{DiagramError, RuntimeError},
 };
 use std::{
     borrow::{Borrow, Cow},
@@ -87,7 +87,7 @@ impl Events {
 
     pub(crate) fn catch_event_link(&self, throw_event_name: &str) -> Result<&usize, RuntimeError> {
         self.catch_event_links.get(throw_event_name).ok_or_else(|| {
-            DiagramErrorKind::MissingIntermediateCatchEvent(
+            DiagramError::MissingIntermediateCatchEvent(
                 Symbol::Link.to_string(),
                 throw_event_name.into(),
             )

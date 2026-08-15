@@ -1,9 +1,6 @@
 use crate::{
-    diagram::{
-        Id, Outputs,
-        reader::{BpmnError, BpmnErrorKind},
-    },
-    process::{DiagramErrorKind, RuntimeError},
+    diagram::{Id, Outputs, reader::BpmnError},
+    process::{DiagramError, RuntimeError},
 };
 use core::fmt;
 use std::fmt::Display;
@@ -164,7 +161,7 @@ impl TryFrom<&str> for Attrib {
             ATTRIB_NAME => Attrib::Name,
             ATTRIB_SOURCE_REF => Attrib::SourceRef,
             ATTRIB_TARGET_REF => Attrib::TargetRef,
-            _ => Err(BpmnErrorKind::TypeNotImplemented(value.into()))?,
+            _ => Err(BpmnError::TypeNotImplemented(value.into()))?,
         })
     }
 }
@@ -188,7 +185,7 @@ impl TryFrom<&str> for EventType {
             INTERMEDIATE_CATCH_EVENT => EventType::IntermediateCatch,
             INTERMEDIATE_THROW_EVENT => EventType::IntermediateThrow,
             START_EVENT => EventType::Start,
-            _ => Err(BpmnErrorKind::TypeNotImplemented(value.into()))?,
+            _ => Err(BpmnError::TypeNotImplemented(value.into()))?,
         })
     }
 }
@@ -228,7 +225,7 @@ impl TryFrom<&str> for ActivityType {
             SEND_TASK => ActivityType::SendTask,
             MANUAL_TASK => ActivityType::ManualTask,
             BUSINESS_RULE_TASK => ActivityType::BusinessRuleTask,
-            _ => Err(BpmnErrorKind::TypeNotImplemented(value.into()))?,
+            _ => Err(BpmnError::TypeNotImplemented(value.into()))?,
         })
     }
 }
@@ -256,7 +253,7 @@ impl TryFrom<&str> for GatewayType {
             INCLUSIVE_GATEWAY => GatewayType::Inclusive,
             PARALLEL_GATEWAY => GatewayType::Parallel,
             EVENT_BASED_GATEWAY => GatewayType::EventBased,
-            _ => Err(BpmnErrorKind::TypeNotImplemented(value.into()))?,
+            _ => Err(BpmnError::TypeNotImplemented(value.into()))?,
         })
     }
 }
@@ -303,7 +300,7 @@ impl TryFrom<&str> for Symbol {
             SIGNAL_EVENT_DEFINITION => Symbol::Signal,
             TERMINATE_EVENT_DEFINITION => Symbol::Terminate,
             TIMER_EVENT_DEFINITION => Symbol::Timer,
-            _ => Err(BpmnErrorKind::TypeNotImplemented(value.into()))?,
+            _ => Err(BpmnError::TypeNotImplemented(value.into()))?,
         };
         Ok(ty)
     }
@@ -325,7 +322,7 @@ impl Gateway {
         self.default
             .as_ref()
             .map(Id::local)
-            .ok_or_else(|| DiagramErrorKind::MissingDefault(self.to_string()).into())
+            .ok_or_else(|| DiagramError::MissingDefault(self.to_string()).into())
     }
 }
 
@@ -347,12 +344,12 @@ impl BpmnValidate for Gateway {
                 gateway_type: GatewayType::EventBased,
                 outputs,
                 ..
-            } if outputs.len() < 2 => Err(BpmnErrorKind::BpmnRequirement(format!(
+            } if outputs.len() < 2 => Err(BpmnError::BpmnRequirement(format!(
                 "{} must have at least two outgoing sequence flows",
                 self
             )))?,
             Gateway { outputs, .. } if outputs.len() == 0 => {
-                Err(BpmnErrorKind::NoOutput(self.to_string()))?
+                Err(BpmnError::NoOutput(self.to_string()))?
             }
             _ => Ok(()),
         }
@@ -396,7 +393,7 @@ impl BpmnValidate for Event {
                 && *symbol == Some(Symbol::Link))
                 && outputs.len() == 0 =>
             {
-                Err(BpmnErrorKind::NoOutput(self.to_string()))?
+                Err(BpmnError::NoOutput(self.to_string()))?
             }
             _ => Ok(()),
         }
@@ -428,7 +425,7 @@ impl BpmnValidate for Activity {
     fn validate(&self) -> Result<(), BpmnError> {
         match self {
             Activity { outputs, .. } if outputs.len() == 0 => {
-                Err(BpmnErrorKind::NoOutput(self.to_string()))?
+                Err(BpmnError::NoOutput(self.to_string()))?
             }
             _ => Ok(()),
         }

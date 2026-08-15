@@ -1,6 +1,5 @@
 mod builder;
 pub use builder::BpmnError;
-pub use builder::BpmnErrorKind;
 
 use super::Diagram;
 use crate::{
@@ -173,7 +172,7 @@ impl RawData {
             .attributes
             .get(&Attrib::Name)
             .or_else(|| self.attributes.get(&Attrib::Id))
-            .ok_or_else(|| BpmnErrorKind::MissingId(self.bpmn_type.clone()))?)
+            .ok_or_else(|| BpmnError::MissingId(self.bpmn_type.clone()))?)
     }
 }
 

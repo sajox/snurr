@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     bpmn::{Event, *},
-    diagram::{Diagram, Outputs, ProcessData, events::Events, reader::RawData},
+    diagram::{Diagram, Id, Outputs, ProcessData, events::Events, reader::RawData},
     process::{ParseError, ParseErrorKind},
 };
 
@@ -228,7 +228,13 @@ impl TryFrom<RawData> for Bpmn {
             data_index,
         }: RawData,
     ) -> Result<Self, Self::Error> {
-        let bpmn_type = bpmn_type.as_ref();
+        let bpmn_type: &str = bpmn_type.as_ref();
+        let id: Id = attributes
+            .remove(&Attrib::Id)
+            .ok_or_else(|| BpmnError::MissingId(bpmn_type.to_owned()))?
+            .into();
+        let name = attributes.remove(&Attrib::Name);
+
         let ty = match bpmn_type {
             START_EVENT
             | END_EVENT
@@ -237,11 +243,8 @@ impl TryFrom<RawData> for Bpmn {
             | INTERMEDIATE_THROW_EVENT => Bpmn::Event(Event {
                 event_type: bpmn_type.try_into()?,
                 symbol,
-                id: attributes
-                    .remove(&Attrib::Id)
-                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
-                    .into(),
-                name: attributes.remove(&Attrib::Name),
+                id,
+                name,
                 attached_to_ref: attributes.remove(&Attrib::AttachedToRef).map(Into::into),
                 outputs: Outputs::new(outputs),
             }),
@@ -249,42 +252,33 @@ impl TryFrom<RawData> for Bpmn {
             | SEND_TASK | MANUAL_TASK | BUSINESS_RULE_TASK | SUB_PROCESS | TRANSACTION => {
                 Bpmn::Activity(Activity {
                     activity_type: bpmn_type.try_into()?,
-                    id: attributes
-                        .remove(&Attrib::Id)
-                        .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
-                        .into(),
+                    id,
                     func_idx: None,
                     data_index,
-                    name: attributes.remove(&Attrib::Name),
+                    name,
                     outputs: Outputs::new(outputs),
                 })
             }
             EXCLUSIVE_GATEWAY | PARALLEL_GATEWAY | INCLUSIVE_GATEWAY | EVENT_BASED_GATEWAY => {
                 Bpmn::Gateway(Gateway {
                     gateway_type: bpmn_type.try_into()?,
-                    id: attributes
-                        .remove(&Attrib::Id)
-                        .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
-                        .into(),
+                    id,
                     func_idx: None,
-                    name: attributes.remove(&Attrib::Name),
+                    name,
                     default: attributes.remove(&Attrib::Default).map(Into::into),
                     outputs: Outputs::new(outputs),
                     inputs: inputs.len() as u16,
                 })
             }
             SEQUENCE_FLOW => Bpmn::SequenceFlow {
-                id: attributes
-                    .remove(&Attrib::Id)
-                    .ok_or_else(|| BpmnErrorKind::MissingId(bpmn_type.into()))?
-                    .into(),
-                name: attributes.remove(&Attrib::Name),
+                id,
+                name,
                 target_ref: attributes
                     .remove(&Attrib::TargetRef)
-                    .ok_or(BpmnErrorKind::MissingTargetRef)?
+                    .ok_or(BpmnError::MissingTargetRef)?
                     .into(),
             },
-            _ => Err(BpmnErrorKind::TypeNotImplemented(bpmn_type.into()))?,
+            _ => Err(BpmnError::TypeNotImplemented(bpmn_type.into()))?,
         };
 
         ty.validate()?;
@@ -294,25 +288,7 @@ impl TryFrom<RawData> for Bpmn {
 
 /// Errors that can occur while constructing bpmn types.
 #[derive(Debug)]
-#[non_exhaustive]
-pub struct BpmnError {
-    pub source: BpmnErrorKind,
-}
-
-impl Display for BpmnError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "could not create bpmn type")
-    }
-}
-
-impl Error for BpmnError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        Some(&self.source)
-    }
-}
-
-#[derive(Debug)]
-pub enum BpmnErrorKind {
+pub enum BpmnError {
     MissingId(String),
     MissingTargetRef,
     NoOutput(String),
@@ -320,28 +296,22 @@ pub enum BpmnErrorKind {
     TypeNotImplemented(String),
 }
 
-impl Display for BpmnErrorKind {
+impl Display for BpmnError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            BpmnErrorKind::MissingId(s) => write!(f, "tag `{s}` missing attribute id"),
-            BpmnErrorKind::MissingTargetRef => {
+            BpmnError::MissingId(s) => write!(f, "tag `{s}` missing attribute id"),
+            BpmnError::MissingTargetRef => {
                 f.write_str("tag `sequenceFlow` missing attribute targetRef")
             }
-            BpmnErrorKind::NoOutput(s) => write!(f, "{s} has no output"),
-            BpmnErrorKind::BpmnRequirement(s) => write!(f, "{s}"),
-            BpmnErrorKind::TypeNotImplemented(s) => write!(f, "tag `{s}` not implemented"),
+            BpmnError::NoOutput(s) => write!(f, "{s} has no output"),
+            BpmnError::BpmnRequirement(s) => write!(f, "{s}"),
+            BpmnError::TypeNotImplemented(s) => write!(f, "tag `{s}` not implemented"),
         }
     }
 }
 
-impl Error for BpmnErrorKind {
+impl Error for BpmnError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         None
-    }
-}
-
-impl From<BpmnErrorKind> for BpmnError {
-    fn from(value: BpmnErrorKind) -> Self {
-        Self { source: value }
     }
 }

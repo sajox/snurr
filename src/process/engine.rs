@@ -5,7 +5,7 @@ use crate::{
     api::{Exclusive, Inclusive, Task},
     bpmn::{Activity, ActivityType, Bpmn, Event, EventType, Gateway, GatewayType, Symbol},
     diagram::{Outputs, ProcessData},
-    process::{DiagramErrorKind, RuntimeError, RuntimeErrorKind},
+    process::{DiagramError, RuntimeError},
 };
 use execute_handler::ExecuteHandler;
 use log::{debug, warn};
@@ -25,7 +25,7 @@ macro_rules! maybe_fork {
         if $outputs.len() <= 1 {
             $outputs
                 .first()
-                .ok_or_else(|| DiagramErrorKind::MissingOutput($ty.to_string()))?
+                .ok_or_else(|| DiagramError::MissingOutput($ty.to_string()))?
         } else {
             return Ok(Return::Fork(Cow::Borrowed($outputs.ids())));
         }
@@ -45,7 +45,7 @@ impl<T> Process<T> {
         loop {
             let active_tokens = handler.active_tokens();
             if active_tokens.is_empty() {
-                return last_visited_end.ok_or(DiagramErrorKind::MissingEndEvent.into());
+                return last_visited_end.ok_or(DiagramError::MissingEndEvent.into());
             }
 
             let flows_iter = {
@@ -137,7 +137,7 @@ impl<T> Process<T> {
     {
         loop {
             current_id = match input.process.get(*current_id).ok_or_else(|| {
-                RuntimeErrorKind::Engine(format!(
+                RuntimeError::Engine(format!(
                     "could not fetch bpmn data with index {}",
                     current_id
                 ))
@@ -166,7 +166,7 @@ impl<T> Process<T> {
                                 (Some(_), _) => {
                                     maybe_fork!(outputs, event)
                                 }
-                                _ => Err(DiagramErrorKind::MissingIntermediateThrowEventName(
+                                _ => Err(DiagramError::MissingIntermediateThrowEventName(
                                     id.bpmn().into(),
                                 ))?,
                             }
@@ -200,23 +200,20 @@ impl<T> Process<T> {
                             match func_idx
                                 .map(|index| self.handler.run_task(index, input.data))
                                 .ok_or_else(|| {
-                                    RuntimeErrorKind::Engine(format!(
-                                        "missing function {:?}",
-                                        activity
-                                    ))
+                                    RuntimeError::Engine(format!("missing function {:?}", activity))
                                 })?? {
                                 Task::Boundary(name, symbol) => input
                                     .process
                                     .events
                                     .boundary(id, symbol, name.as_deref())
                                     .ok_or_else(|| {
-                                        DiagramErrorKind::MissingBoundary(
+                                        DiagramError::MissingBoundary(
                                             format!("({name:?},{symbol})"),
                                             activity.to_string(),
                                         )
                                     })?,
                                 Task::Default => maybe_fork!(outputs, activity),
-                                Task::Panic(e) => Err(RuntimeErrorKind::Panic(e))?,
+                                Task::Panic(e) => Err(RuntimeError::Panic(e))?,
                             }
                         }
                         ActivityType::SubProcess => {
@@ -225,7 +222,7 @@ impl<T> Process<T> {
                             {
                                 process_data
                             } else {
-                                Err(RuntimeErrorKind::Engine(format!(
+                                Err(RuntimeError::Engine(format!(
                                     "missing subprocess data with bpmn id {:?}",
                                     activity
                                 )))?
@@ -252,7 +249,7 @@ impl<T> Process<T> {
                                     .events
                                     .boundary(id, *symbol, name.as_deref())
                                     .ok_or_else(|| {
-                                        DiagramErrorKind::MissingBoundary(
+                                        DiagramError::MissingBoundary(
                                             symbol.to_string(),
                                             activity.to_string(),
                                         )
@@ -275,9 +272,10 @@ impl<T> Process<T> {
                 ) => {
                     debug!("{gateway}");
                     match gateway_type {
-                        _ if outputs.len() == 0 => {
-                            Err(DiagramErrorKind::MissingOutput(gateway.to_string()))?
-                        }
+                        _ if outputs.len() == 0 => Err(DiagramError::MissingOutput(format!(
+                            "{} has no outputs",
+                            gateway
+                        )))?,
                         // Handle 1 to 1, probably a temporary design or mistake
                         _ if outputs.len() == 1 && *inputs == 1 => outputs.first().unwrap(),
                         GatewayType::Exclusive if outputs.len() == 1 => outputs.first().unwrap(),
@@ -285,16 +283,13 @@ impl<T> Process<T> {
                             match func_idx
                                 .map(|index| self.handler.run_exclusive(index, input.data))
                                 .ok_or_else(|| {
-                                    RuntimeErrorKind::Engine(format!(
-                                        "missing function {:?}",
-                                        gateway
-                                    ))
+                                    RuntimeError::Engine(format!("missing function {:?}", gateway))
                                 })?? {
                                 Exclusive::Flow(value) => {
                                     input.find_flow(&value, outputs, gateway)?
                                 }
                                 Exclusive::Default => gateway.default_path()?,
-                                Exclusive::Panic(e) => Err(RuntimeErrorKind::Panic(e))?,
+                                Exclusive::Panic(e) => Err(RuntimeError::Panic(e))?,
                             }
                         }
                         // Handle a regular Join or a JoinFork. In both cases, we need to wait for all tokens.
@@ -313,21 +308,18 @@ impl<T> Process<T> {
                             match func_idx
                                 .map(|index| self.handler.run_eventbased(index, input.data))
                                 .ok_or_else(|| {
-                                    RuntimeErrorKind::Engine(format!(
-                                        "missing function {:?}",
-                                        gateway
-                                    ))
+                                    RuntimeError::Engine(format!("missing function {:?}", gateway))
                                 })?? {
                                 IntermediateEvent::Throw(name, symbol) => input
                                     .process
                                     .find_by_intermediate_event(&name, symbol, outputs)
                                     .ok_or_else(|| {
-                                        DiagramErrorKind::MissingIntermediateEvent(
+                                        DiagramError::MissingIntermediateEvent(
                                             gateway.to_string(),
                                             format!("({name},{symbol})"),
                                         )
                                     })?,
-                                IntermediateEvent::Panic(e) => Err(RuntimeErrorKind::Panic(e))?,
+                                IntermediateEvent::Panic(e) => Err(RuntimeError::Panic(e))?,
                             }
                         }
                     }
@@ -354,7 +346,7 @@ impl<T> Process<T> {
     ) -> Result<Tokens<'a>, RuntimeError> {
         let value = match func_idx
             .map(|index| self.handler.run_inclusive(index, input.data))
-            .ok_or_else(|| RuntimeErrorKind::Engine(format!("missing function {:?}", gateway)))??
+            .ok_or_else(|| RuntimeError::Engine(format!("missing function {:?}", gateway)))??
         {
             Inclusive::Flow(value) => input.find_flow(&value, outputs, gateway)?,
             Inclusive::Fork(mut values) => match values.as_slice() {
@@ -377,7 +369,7 @@ impl<T> Process<T> {
                 }
             },
             Inclusive::Default => gateway.default_path()?,
-            Inclusive::Panic(e) => Err(RuntimeErrorKind::Panic(e))?,
+            Inclusive::Panic(e) => Err(RuntimeError::Panic(e))?,
         };
         Ok(Cow::Owned(vec![*value]))
     }
@@ -408,6 +400,8 @@ impl<'a, T> ExecuteInput<'a, T> {
         Ok(self
             .process
             .find_by_name_or_id(search, outputs)
-            .ok_or_else(|| DiagramErrorKind::MissingOutput(message.to_string()))?)
+            .ok_or_else(|| {
+                DiagramError::MissingOutput(format!("{} has no output `{search}`", message))
+            })?)
     }
 }

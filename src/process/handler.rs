@@ -1,13 +1,13 @@
 use crate::{
     api::{Exclusive, Inclusive, IntermediateEvent, Task},
-    process::{RuntimeError, RuntimeErrorKind},
+    process::{RuntimeError},
 };
 
 macro_rules! callback {
     ($name:ident, $variant:pat => $value:ident, $ret:ty) => {
         pub(super) fn $name(&self, index: usize, data: &T) -> Result<$ret, RuntimeError> {
             let Some($variant) = self.callbacks.get(index) else {
-                Err(RuntimeErrorKind::Engine(format!(
+                Err(RuntimeError::Engine(format!(
                     "missing {} with index: {index}",
                     stringify!($name)
                 )))?

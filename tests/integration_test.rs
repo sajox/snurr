@@ -1,8 +1,8 @@
 use snurr::{
     Exclusive, ProcessBuilder, Symbol, Task,
     error::{
-        BpmnError, BpmnErrorKind, BpmnFileError, BpmnFileErrorKind, DiagramError, DiagramErrorKind,
-        ParseError, ParseErrorKind, Result, RuntimeError, RuntimeErrorKind,
+        BpmnError, BpmnFileError, BpmnFileErrorKind, DiagramError, ParseError, ParseErrorKind,
+        Result, RuntimeError,
     },
 };
 use std::{borrow::Cow, sync::Mutex};
@@ -233,10 +233,7 @@ fn inclusive_gateway_no_output() -> Result<()> {
                 BpmnFileError {
                     path: _,
                     source: BpmnFileErrorKind::Parse(ParseError {
-                        source: ParseErrorKind::Bpmn(BpmnError {
-                            source: BpmnErrorKind::NoOutput(_),
-                            ..
-                        }),
+                        source: ParseErrorKind::Bpmn(BpmnError::NoOutput(_),),
                         ..
                     }),
                     ..
@@ -406,13 +403,7 @@ fn subprocess_external_link_fail() -> Result<()> {
         .build()?;
     match bpmn.run(Default::default()) {
         Err(error) => assert!(
-            matches!(error, RuntimeError {
-                    source: RuntimeErrorKind::Diagram(DiagramError {
-                        source: DiagramErrorKind::MissingIntermediateCatchEvent(symbol, name),
-                        ..
-                    }),
-                    ..
-                } if symbol == "Link" && name == "Link 2"),
+            matches!(error, RuntimeError::Diagram(DiagramError::MissingIntermediateCatchEvent(symbol, name)) if symbol == "Link" && name == "Link 2"),
             "Expected Link Symbol with name Link 2"
         ),
         _ => panic!("Expected an error"),
@@ -693,13 +684,7 @@ fn parallel_stalled_execution() -> Result<()> {
         Err(error) => assert!(
             matches!(
                 error,
-                RuntimeError {
-                    source: RuntimeErrorKind::Diagram(DiagramError {
-                        source: DiagramErrorKind::BpmnRequirement(_),
-                        ..
-                    }),
-                    ..
-                }
+                RuntimeError::Diagram(DiagramError::BpmnRequirement(_))
             ),
             "Expected BpmnRequirement"
         ),
@@ -717,16 +702,7 @@ fn panic() -> Result<()> {
         .build()?;
 
     match bpmn.run(Default::default()) {
-        Err(error) => assert!(
-            matches!(
-                error,
-                RuntimeError {
-                    source: RuntimeErrorKind::Panic(_),
-                    ..
-                }
-            ),
-            "Expected Panic"
-        ),
+        Err(error) => assert!(matches!(error, RuntimeError::Panic(_)), "Expected Panic"),
         _ => panic!("Expected an error"),
     }
     Ok(())
@@ -741,16 +717,7 @@ fn parallel_unbalanced() -> Result<()> {
 
     match bpmn.run(Default::default()) {
         Err(error) => assert!(
-            matches!(
-                error,
-                RuntimeError {
-                    source: RuntimeErrorKind::Diagram(DiagramError {
-                        source: DiagramErrorKind::NotSupported(_),
-                        ..
-                    }),
-                    ..
-                }
-            ),
+            matches!(error, RuntimeError::Diagram(DiagramError::NotSupported(_))),
             "Expected NotSupported"
         ),
         _ => panic!("Expected an error"),
@@ -767,16 +734,7 @@ fn parallel_unbalanced2() -> Result<()> {
 
     match bpmn.run(Default::default()) {
         Err(error) => assert!(
-            matches!(
-                error,
-                RuntimeError {
-                    source: RuntimeErrorKind::Diagram(DiagramError {
-                        source: DiagramErrorKind::NotSupported(_),
-                        ..
-                    }),
-                    ..
-                }
-            ),
+            matches!(error, RuntimeError::Diagram(DiagramError::NotSupported(_))),
             "Expected NotSupported"
         ),
         _ => panic!("Expected an error"),
