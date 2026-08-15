@@ -108,7 +108,7 @@ pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, ParseErro
             _ => (),
         }
     }
-    Ok(builder.into())
+    Ok(builder.try_into()?)
 }
 
 fn collect_attributes(bs: &quick_xml::events::BytesStart<'_>) -> HashMap<Attrib, String> {

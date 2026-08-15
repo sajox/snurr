@@ -14,17 +14,20 @@ use std::{
 
 #[derive(Debug)]
 pub struct Diagram {
-    definitions: Box<[usize]>,
+    process_index: usize,
     data: Box<[ProcessData]>,
 }
 
 impl Diagram {
-    fn new(definitions: Box<[usize]>, data: Box<[ProcessData]>) -> Self {
-        Self { definitions, data }
+    fn new(process_index: usize, data: Box<[ProcessData]>) -> Self {
+        Self {
+            process_index,
+            data,
+        }
     }
 
-    pub fn definition(&self) -> &[usize] {
-        &self.definitions
+    pub fn process_index(&self) -> usize {
+        self.process_index
     }
 
     // Can be a process or sub process

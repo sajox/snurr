@@ -204,13 +204,11 @@ impl<T> Process<T> {
     where
         T: Send + Sync,
     {
-        // Run every process specified in the diagram
-        for index in self.diagram.definition().iter() {
-            let process_data = self.diagram.get_process(*index).ok_or_else(|| {
-                RuntimeError::Engine(format!("missing process data with index `{}`", index))
-            })?;
-            self.execute(ExecuteInput::new(process_data, false, &data))?;
-        }
+        let index = self.diagram.process_index();
+        let process_data = self.diagram.get_process(index).ok_or_else(|| {
+            RuntimeError::Engine(format!("missing process data with index `{}`", index))
+        })?;
+        self.execute(ExecuteInput::new(process_data, false, &data))?;
         Ok(data)
     }
 }
@@ -266,7 +264,7 @@ impl Error for ParseError {
 #[derive(Debug)]
 pub enum ParseErrorKind {
     Bpmn(BpmnError),
-    ProcessBuild,
+    ProcessBuild(String),
     MissingStartEvent,
     NotSupported(String),
     Encoding(Box<dyn std::error::Error + Send + Sync>),
@@ -281,12 +279,12 @@ impl Display for ParseErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             ParseErrorKind::Bpmn(_) => f.write_str("could not create bpmn type"),
-            ParseErrorKind::ProcessBuild => f.write_str("could not build the snurr process"),
+            ParseErrorKind::ProcessBuild(s) => write!(f, "{s}"),
             ParseErrorKind::MissingStartEvent => f.write_str("missing start event"),
-            ParseErrorKind::NotSupported(s) => write!(f, "{s} not supported"),
+            ParseErrorKind::NotSupported(s) => write!(f, "`{s}` not supported"),
             ParseErrorKind::Encoding(error) => error.fmt(f),
             ParseErrorKind::Xml { line, column, .. } => {
-                write!(f, "xml error on line {line} and column {column}")
+                write!(f, "xml error on line `{line}` and column `{column}`")
             }
         }
     }

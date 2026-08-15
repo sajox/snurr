@@ -388,12 +388,20 @@ fn intermediate_event() -> Result<()> {
 
 #[test]
 fn two_process_pools() -> Result<()> {
-    let bpmn = ProcessBuilder::new("tests/files/two_process_pools.bpmn")?
-        .task(COUNT_1, func_cnt(1))
-        .task(COUNT_2, func_cnt(2))
-        .build()?;
-    let result = bpmn.run(Default::default())?;
-    assert_eq!(result.lock().unwrap().count, 3);
+    match ProcessBuilder::<()>::new("tests/files/two_process_pools.bpmn") {
+        Err(error) => assert!(matches!(
+            error,
+            BpmnFileError {
+                path: _,
+                source: BpmnFileErrorKind::Parse(ParseError {
+                    source: ParseErrorKind::NotSupported(_),
+                    ..
+                }),
+                ..
+            }
+        )),
+        _ => panic!("Expected an error"),
+    }
     Ok(())
 }
 

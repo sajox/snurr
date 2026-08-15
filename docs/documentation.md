@@ -300,6 +300,10 @@ Collapsed, expanded subprocess or transaction can be used.
 
 ## Not supported
 
+### Process pools
+
+Limited to one BPMN process per file (not to be confused with subprocesses, of which there can be several).
+
 ### Conditional Sequence Flows
 
 Use an explicit gateway instead. Snurr return an `ParseError` if present.

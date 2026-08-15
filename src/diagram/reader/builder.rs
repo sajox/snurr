@@ -12,10 +12,7 @@ use crate::{
 };
 
 //
-// definition: [ // Definitions contains all top level processes.
-//                Process 0, data at index 0
-//                Process 1, data at index 2
-//             ]
+// process_index: data at index 0
 //
 // data: [
 //            [ // Might contain a sub process that has its data at index 1
@@ -24,16 +21,12 @@ use crate::{
 //            [
 //                Sub Process DATA
 //            ],
-//            [
-//                Process 1 DATA
-//            ],
 //        ]
 //
 
 #[derive(Default)]
 pub(super) struct DataBuilder {
-    // Top level processes collected in definitions
-    definitions: Vec<usize>,
+    process_index: Option<usize>,
 
     // Process and subprocess data
     data: Vec<ProcessData>,
@@ -93,7 +86,9 @@ impl DataBuilder {
     pub(super) fn end_process(&mut self) -> Result<(), ParseError> {
         let Some((mut xml_data, mut process_data)) = self.stack.pop().zip(self.process_stack.pop())
         else {
-            Err(ParseErrorKind::ProcessBuild)?
+            Err(ParseErrorKind::ProcessBuild(
+                "unable to build process".into(),
+            ))?
         };
 
         match self.process_stack.last_mut() {
@@ -105,7 +100,14 @@ impl DataBuilder {
                 parent_process_data.add(bpmn)?;
             }
             // Definitions collect all processes. data.len() is process index.
-            None => self.definitions.push(self.data.len()),
+            None => {
+                // We can support more main processses but only accept one at the moment.
+                if self.process_index.replace(self.data.len()).is_some() {
+                    Err(ParseErrorKind::NotSupported(
+                        "many bpmn processes in same bpmn file".into(),
+                    ))?;
+                }
+            }
         }
 
         process_data.finalize();
@@ -114,12 +116,16 @@ impl DataBuilder {
     }
 }
 
-impl From<DataBuilder> for Diagram {
-    fn from(builder: DataBuilder) -> Self {
-        Diagram::new(
-            builder.definitions.into_boxed_slice(),
+impl TryFrom<DataBuilder> for Diagram {
+    type Error = ParseErrorKind;
+
+    fn try_from(builder: DataBuilder) -> Result<Self, Self::Error> {
+        Ok(Diagram::new(
+            builder
+                .process_index
+                .ok_or_else(|| ParseErrorKind::ProcessBuild("no process found".into()))?,
             builder.data.into_boxed_slice(),
-        )
+        ))
     }
 }
 
