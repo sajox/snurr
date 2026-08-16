@@ -172,6 +172,14 @@ impl<T> Process<T> {
                             }
                         }
                         EventType::End => {
+                            if let Some(index) = self.end_callback
+                                && let Some(symbol) = symbol
+                            {
+                                self.handler
+                                    .run_end(index, input.data, name.as_deref(), *symbol)?
+                                    .map_err(RuntimeError::Panic)?;
+                            }
+
                             return Ok(Return::End(event));
                         }
                     }

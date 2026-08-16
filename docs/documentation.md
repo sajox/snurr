@@ -274,6 +274,25 @@ End events have different effects depending on where they are used. In a regular
 - **Signal** In a subprocess, ends and run the Signal boundary.
 - **Terminate** ends the process. In a subprocess, ends and continues with the parent process.
 
+#### Listen to end events
+
+Optionally register an end callback to act on end events. If an error is returned it terminate the process prematurely and have it return the specified error. Only one can be registered.
+
+```rust no_run
+# use snurr::{ProcessBuilder, Symbol} ;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+#   ProcessBuilder::<()>::new("dummy.bpmn")?
+.end_event(|_input, name, symbol| {      
+    match symbol {
+        Symbol::Error => println!("act on an error, such as update the model or inform external systems"),
+        _ => println!("ignore other end events"),
+    }
+    Ok(())
+});
+# Ok(())
+# }
+```
+
 ### Intermediate event
 
 - Intermediate **none** events (no icon) don't do anything and just follow its output. 

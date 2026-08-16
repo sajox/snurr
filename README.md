@@ -55,10 +55,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             .into()
         })
+        .end_event(|_input, name, symbol| {
+            log::debug!(
+                "act on end event `{symbol}` with name `{}`",
+                name.unwrap_or_default()
+            );
+            Ok(())
+        })
         .build()?;
 
-    let result = bpmn.run(Default::default())?;
-    println!("{result:?}");
+    println!("{:?}", bpmn.run(Default::default())?);
     Ok(())
 }
 ```
@@ -83,5 +89,6 @@ If `RUST_LOG=debug` is set when running example
  DEBUG snurr::process::engine > Exclusive `equal to 3`
  DEBUG snurr::process::engine > SequenceFlow `YES`
  DEBUG snurr::process::engine > End `End process`
+ DEBUG counter                > act on end event `Message` with name `End process`
 Counter(3)
 ```

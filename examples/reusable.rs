@@ -7,7 +7,6 @@ use std::sync::{
 
 // Tasks
 const RUN_COUNTER_PROCESS: &'static str = "run counter process";
-const HANDLE_ERROR: &'static str = "handle error";
 const COUNT_1: &'static str = "Count 1";
 
 //Gateways
@@ -34,7 +33,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let manager = ProcessBuilder::<Mutex<Manager>>::new("examples/reusable.bpmn")?
         .task(RUN_COUNTER_PROCESS, run_counter_process()?)
-        .task(HANDLE_ERROR, handle_error)
+        .end_event(|input, _name, symbol| {
+            // Act on error end event, update model or inform external system
+            if let Symbol::Error = symbol {
+                input.lock().unwrap().failed = true;
+            }
+            Ok(())
+        })
         .build()?;
 
     println!("{:?}", manager.run(Default::default())?.into_inner()?);
@@ -69,9 +74,4 @@ fn run_counter_process() -> Result<impl Fn(&Mutex<Manager>) -> Task, Box<dyn std
         input.lock().unwrap().counters.push(counter);
         Default::default()
     })
-}
-
-fn handle_error(input: &Mutex<Manager>) -> Task {
-    input.lock().unwrap().failed = true;
-    Default::default()
 }

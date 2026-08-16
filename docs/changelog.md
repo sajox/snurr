@@ -10,13 +10,14 @@
 
 ### API changes
 
-- Removed typestate pattern with regular builder. Now use `ProcessBuilder::new` and `build()` to create the runnable `Process`.
-- Renamed Enum `With` to `Inclusive`.
-- New enum types `Exclusive`, `Task`, `IntermediateEvent`.
-- Support for `Panic`. Enables terminating the process from task and gateways. The process returns a RunTimeError::Panic containing the specified error.
+- Added an optional callback for end events to enable handling of such events, updating the model upon errors, or sending messages to external systems.
 - Using `Cow<'static, str>` instead of `&'static str` to be more flexible with different types of strings.
 - Added convenient factory methods for cases where conversions via `From` are not used.
 - Error redesign.
+- Support for `Panic`. Enables terminating the process from task and gateways. The process returns a RunTimeError::Panic containing the specified error.
+- Renamed Enum `With` to `Inclusive`.
+- New enum types `Exclusive`, `Task`, `IntermediateEvent`.
+- Removed typestate pattern with regular builder. Now use `ProcessBuilder::new` and `build()` to create the runnable `Process`.
 - Removed `Arc` and `Mutex` usage in Snurr and let the user choose. Callbacks now use `&T` instead of `Arc<Mutex<T>>`.
     - Change your process type to `ProcessBuilder::<Arc<Mutex<YourModel>>>::new` to maintain compatibility with existing code.
     - And to extract result

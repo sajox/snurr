@@ -4,6 +4,7 @@ pub(crate) mod handler;
 mod scaffold;
 
 use crate::{
+    Symbol,
     api::{Exclusive, Inclusive, IntermediateEvent, Task},
     bpmn::BpmnType,
     diagram::{
@@ -30,6 +31,7 @@ where
     diagram: Diagram,
     handler: Handler<T>,
     func_map: FuncMap,
+    end_callback: Option<usize>,
 }
 
 impl<T> ProcessBuilder<T> {
@@ -59,6 +61,7 @@ impl<T> ProcessBuilder<T> {
             diagram,
             handler: Default::default(),
             func_map: Default::default(),
+            end_callback: Default::default(),
         })
     }
 
@@ -117,6 +120,22 @@ impl<T> ProcessBuilder<T> {
         self
     }
 
+    /// Optionally register an end callback to act on end events. If an error is returned it terminate the process
+    /// prematurely and have it return the specified error. Only one can be registered.
+    pub fn end_event<F>(mut self, func: F) -> Self
+    where
+        F: Fn(&T, Option<&str>, Symbol) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+            + 'static
+            + Sync
+            + Send,
+    {
+        self.end_callback = self
+            .handler
+            .add_callback(Callback::End(Box::new(func)))
+            .into();
+        self
+    }
+
     /// Install and check that all required functions have been registered. Return runnable process if successful.
     /// If `build` returns an error, it contains the missing functions.
     pub fn build(mut self) -> Result<Process<T>, BuildError> {
@@ -125,6 +144,7 @@ impl<T> ProcessBuilder<T> {
             Ok(Process {
                 diagram: self.diagram,
                 handler: self.handler,
+                end_callback: self.end_callback,
             })
         } else {
             Err(BuildError::MissingImplementations(
@@ -153,6 +173,7 @@ impl<T> FromStr for ProcessBuilder<T> {
             diagram: read_bpmn(quick_xml::Reader::from_str(s))?,
             handler: Default::default(),
             func_map: Default::default(),
+            end_callback: Default::default(),
         })
     }
 }
@@ -164,6 +185,7 @@ where
 {
     diagram: Diagram,
     handler: Handler<T>,
+    end_callback: Option<usize>,
 }
 
 impl<T> Process<T> {
