@@ -87,7 +87,7 @@ fn subprocess_message_end() -> Result<()> {
         .exclusive("CHOOSE", |_| Default::default())
         .build()?;
     let result = bpmn.run(Default::default())?;
-    assert_eq!(result.lock().unwrap().count, 3);
+    assert_eq!(result.lock().unwrap().count, 1);
     Ok(())
 }
 

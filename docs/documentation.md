@@ -267,10 +267,8 @@ An inclusive gateway can select one or many flows named after the outgoing seque
 End events have different effects depending on where they are used. In a regular process or a subprocess. Some of these events are not used in accordance with the BPMN specification and are marked with `!BPMN`. They should not trigger a boundary event in this way.
 
 - **Cancel** ends the transaction subprocess and run the cancel boundary.
-- **Compensation** In a subprocess, ends and run the Compensation boundary. `!BPMN`
-- **Error** ends the process. In a subprocess, ends and run the error boundary.
+- **Error** In a subprocess, ends and run the error boundary.
 - **Escalation** In a subprocess, ends and run the Escalation boundary.
-- **Message** In a subprocess, ends and run the Message boundary. `!BPMN`
 - **Signal** In a subprocess, ends and run the Signal boundary.
 - **Terminate** ends the process. In a subprocess, ends and continues with the parent process.
 

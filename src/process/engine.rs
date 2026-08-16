@@ -85,7 +85,7 @@ impl<T> Process<T> {
                                 // Regular process
                                 Event {
                                     event_type: EventType::End,
-                                    symbol: Some(Symbol::Terminate | Symbol::Error),
+                                    symbol: Some(Symbol::Terminate),
                                     ..
                                 } => return Ok(event),
                                 _ => {
@@ -252,10 +252,8 @@ impl<T> Process<T> {
                                 symbol:
                                     Some(
                                         symbol @ (Symbol::Cancel
-                                        | Symbol::Compensation
                                         | Symbol::Error
                                         | Symbol::Escalation
-                                        | Symbol::Message
                                         | Symbol::Signal),
                                     ),
                                 name,

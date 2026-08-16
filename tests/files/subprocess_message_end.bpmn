@@ -25,11 +25,11 @@
         <bpmn:outgoing>Flow_0v8i1hs</bpmn:outgoing>
       </bpmn:task>
       <bpmn:sequenceFlow id="Flow_0fdl809" name="YES" sourceRef="Gateway_0pkk2tf" targetRef="Activity_0ct2k4b" />
+      <bpmn:sequenceFlow id="Flow_0v8i1hs" sourceRef="Activity_0ct2k4b" targetRef="Event_16gsgu3" />
+      <bpmn:sequenceFlow id="Flow_0p1ncgl" name="NO" sourceRef="Gateway_0pkk2tf" targetRef="Event_0phjy23" />
       <bpmn:endEvent id="Event_0phjy23">
         <bpmn:incoming>Flow_0p1ncgl</bpmn:incoming>
       </bpmn:endEvent>
-      <bpmn:sequenceFlow id="Flow_0p1ncgl" name="NO" sourceRef="Gateway_0pkk2tf" targetRef="Event_0phjy23" />
-      <bpmn:sequenceFlow id="Flow_0v8i1hs" sourceRef="Activity_0ct2k4b" targetRef="Event_16gsgu3" />
     </bpmn:subProcess>
     <bpmn:sequenceFlow id="Flow_1jpp2ze" sourceRef="StartEvent_0fqyv2p" targetRef="Activity_0zd8r93" />
     <bpmn:boundaryEvent id="Event_0r55d8a" attachedToRef="Activity_0zd8r93">
@@ -49,6 +49,10 @@
       <bpmn:incoming>Flow_0gbep73</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="Flow_0gbep73" sourceRef="Activity_0zd8r93" targetRef="Event_13az9np" />
+    <bpmn:textAnnotation id="TextAnnotation_0zesvnk">
+      <bpmn:text>Message end in a subprocess do not trigger boundary</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="Association_0uve9xy" associationDirection="None" sourceRef="Event_0r55d8a" targetRef="TextAnnotation_0zesvnk" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_1meln4r">
@@ -110,6 +114,10 @@
       <bpmndi:BPMNShape id="Event_13az9np_di" bpmnElement="Event_13az9np">
         <dc:Bounds x="812" y="172" width="36" height="36" />
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Association_0uve9xy_di" bpmnElement="Association_0uve9xy">
+        <di:waypoint x="464" y="318" />
+        <di:waypoint x="372" y="360" />
+      </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="Event_0r55d8a_di" bpmnElement="Event_0r55d8a">
         <dc:Bounds x="462" y="292" width="36" height="36" />
       </bpmndi:BPMNShape>
@@ -130,6 +138,10 @@
         <di:waypoint x="760" y="190" />
         <di:waypoint x="812" y="190" />
       </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="TextAnnotation_0zesvnk_di" bpmnElement="TextAnnotation_0zesvnk">
+        <dc:Bounds x="290" y="360" width="100" height="70" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>
