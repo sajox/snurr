@@ -735,6 +735,24 @@ fn intermediate_throw_event() -> Result<()> {
 }
 
 #[test]
+fn intermediate_catch_event() -> Result<()> {
+    let bpmn = ProcessBuilder::new("tests/files/intermediate_catch_event.bpmn")?
+        .task(COUNT_1, func_cnt(1))
+        .intermediate_catch_event(|input, name, symbol| {
+            // Count 1 on waiting to signal visited
+            match (name, symbol) {
+                (Some("wait"), Symbol::Timer) => input.lock().unwrap().count += 1,
+                _ => {}
+            }
+            Ok(())
+        })
+        .build()?;
+    let result = bpmn.run(Default::default())?;
+    assert_eq!(result.lock().unwrap().count, 2);
+    Ok(())
+}
+
+#[test]
 #[cfg(debug_assertions)]
 fn parallel_unbalanced() -> Result<()> {
     let bpmn = ProcessBuilder::new("tests/files/parallel_unbalanced.bpmn")?

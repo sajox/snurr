@@ -12,6 +12,7 @@
 
 - Added an optional callback for `end events` to enable handling of such events, updating the model upon errors, or sending messages to external systems.
 - Added an optional callback for `intermediate throw events` to enable handling of such events, for example, sending messages to external systems.
+- Added an optional callback for `intermediate catch events` to enable handling of such events, for example, waiting for a timer.
 - Using `Cow<'static, str>` instead of `&'static str` to be more flexible with different types of strings.
 - Added convenient factory methods for cases where conversions via `From` are not used.
 - Error redesign.

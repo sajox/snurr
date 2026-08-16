@@ -33,6 +33,7 @@ where
     func_map: FuncMap,
     end_callback: Option<usize>,
     intermediate_throw_callback: Option<usize>,
+    intermediate_catch_callback: Option<usize>,
 }
 
 impl<T> ProcessBuilder<T> {
@@ -64,10 +65,63 @@ impl<T> ProcessBuilder<T> {
             func_map: Default::default(),
             end_callback: Default::default(),
             intermediate_throw_callback: Default::default(),
+            intermediate_catch_callback: Default::default(),
         })
     }
 
-    /// Register a task function with name or bpmn id
+    /// # Task
+    ///
+    /// All tasks is used in the same way regardless of which icon is used in the BPMN diagram. If a task name
+    /// is given then every task with same name will use the same closure. Register a task by **name** or by **id**.
+    ///
+    /// A name is preferable, since an id can be regenerated in the BPMN tool (if elements are deleted and re-added).
+    /// Two or more outgoing sequence flows from a task create a fork of the flow. It is recommended to use a parallel gateway
+    /// after the task instead, for the sake of clarity.
+    ///
+    /// ## Default flow
+    ///
+    /// Return `Default` if no boundary is used and follow regular flow.
+    ///
+    /// ```rust no_run
+    /// # use snurr::ProcessBuilder;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// #   ProcessBuilder::<()>::new("dummy.bpmn")?
+    /// .task("name or id", |input| {
+    ///     Default::default()
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// ## Boundary flow
+    ///
+    /// If one or more boundaries exist on a task, then a boundary can be returned. If a name exist it must match.
+    ///
+    /// ### Boundary with no name
+    ///
+    /// ```rust no_run
+    /// # use snurr::{ProcessBuilder, Symbol};
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// #   ProcessBuilder::<()>::new("dummy.bpmn")?
+    /// .task("name or id", |input| {
+    ///     Symbol::Error.into()
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// ### Boundary with name
+    ///
+    /// ```rust no_run
+    /// # use snurr::{ProcessBuilder, Symbol};
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// #   ProcessBuilder::<()>::new("dummy.bpmn")?
+    /// .task("name or id", |input| {
+    ///     ("Not good", Symbol::Error).into()
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn task<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
         F: Fn(&T) -> Task + 'static + Sync + Send,
@@ -80,7 +134,35 @@ impl<T> ProcessBuilder<T> {
         self
     }
 
-    /// Register an exclusive gateway function with name or bpmn id
+    /// # Exclusive gateway
+    ///
+    /// An exclusive gateway can select a flow named after the outgoing sequence flow.
+    ///
+    /// ## One flow
+    ///
+    /// ```rust no_run
+    /// # use snurr::ProcessBuilder;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// #   ProcessBuilder::<()>::new("dummy.bpmn")?
+    /// .exclusive("name or id", |input| {
+    ///     "YES".into()
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// ## Default flow
+    ///
+    /// ```rust no_run
+    /// # use snurr::ProcessBuilder;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// #   ProcessBuilder::<()>::new("dummy.bpmn")?
+    /// .exclusive("name or id", |input| {
+    ///     Default::default()
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn exclusive<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
         F: Fn(&T) -> Exclusive + 'static + Sync + Send,
@@ -94,7 +176,50 @@ impl<T> ProcessBuilder<T> {
         self
     }
 
-    /// Register an inclusive gateway function with name or bpmn id
+    /// # Inclusive gateway
+    ///
+    /// An inclusive gateway can select one or many flows named after the outgoing sequence flow. A default flow
+    /// should always be available in the BPMN diagram. Do not forget to merge the flows using a converging gateway.
+    /// Only balanced gateway construction supported.
+    ///
+    /// ## One flow
+    ///
+    /// ```rust no_run
+    /// # use snurr::ProcessBuilder;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// #   ProcessBuilder::<()>::new("dummy.bpmn")?
+    /// .inclusive("name or id", |input| {
+    ///     "YES".into()
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// ## Many flows
+    ///
+    /// ```rust no_run
+    /// # use snurr::ProcessBuilder;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// #   ProcessBuilder::<()>::new("dummy.bpmn")?
+    /// .inclusive("name or id", |input| {
+    ///     vec!["YES", "NO"].into()
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// ## Default flow
+    ///
+    /// ```rust no_run
+    /// # use snurr::ProcessBuilder;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// #   ProcessBuilder::<()>::new("dummy.bpmn")?
+    /// .inclusive("name or id", |input| {
+    ///     Default::default()
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn inclusive<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
         F: Fn(&T) -> Inclusive + 'static + Sync + Send,
@@ -108,7 +233,22 @@ impl<T> ProcessBuilder<T> {
         self
     }
 
-    /// Register an event based gateway function with name or bpmn id
+    /// # Event-based gateway
+    ///
+    /// An event-based gateway can select a flow with an intermediate throw event, where the name and symbol must match those of the intermediate catching event. Event-based gateways require at least 2 outputs.
+    ///
+    /// ## One flow
+    ///
+    /// ```rust no_run
+    /// # use snurr::{ProcessBuilder, Symbol};
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// #   ProcessBuilder::<()>::new("dummy.bpmn")?
+    /// .event_based("name or id", |input| {
+    ///      ("Message", Symbol::Message).into()
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn event_based<F>(mut self, name: impl Into<String>, func: F) -> Self
     where
         F: Fn(&T) -> IntermediateEvent + 'static + Sync + Send,
@@ -124,6 +264,20 @@ impl<T> ProcessBuilder<T> {
 
     /// Optionally register an end callback to act on end events. If an error is returned it terminate the process
     /// prematurely and have it return the specified error. Only one can be registered.
+    /// ```rust no_run
+    /// # use snurr::{ProcessBuilder, Symbol} ;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// #   ProcessBuilder::<()>::new("dummy.bpmn")?
+    /// .end_event(|_input, name, symbol| {      
+    ///     match symbol {
+    ///         Symbol::Error => println!("act on an error, such as update the model or inform external systems"),
+    ///         _ => println!("ignore other end events"),
+    ///     }
+    ///     Ok(())
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn end_event<F>(mut self, func: F) -> Self
     where
         F: Fn(&T, Option<&str>, Symbol) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
@@ -140,6 +294,20 @@ impl<T> ProcessBuilder<T> {
 
     /// Optionally register an intermediate throw callback to act on intermediate throw events. If an error is returned it terminate the process
     /// prematurely and have it return the specified error. Only one can be registered.
+    /// ```rust no_run
+    /// # use snurr::{ProcessBuilder, Symbol} ;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// #   ProcessBuilder::<()>::new("dummy.bpmn")?
+    /// .intermediate_throw_event(|_input, name, symbol| {      
+    ///     match symbol {
+    ///         Symbol::Message => println!("act on the message, for example by informing external systems"),
+    ///         _ => println!("ignore other throw events"),
+    ///     }
+    ///     Ok(())
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn intermediate_throw_event<F>(mut self, func: F) -> Self
     where
         F: Fn(&T, Option<&str>, Symbol) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
@@ -148,6 +316,38 @@ impl<T> ProcessBuilder<T> {
             + Send,
     {
         self.intermediate_throw_callback = self
+            .handler
+            .add_callback(Callback::EndOrIntermediate(Box::new(func)))
+            .into();
+        self
+    }
+
+    /// Optionally register an intermediate catch callback to act on intermediate catch events. If an error is returned it terminate the process
+    /// prematurely and have it return the specified error. Only one can be registered.
+    /// ```rust no_run
+    /// # use snurr::{ProcessBuilder, Symbol};
+    /// # use std::time::{Duration};
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// #   ProcessBuilder::<()>::new("dummy.bpmn")?
+    /// .intermediate_catch_event(|_input, name, symbol| {
+    ///     match (name, symbol) {
+    ///         (Some("wait 5 sec"), Symbol::Timer) => std::thread::sleep(Duration::new(5, 0)),
+    ///         (Some("wait 1 minute"), Symbol::Timer) => std::thread::sleep(Duration::new(60, 0)),
+    ///         _ => println!("ignore other catch events"),
+    ///     }
+    ///     Ok(())
+    /// });
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn intermediate_catch_event<F>(mut self, func: F) -> Self
+    where
+        F: Fn(&T, Option<&str>, Symbol) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+            + 'static
+            + Sync
+            + Send,
+    {
+        self.intermediate_catch_callback = self
             .handler
             .add_callback(Callback::EndOrIntermediate(Box::new(func)))
             .into();
@@ -164,6 +364,7 @@ impl<T> ProcessBuilder<T> {
                 handler: self.handler,
                 end_callback: self.end_callback,
                 intermediate_throw_callback: self.intermediate_throw_callback,
+                intermediate_catch_callback: self.intermediate_catch_callback,
             })
         } else {
             Err(BuildError::MissingImplementations(
@@ -194,6 +395,7 @@ impl<T> FromStr for ProcessBuilder<T> {
             func_map: Default::default(),
             end_callback: Default::default(),
             intermediate_throw_callback: Default::default(),
+            intermediate_catch_callback: Default::default(),
         })
     }
 }
@@ -207,6 +409,7 @@ where
     handler: Handler<T>,
     end_callback: Option<usize>,
     intermediate_throw_callback: Option<usize>,
+    intermediate_catch_callback: Option<usize>,
 }
 
 impl<T> Process<T> {

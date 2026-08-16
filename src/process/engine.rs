@@ -154,31 +154,47 @@ impl<T> Process<T> {
                 ) => {
                     debug!("{event}");
                     match event_type {
-                        EventType::Start | EventType::IntermediateCatch | EventType::Boundary => {
+                        EventType::Start | EventType::Boundary => {
+                            maybe_fork!(outputs, event)
+                        }
+                        EventType::IntermediateCatch => {
+                            if !matches!(symbol, Some(Symbol::Link))
+                                && let Some(index) = self.intermediate_catch_callback
+                                && let Some(symbol) = symbol
+                            {
+                                self.handler
+                                    .run_end_or_intermediate(
+                                        index,
+                                        input.data,
+                                        name.as_deref(),
+                                        *symbol,
+                                    )?
+                                    .map_err(RuntimeError::Panic)?;
+                            }
+
                             maybe_fork!(outputs, event)
                         }
                         EventType::IntermediateThrow => match (name.as_ref(), symbol.as_ref()) {
                             (Some(name), Some(Symbol::Link)) => {
                                 input.process.events.catch_event_link(name)?
                             }
-                            (Some(_), _) => {
-                                if let Some(index) = self.intermediate_throw_callback
-                                    && let Some(symbol) = symbol
-                                {
+                            (None, Some(Symbol::Link)) => Err(
+                                DiagramError::MissingIntermediateThrowEventName(id.bpmn().into()),
+                            )?,
+                            _ => {
+                                // Intermediate None is a throw event
+                                if let Some(index) = self.intermediate_throw_callback {
                                     self.handler
                                         .run_end_or_intermediate(
                                             index,
                                             input.data,
                                             name.as_deref(),
-                                            *symbol,
+                                            symbol.unwrap_or_default(),
                                         )?
                                         .map_err(RuntimeError::Panic)?;
                                 }
                                 maybe_fork!(outputs, event)
                             }
-                            _ => Err(DiagramError::MissingIntermediateThrowEventName(
-                                id.bpmn().into(),
-                            ))?,
                         },
                         EventType::End => {
                             if let Some(index) = self.end_callback

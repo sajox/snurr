@@ -107,15 +107,13 @@ pub fn build(process_builder: ProcessBuilder<()>) -> Result<Process<()>, BuildEr
 }
 ```
 
-## Tasks
+## Task
 
 All tasks is used in the same way regardless of which icon is used in the BPMN diagram. If a task name is given then every task with same name will use the same closure. Register a task by **name** or by **id**. A name is preferable, since an id can be regenerated in the BPMN tool (if elements are deleted and re-added).
 
 Two or more outgoing sequence flows from a task create a fork of the flow. It is recommended to use a parallel gateway after the task instead, for the sake of clarity.
 
-### Task
-
-#### Default flow
+### Default flow
 
 Return `Default` if no boundary is used and follow regular flow.
 
@@ -130,11 +128,11 @@ Return `Default` if no boundary is used and follow regular flow.
 # }
 ```
 
-#### Boundary flow
+### Boundary flow
 
 If one or more boundaries exist on a task, then a boundary can be returned. If a name exist it must match.
 
-##### Boundary with no name
+#### Boundary with no name
 
 ```rust no_run
 # use snurr::{ProcessBuilder, Symbol};
@@ -147,7 +145,7 @@ If one or more boundaries exist on a task, then a boundary can be returned. If a
 # }
 ```
 
-##### Boundary with name
+#### Boundary with name
 
 ```rust no_run
 # use snurr::{ProcessBuilder, Symbol};
@@ -309,6 +307,27 @@ Optionally register an intermediate throw callback to act on throw events. If an
     match symbol {
         Symbol::Message => println!("act on the message, for example by informing external systems"),
         _ => println!("ignore other throw events"),
+    }
+    Ok(())
+});
+# Ok(())
+# }
+```
+
+#### Listen to intermediate catch events
+
+Optionally register an intermediate catch callback to act on catch events. If an error is returned it terminate the process prematurely and have it return the specified error. Only one can be registered.
+
+```rust no_run
+# use snurr::{ProcessBuilder, Symbol};
+# use std::time::{Duration}; 
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+#   ProcessBuilder::<()>::new("dummy.bpmn")?
+.intermediate_catch_event(|input, name, symbol| {
+    match (name, symbol) {
+        (Some("wait 5 sec"), Symbol::Timer) => std::thread::sleep(Duration::new(5, 0)),
+        (Some("wait 1 minute"), Symbol::Timer) => std::thread::sleep(Duration::new(60, 0)),
+        _ => println!("ignore other catch events"),
     }
     Ok(())
 });
