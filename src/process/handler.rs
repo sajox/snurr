@@ -22,7 +22,7 @@ type TaskCallback<T> = Box<dyn Fn(&T) -> Task + Sync + Send>;
 type ExclusiveCallback<T> = Box<dyn Fn(&T) -> Exclusive + Sync + Send>;
 type InclusiveCallback<T> = Box<dyn Fn(&T) -> Inclusive + Sync + Send>;
 type EventBasedCallback<T> = Box<dyn Fn(&T) -> IntermediateEvent + Sync + Send>;
-type EndCallback<T> = Box<
+type EndOrInterMediateCallback<T> = Box<
     dyn Fn(&T, Option<&str>, Symbol) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
         + Sync
         + Send,
@@ -33,7 +33,7 @@ pub(super) enum Callback<T> {
     Exclusive(ExclusiveCallback<T>),
     Inclusive(InclusiveCallback<T>),
     EventBased(EventBasedCallback<T>),
-    End(EndCallback<T>),
+    EndOrIntermediate(EndOrInterMediateCallback<T>),
 }
 
 pub(super) struct Handler<T> {
@@ -61,16 +61,16 @@ impl<T> Handler<T> {
     callback!(run_inclusive, Callback::Inclusive(func) => func, Inclusive);
     callback!(run_eventbased, Callback::EventBased(func) => func, IntermediateEvent);
 
-    pub(super) fn run_end(
+    pub(super) fn run_end_or_intermediate(
         &self,
         index: usize,
         data: &T,
         name: Option<&str>,
         symbol: Symbol,
     ) -> Result<Result<(), Box<dyn std::error::Error + Send + Sync>>, RuntimeError> {
-        let Some(Callback::End(func)) = self.callbacks.get(index) else {
+        let Some(Callback::EndOrIntermediate(func)) = self.callbacks.get(index) else {
             Err(RuntimeError::Engine(format!(
-                "missing run_end with index: {index}",
+                "missing run_end_or_intermediate with index: {index}",
             )))?
         };
         Ok(func(data, name, symbol))

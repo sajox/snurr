@@ -32,6 +32,7 @@ where
     handler: Handler<T>,
     func_map: FuncMap,
     end_callback: Option<usize>,
+    intermediate_throw_callback: Option<usize>,
 }
 
 impl<T> ProcessBuilder<T> {
@@ -62,6 +63,7 @@ impl<T> ProcessBuilder<T> {
             handler: Default::default(),
             func_map: Default::default(),
             end_callback: Default::default(),
+            intermediate_throw_callback: Default::default(),
         })
     }
 
@@ -131,7 +133,23 @@ impl<T> ProcessBuilder<T> {
     {
         self.end_callback = self
             .handler
-            .add_callback(Callback::End(Box::new(func)))
+            .add_callback(Callback::EndOrIntermediate(Box::new(func)))
+            .into();
+        self
+    }
+
+    /// Optionally register an intermediate throw callback to act on intermediate throw events. If an error is returned it terminate the process
+    /// prematurely and have it return the specified error. Only one can be registered.
+    pub fn intermediate_throw_event<F>(mut self, func: F) -> Self
+    where
+        F: Fn(&T, Option<&str>, Symbol) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+            + 'static
+            + Sync
+            + Send,
+    {
+        self.intermediate_throw_callback = self
+            .handler
+            .add_callback(Callback::EndOrIntermediate(Box::new(func)))
             .into();
         self
     }
@@ -145,6 +163,7 @@ impl<T> ProcessBuilder<T> {
                 diagram: self.diagram,
                 handler: self.handler,
                 end_callback: self.end_callback,
+                intermediate_throw_callback: self.intermediate_throw_callback,
             })
         } else {
             Err(BuildError::MissingImplementations(
@@ -174,6 +193,7 @@ impl<T> FromStr for ProcessBuilder<T> {
             handler: Default::default(),
             func_map: Default::default(),
             end_callback: Default::default(),
+            intermediate_throw_callback: Default::default(),
         })
     }
 }
@@ -186,6 +206,7 @@ where
     diagram: Diagram,
     handler: Handler<T>,
     end_callback: Option<usize>,
+    intermediate_throw_callback: Option<usize>,
 }
 
 impl<T> Process<T> {

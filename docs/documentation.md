@@ -297,7 +297,27 @@ Optionally register an end callback to act on end events. If an error is returne
 
 - Intermediate **none** events (no icon) don't do anything and just follow its output. 
 - **Link** throw and catch need a matching name
-- **Other symbols** don't do anything and just follow its output.
+- **Other symbols** call the optionally registered callback and just follow its output.
+
+#### Listen to intermediate throw events
+
+Optionally register an intermediate throw callback to act on throw events. If an error is returned it terminate the process prematurely and have it return the specified error. Only one can be registered.
+
+```rust no_run
+# use snurr::{ProcessBuilder, Symbol} ;
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+#   ProcessBuilder::<()>::new("dummy.bpmn")?
+.intermediate_throw_event(|_input, name, symbol| {      
+    match symbol {
+        Symbol::Message => println!("act on the message, for example by informing external systems"),
+        _ => println!("ignore other throw events"),
+    }
+    Ok(())
+});
+# Ok(())
+# }
+```
+
  
 ### Boundary event
 
