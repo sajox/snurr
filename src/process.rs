@@ -204,11 +204,11 @@ impl<T> Process<T> {
     where
         T: Send + Sync,
     {
-        let index = self.diagram.process_index();
-        let process_data = self.diagram.get_process(index).ok_or_else(|| {
-            RuntimeError::Engine(format!("missing process data with index `{}`", index))
-        })?;
-        self.execute(ExecuteInput::new(process_data, false, &data))?;
+        self.execute(ExecuteInput::new(
+            self.diagram.main_process()?,
+            false,
+            &data,
+        ))?;
         Ok(data)
     }
 }

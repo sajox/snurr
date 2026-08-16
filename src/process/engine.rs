@@ -217,15 +217,12 @@ impl<T> Process<T> {
                             }
                         }
                         ActivityType::SubProcess => {
-                            let subprocess = if let Some(index) = data_index
-                                && let Some(process_data) = self.diagram.get_process(*index)
-                            {
-                                process_data
-                            } else {
-                                Err(RuntimeError::Engine(format!(
-                                    "missing subprocess data with bpmn id {:?}",
+                            let subprocess = match data_index {
+                                Some(index) => self.diagram.get_process(*index)?,
+                                _ => Err(RuntimeError::Engine(format!(
+                                    "missing subprocess index {:?}",
                                     activity
-                                )))?
+                                )))?,
                             };
 
                             if let Event {

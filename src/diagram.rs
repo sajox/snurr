@@ -4,6 +4,7 @@ pub mod reader;
 use crate::{
     bpmn::{Activity, ActivityType, Bpmn, BpmnType, Event, Gateway, GatewayType, Symbol},
     diagram::events::Events,
+    error::RuntimeError,
     process::func_map::FuncMap,
 };
 
@@ -26,13 +27,15 @@ impl Diagram {
         }
     }
 
-    pub fn process_index(&self) -> usize {
-        self.process_index
+    pub fn main_process(&self) -> Result<&ProcessData, RuntimeError> {
+        self.get_process(self.process_index)
     }
 
     // Can be a process or sub process
-    pub fn get_process(&self, process_id: usize) -> Option<&ProcessData> {
-        self.data.get(process_id)
+    pub fn get_process(&self, process_id: usize) -> Result<&ProcessData, RuntimeError> {
+        self.data.get(process_id).ok_or_else(|| {
+            RuntimeError::Engine(format!("missing process data with index `{}`", process_id))
+        })
     }
 
     pub fn data(&self) -> &[ProcessData] {
