@@ -54,10 +54,11 @@ impl DataBuilder {
         Ok(())
     }
 
-    pub(super) fn update_symbol(&mut self, bpmn_type: &str) {
+    pub(super) fn update_symbol(&mut self, bpmn_type: &str) -> Result<(), ParseError> {
         if let Some(RawData { symbol, .. }) = self.stack.last_mut() {
-            *symbol = bpmn_type.try_into().ok();
+            *symbol = bpmn_type.try_into().map_err(ParseErrorKind::Bpmn)?;
         }
+        Ok(())
     }
 
     pub(super) fn add_text_to_parent(&mut self, bpmn_type: &str) {
@@ -157,7 +158,7 @@ impl ProcessConstruction {
         let len = self.data.len();
         if let Bpmn::Event(Event {
             event_type: EventType::Start,
-            symbol: None,
+            symbol: Symbol::None,
             ..
         }) = bpmn
             && self.start.replace(len).is_some()

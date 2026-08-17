@@ -69,7 +69,7 @@ pub fn read_bpmn<R: BufRead>(mut reader: Reader<R>) -> Result<Diagram, ParseErro
                     | SIGNAL_EVENT_DEFINITION
                     | TERMINATE_EVENT_DEFINITION
                     | TIMER_EVENT_DEFINITION) => {
-                        builder.update_symbol(bpmn_type);
+                        builder.update_symbol(bpmn_type)?;
                     }
                     bpmn_type @ SEQUENCE_FLOW => {
                         builder.add_to_process(RawData::new(bpmn_type, collect_attributes(&bs)))?;
@@ -152,7 +152,7 @@ impl<T> LineAndColumn for Reader<T> {
 struct RawData {
     bpmn_type: String,
     attributes: HashMap<Attrib, String>,
-    symbol: Option<Symbol>,
+    symbol: Symbol,
     data_index: Option<usize>,
     outputs: Vec<String>,
     inputs: Vec<String>,

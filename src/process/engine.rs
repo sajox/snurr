@@ -75,17 +75,22 @@ impl<T> Process<T> {
                         Ok(Return::Join(gateway)) => handler.consume_token(Some(gateway)),
                         Ok(Return::End(event)) => {
                             match event {
-                                // A subprocess end event, terminate early. The result is used by the subprocess to choose boundary (interrupting).
+                                // A subprocess end event, terminate early if a boundary (interrupting) or terminate event
                                 Event {
                                     event_type: EventType::End,
-                                    symbol: Some(_),
+                                    symbol:
+                                        Symbol::Cancel
+                                        | Symbol::Error
+                                        | Symbol::Escalation
+                                        | Symbol::Signal
+                                        | Symbol::Terminate,
                                     ..
                                 } if input.is_subprocess => return Ok(event),
 
                                 // Regular process
                                 Event {
                                     event_type: EventType::End,
-                                    symbol: Some(Symbol::Terminate),
+                                    symbol: Symbol::Terminate,
                                     ..
                                 } => return Ok(event),
                                 _ => {
@@ -158,9 +163,8 @@ impl<T> Process<T> {
                             maybe_fork!(outputs, event)
                         }
                         EventType::IntermediateCatch => {
-                            if !matches!(symbol, Some(Symbol::Link))
+                            if !matches!(symbol, Symbol::Link)
                                 && let Some(index) = self.intermediate_catch_callback
-                                && let Some(symbol) = symbol
                             {
                                 self.handler
                                     .run_end_or_intermediate(
@@ -174,22 +178,21 @@ impl<T> Process<T> {
 
                             maybe_fork!(outputs, event)
                         }
-                        EventType::IntermediateThrow => match (name.as_ref(), symbol.as_ref()) {
-                            (Some(name), Some(Symbol::Link)) => {
+                        EventType::IntermediateThrow => match (name.as_ref(), symbol) {
+                            (Some(name), Symbol::Link) => {
                                 input.process.events.catch_event_link(name)?
                             }
-                            (None, Some(Symbol::Link)) => Err(
+                            (None, Symbol::Link) => Err(
                                 DiagramError::MissingIntermediateThrowEventName(id.bpmn().into()),
                             )?,
                             _ => {
-                                // Intermediate None is a throw event
                                 if let Some(index) = self.intermediate_throw_callback {
                                     self.handler
                                         .run_end_or_intermediate(
                                             index,
                                             input.data,
                                             name.as_deref(),
-                                            symbol.unwrap_or_default(),
+                                            *symbol,
                                         )?
                                         .map_err(RuntimeError::Panic)?;
                                 }
@@ -197,8 +200,8 @@ impl<T> Process<T> {
                             }
                         },
                         EventType::End => {
-                            if let Some(index) = self.end_callback
-                                && let Some(symbol) = symbol
+                            if !matches!(symbol, Symbol::None)
+                                && let Some(index) = self.end_callback
                             {
                                 self.handler
                                     .run_end_or_intermediate(
@@ -266,12 +269,11 @@ impl<T> Process<T> {
                             if let Event {
                                 event_type: EventType::End,
                                 symbol:
-                                    Some(
-                                        symbol @ (Symbol::Cancel
-                                        | Symbol::Error
-                                        | Symbol::Escalation
-                                        | Symbol::Signal),
-                                    ),
+                                    symbol @ (Symbol::Cancel
+                                    | Symbol::Error
+                                    | Symbol::Escalation
+                                    | Symbol::Signal),
+
                                 name,
                                 ..
                             } = self.execute(ExecuteInput::new(subprocess, true, input.data))?

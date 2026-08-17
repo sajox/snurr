@@ -38,7 +38,7 @@ impl Events {
             Event {
                 id,
                 attached_to_ref: Some(attached_to_ref),
-                symbol: Some(symbol),
+                symbol,
                 name,
                 ..
             } => {
@@ -53,7 +53,7 @@ impl Events {
             }
             Event {
                 event_type: EventType::IntermediateCatch,
-                symbol: Some(Symbol::Link),
+                symbol: Symbol::Link,
                 id,
                 name: Some(name),
                 ..

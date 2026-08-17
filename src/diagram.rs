@@ -142,12 +142,11 @@ impl ProcessData {
                     }) => symbol == Symbol::Message && name_check.as_str() == name,
                     Bpmn::Event(Event {
                         symbol:
-                            Some(
-                                symbol_check @ (Symbol::Message
-                                | Symbol::Signal
-                                | Symbol::Timer
-                                | Symbol::Conditional),
-                            ),
+                            symbol_check @ (Symbol::Message
+                            | Symbol::Signal
+                            | Symbol::Timer
+                            | Symbol::Conditional),
+
                         name: Some(name_check),
                         ..
                     }) => symbol_check == &symbol && name_check.as_str() == name,

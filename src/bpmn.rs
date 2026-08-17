@@ -361,7 +361,7 @@ impl BpmnValidate for Gateway {
 #[derive(Debug)]
 pub(crate) struct Event {
     pub(crate) event_type: EventType,
-    pub(crate) symbol: Option<Symbol>,
+    pub(crate) symbol: Symbol,
     pub(crate) id: Id,
     pub(crate) name: Option<String>,
     pub(crate) attached_to_ref: Option<Id>,
@@ -391,8 +391,7 @@ impl BpmnValidate for Event {
                 symbol,
                 outputs,
                 ..
-            } if !(*event_type == EventType::IntermediateThrow
-                && *symbol == Some(Symbol::Link))
+            } if !(*event_type == EventType::IntermediateThrow && *symbol == Symbol::Link)
                 && outputs.len() == 0 =>
             {
                 Err(BpmnError::NoOutput(self.to_string()))?
