@@ -15,7 +15,6 @@ pub enum Error {
     Parse(ParseError),
     Runtime(RuntimeError),
     Build(BuildError),
-    Io(std::io::Error),
 }
 
 impl Display for Error {
@@ -25,7 +24,6 @@ impl Display for Error {
             Error::Parse(error) => error.fmt(f),
             Error::Runtime(error) => error.fmt(f),
             Error::Build(error) => error.fmt(f),
-            Error::Io(error) => error.fmt(f),
         }
     }
 }
@@ -37,7 +35,6 @@ impl std::error::Error for Error {
             Error::Parse(error) => error.source(),
             Error::Runtime(error) => error.source(),
             Error::Build(error) => error.source(),
-            Error::Io(error) => error.source(),
         }
     }
 }
@@ -63,11 +60,5 @@ impl From<RuntimeError> for Error {
 impl From<BuildError> for Error {
     fn from(value: BuildError) -> Self {
         Self::Build(value)
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(value: std::io::Error) -> Self {
-        Self::Io(value)
     }
 }
