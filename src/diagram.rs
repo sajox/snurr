@@ -124,36 +124,36 @@ impl ProcessData {
     }
 
     pub fn find_by_intermediate_event<'a>(
-        &self,
+        &'a self,
         name: &str,
         symbol: Symbol,
         outputs: &'a Outputs,
     ) -> Option<&'a usize> {
-        outputs.iter().find(|index| {
-            if let Some(Bpmn::SequenceFlow { target_ref, .. }) = self.get(**index)
+        outputs.iter().find_map(|index| {
+            if let Some(Bpmn::SequenceFlow { target_ref, .. }) = self.get(*index)
                 && let Some(bpmn) = self.get(*target_ref.local())
             {
-                return match bpmn {
-                    // We can target both ReceiveTask or Events.
+                // We can target both ReceiveTask or Events.
+                let id = match bpmn {
                     Bpmn::Activity(Activity {
                         activity_type: ActivityType::ReceiveTask,
                         name: Some(name_check),
                         ..
-                    }) => symbol == Symbol::Message && name_check.as_str() == name,
+                    }) if symbol == Symbol::Message && name_check.as_str() == name => target_ref,
                     Bpmn::Event(Event {
                         symbol:
                             symbol_check @ (Symbol::Message
                             | Symbol::Signal
                             | Symbol::Timer
                             | Symbol::Conditional),
-
                         name: Some(name_check),
                         ..
-                    }) => symbol_check == &symbol && name_check.as_str() == name,
-                    _ => false,
+                    }) if symbol_check == &symbol && name_check.as_str() == name => target_ref,
+                    _ => return None,
                 };
+                return Some(id.local());
             }
-            false
+            None
         })
     }
 }

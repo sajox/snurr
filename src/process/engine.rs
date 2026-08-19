@@ -345,7 +345,7 @@ impl<T> Process<T> {
                                 .ok_or_else(|| {
                                     RuntimeError::Engine(format!("missing function {:?}", gateway))
                                 })?? {
-                                IntermediateEvent::Throw(name, symbol) => input
+                                IntermediateEvent::Catch(name, symbol) => input
                                     .process
                                     .find_by_intermediate_event(&name, symbol, outputs)
                                     .ok_or_else(|| {

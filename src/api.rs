@@ -169,8 +169,8 @@ impl From<Symbol> for Task {
 /// Event based gateway return type
 #[derive(Debug)]
 pub enum IntermediateEvent {
-    /// Throw intermediate event to correlate to matching catch
-    Throw(Cow<'static, str>, Symbol),
+    /// Select the flow from the intermediate catch event that occurred in the gateway.
+    Catch(Cow<'static, str>, Symbol),
     /// Terminate the process prematurely and have it return the specified error.
     /// Instead of doing this, you should ensure that the BPMN diagram is always modeled
     /// with an error path whenever possible.
@@ -179,11 +179,11 @@ pub enum IntermediateEvent {
 
 /// Convenient factory methods
 impl IntermediateEvent {
-    pub fn throw<S>(name: S, symbol: Symbol) -> IntermediateEvent
+    pub fn catch<S>(name: S, symbol: Symbol) -> IntermediateEvent
     where
         S: Into<Cow<'static, str>>,
     {
-        Self::Throw(name.into(), symbol)
+        Self::Catch(name.into(), symbol)
     }
 
     pub fn panic<S>(value: S) -> IntermediateEvent
@@ -199,6 +199,6 @@ where
     S: Into<Cow<'static, str>>,
 {
     fn from(value: (S, Symbol)) -> Self {
-        Self::Throw(value.0.into(), value.1)
+        Self::Catch(value.0.into(), value.1)
     }
 }
