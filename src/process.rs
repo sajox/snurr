@@ -235,7 +235,8 @@ impl<T> ProcessBuilder<T> {
 
     /// # Event-based gateway
     ///
-    /// An event-based gateway can select a flow with an intermediate throw event, where the name and symbol must match those of the intermediate catching event. Event-based gateways require at least 2 outputs.
+    /// An event-based gateway waits for an incoming event, after which the outgoing flow is selected based
+    /// on the name and symbol of the catching intermediate event. Event-based gateways require at least two outgoing flows.
     ///
     /// ## One flow
     ///
