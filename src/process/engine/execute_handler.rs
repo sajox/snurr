@@ -3,11 +3,11 @@ use crate::{
     process::{DiagramError, RuntimeError, engine::Tokens},
 };
 use log::trace;
-use std::{borrow::Cow, fmt::Display};
+use std::fmt::Display;
 
 #[derive(Default, Debug)]
 pub(super) struct ExecuteHandler<'a> {
-    ready: Vec<Tokens<'a>>,
+    ready: Vec<usize>,
     pending: Vec<Tokens<'a>>,
     stack: Vec<TokenData<'a>>,
 }
@@ -15,20 +15,23 @@ pub(super) struct ExecuteHandler<'a> {
 impl<'a> ExecuteHandler<'a> {
     pub(super) fn new(start_token: usize) -> Self {
         Self {
-            ready: vec![Cow::from(vec![start_token])],
+            ready: vec![start_token],
             ..Default::default()
         }
     }
 
-    // Return tokens to be processed.
-    pub(super) fn active_tokens(&mut self) -> Vec<Tokens<'a>> {
-        std::mem::take(&mut self.ready)
+    // Swap tokens with consumer
+    pub(super) fn swap(&mut self, consumer: &mut Vec<usize>) {
+        std::mem::swap(&mut self.ready, consumer);
+
+        // Clear if something was left from consumer
+        self.ready.clear();
     }
 
     // Push directly to ready without the involvement of token_stack.
     // When we JOIN a gateway with one output we should not increase the token_stack.
     pub(super) fn immediate(&mut self, item: Tokens<'a>) {
-        self.ready.push(item);
+        self.ready.extend(item.iter());
     }
 
     // If a gateway FORK is involved, we need to use the token stack. Even if the gateway only selects one flow.
@@ -41,7 +44,7 @@ impl<'a> ExecuteHandler<'a> {
         for item in self.pending.drain(..) {
             trace!("NEW TOKENS {}", item.len());
             self.stack.push(TokenData::new(item.len()));
-            self.ready.push(item);
+            self.ready.extend(item.iter());
         }
     }
 

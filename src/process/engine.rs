@@ -42,8 +42,9 @@ impl<T> Process<T> {
     {
         let mut last_visited_end = None;
         let mut handler = ExecuteHandler::new(input.process.start());
+        let mut active_tokens = vec![];
         loop {
-            let active_tokens = handler.active_tokens();
+            handler.swap(&mut active_tokens);
             if active_tokens.is_empty() {
                 return last_visited_end.ok_or(DiagramError::MissingEndEvent.into());
             }
@@ -52,55 +53,46 @@ impl<T> Process<T> {
                 #[cfg(feature = "parallel")]
                 {
                     use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-                    let results: Vec<Vec<_>> = active_tokens
+                    let results: Vec<_> = active_tokens
                         .par_iter()
-                        .map(|tokens| {
-                            tokens
-                                .par_iter()
-                                .map(|token| self.flow(token, &input))
-                                .collect()
-                        })
+                        .map(|token| self.flow(token, &input))
                         .collect::<Vec<_>>();
                     results.into_iter()
                 }
                 #[cfg(not(feature = "parallel"))]
-                active_tokens
-                    .iter()
-                    .map(|tokens| tokens.iter().map(|token| self.flow(token, &input)))
+                active_tokens.iter().map(|token| self.flow(token, &input))
             };
 
-            for flows_result in flows_iter.rev() {
-                for flow_result in flows_result {
-                    match flow_result? {
-                        Return::Join(gateway) => handler.consume_token(Some(gateway)),
-                        Return::End(event) => {
-                            match event {
-                                // A subprocess end event, terminate early if a boundary (interrupting) or terminate event
-                                Event {
-                                    event_type: EventType::End,
-                                    symbol:
-                                        Symbol::Cancel
-                                        | Symbol::Error
-                                        | Symbol::Escalation
-                                        | Symbol::Signal
-                                        | Symbol::Terminate,
-                                    ..
-                                } if input.is_subprocess => return Ok(event),
+            for flow_result in flows_iter.rev() {
+                match flow_result? {
+                    Return::Join(gateway) => handler.consume_token(Some(gateway)),
+                    Return::End(event) => {
+                        match event {
+                            // A subprocess end event, terminate early if a boundary (interrupting) or terminate event
+                            Event {
+                                event_type: EventType::End,
+                                symbol:
+                                    Symbol::Cancel
+                                    | Symbol::Error
+                                    | Symbol::Escalation
+                                    | Symbol::Signal
+                                    | Symbol::Terminate,
+                                ..
+                            } if input.is_subprocess => return Ok(event),
 
-                                // Regular process
-                                Event {
-                                    event_type: EventType::End,
-                                    symbol: Symbol::Terminate,
-                                    ..
-                                } => return Ok(event),
-                                _ => {
-                                    last_visited_end.replace(event);
-                                    handler.consume_token(None);
-                                }
+                            // Regular process
+                            Event {
+                                event_type: EventType::End,
+                                symbol: Symbol::Terminate,
+                                ..
+                            } => return Ok(event),
+                            _ => {
+                                last_visited_end.replace(event);
+                                handler.consume_token(None);
                             }
                         }
-                        Return::Fork(item) => handler.pending_fork(item),
                     }
+                    Return::Fork(item) => handler.pending_fork(item),
                 }
 
                 // Check if all inputs have been merged for a gateway, then proceed with its outputs.
