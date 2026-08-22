@@ -71,9 +71,9 @@ impl<T> Process<T> {
 
             for flows_result in flows_iter.rev() {
                 for flow_result in flows_result {
-                    match flow_result {
-                        Ok(Return::Join(gateway)) => handler.consume_token(Some(gateway)),
-                        Ok(Return::End(event)) => {
+                    match flow_result? {
+                        Return::Join(gateway) => handler.consume_token(Some(gateway)),
+                        Return::End(event) => {
                             match event {
                                 // A subprocess end event, terminate early if a boundary (interrupting) or terminate event
                                 Event {
@@ -99,8 +99,7 @@ impl<T> Process<T> {
                                 }
                             }
                         }
-                        Ok(Return::Fork(item)) => handler.pending_fork(item),
-                        Err(value) => return Err(value),
+                        Return::Fork(item) => handler.pending_fork(item),
                     }
                 }
 
