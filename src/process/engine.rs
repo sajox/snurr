@@ -15,6 +15,7 @@ type Tokens<'a> = Cow<'a, [usize]>;
 
 #[derive(Debug)]
 enum Return<'a> {
+    Continue(usize),
     Fork(Tokens<'a>),
     Join(&'a Gateway),
     End(&'a Event),
@@ -55,12 +56,12 @@ impl<T> Process<T> {
                     use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
                     let results: Vec<_> = active_tokens
                         .par_iter()
-                        .map(|token| self.flow(token, &input))
+                        .map(|token| self.flow_loop(*token, &input))
                         .collect::<Vec<_>>();
                     results.into_iter()
                 }
                 #[cfg(not(feature = "parallel"))]
-                active_tokens.iter().map(|token| self.flow(token, &input))
+                self.flow_alternator(&active_tokens, &input).into_iter()
             };
 
             for flow_result in flows_iter.rev() {
@@ -93,6 +94,7 @@ impl<T> Process<T> {
                         }
                     }
                     Return::Fork(item) => handler.pending_fork(item),
+                    _ => {}
                 }
 
                 // Check if all inputs have been merged for a gateway, then proceed with its outputs.
@@ -122,245 +124,288 @@ impl<T> Process<T> {
         }
     }
 
-    // Each flow process one "token" and returns on a Fork, Join or End.
-    fn flow<'a: 'b, 'b>(
+    #[cfg(feature = "parallel")]
+    fn flow_loop<'a>(
         &'a self,
-        mut current_id: &'b usize,
+        mut current_id: usize,
         input: &ExecuteInput<'a, T>,
     ) -> Result<Return<'a>, RuntimeError>
     where
         T: Send + Sync,
     {
         loop {
-            current_id = match input.process.get(*current_id).ok_or_else(|| {
-                RuntimeError::Engine(format!(
-                    "could not fetch bpmn data with index {}",
-                    current_id
-                ))
-            })? {
-                Bpmn::Event(
-                    event @ Event {
-                        event_type,
-                        symbol,
-                        id,
-                        name,
-                        outputs,
-                        ..
-                    },
-                ) => {
-                    debug!("{event}");
-                    match event_type {
-                        EventType::Start | EventType::Boundary => {
-                            maybe_fork!(outputs, event)
-                        }
-                        EventType::IntermediateCatch => {
-                            if !matches!(symbol, Symbol::Link)
-                                && let Some(index) = self.intermediate_catch_callback
-                            {
-                                self.handler
-                                    .run_end_or_intermediate(
-                                        index,
-                                        input.data,
-                                        name.as_deref(),
-                                        *symbol,
-                                    )?
-                                    .map_err(RuntimeError::Panic)?;
-                            }
+            match self.flow(current_id, input) {
+                Ok(Return::Continue(value)) => current_id = value,
+                other => return other,
+            }
+        }
+    }
 
-                            maybe_fork!(outputs, event)
-                        }
-                        EventType::IntermediateThrow => match (name.as_ref(), symbol) {
-                            (Some(name), Symbol::Link) => {
-                                input.process.events.catch_event_link(name)?
-                            }
-                            (None, Symbol::Link) => Err(
-                                DiagramError::MissingIntermediateThrowEventName(id.bpmn().into()),
-                            )?,
-                            _ => {
-                                if let Some(index) = self.intermediate_throw_callback {
-                                    self.handler
-                                        .run_end_or_intermediate(
-                                            index,
-                                            input.data,
-                                            name.as_deref(),
-                                            *symbol,
-                                        )?
-                                        .map_err(RuntimeError::Panic)?;
-                                }
-                                maybe_fork!(outputs, event)
-                            }
-                        },
-                        EventType::End => {
-                            if !matches!(symbol, Symbol::None)
-                                && let Some(index) = self.end_callback
-                            {
-                                self.handler
-                                    .run_end_or_intermediate(
-                                        index,
-                                        input.data,
-                                        name.as_deref(),
-                                        *symbol,
-                                    )?
-                                    .map_err(RuntimeError::Panic)?;
-                            }
+    // Only used in single thread mode to alternate work
+    #[cfg(not(feature = "parallel"))]
+    fn flow_alternator<'a: 'b, 'b>(
+        &'a self,
+        tokens: &[usize],
+        input: &ExecuteInput<'a, T>,
+    ) -> Vec<Result<Return<'a>, RuntimeError>>
+    where
+        T: Send + Sync,
+    {
+        let mut result = vec![];
+        let mut queue = std::collections::VecDeque::from_iter(tokens.iter().cloned());
+        while let Some(token) = queue.pop_front() {
+            match self.flow(token, input) {
+                Ok(Return::Continue(value)) => queue.push_back(value),
 
-                            return Ok(Return::End(event));
-                        }
-                    }
+                // terminate event, stop working.
+                end @ Ok(Return::End(Event {
+                    event_type: EventType::End,
+                    symbol: Symbol::Terminate,
+                    ..
+                })) => {
+                    result.push(end);
+                    break;
                 }
-                Bpmn::Activity(
-                    activity @ Activity {
-                        activity_type,
-                        id,
-                        func_idx,
-                        data_index,
-                        outputs,
-                        ..
-                    },
-                ) => {
-                    debug!("{activity}");
-                    match activity_type {
-                        ActivityType::Task
-                        | ActivityType::ScriptTask
-                        | ActivityType::UserTask
-                        | ActivityType::ServiceTask
-                        | ActivityType::CallActivity
-                        | ActivityType::ReceiveTask
-                        | ActivityType::SendTask
-                        | ActivityType::ManualTask
-                        | ActivityType::BusinessRuleTask => {
-                            match func_idx
-                                .map(|index| self.handler.run_task(index, input.data))
-                                .ok_or_else(|| {
-                                    RuntimeError::Engine(format!("missing function {:?}", activity))
-                                })?? {
-                                Task::Boundary(name, symbol) => input
-                                    .process
-                                    .events
-                                    .boundary(id, symbol, name.as_deref())
-                                    .ok_or_else(|| {
-                                        DiagramError::MissingBoundary(
-                                            format!("({name:?},{symbol})"),
-                                            activity.to_string(),
-                                        )
-                                    })?,
-                                Task::Default => maybe_fork!(outputs, activity),
-                                Task::Panic(e) => Err(RuntimeError::Panic(e))?,
-                            }
-                        }
-                        ActivityType::SubProcess => {
-                            let subprocess = match data_index {
-                                Some(index) => self.diagram.get_process(*index)?,
-                                _ => Err(RuntimeError::Engine(format!(
-                                    "missing subprocess index {:?}",
-                                    activity
-                                )))?,
-                            };
+                other => result.push(other),
+            }
+        }
+        result
+    }
 
-                            if let Event {
-                                event_type: EventType::End,
-                                symbol:
-                                    symbol @ (Symbol::Cancel
-                                    | Symbol::Error
-                                    | Symbol::Escalation
-                                    | Symbol::Signal),
-
-                                name,
-                                ..
-                            } = self.execute(ExecuteInput::new(subprocess, true, input.data))?
-                            {
-                                // Jump to boundary
-                                input
-                                    .process
-                                    .events
-                                    .boundary(id, *symbol, name.as_deref())
-                                    .ok_or_else(|| {
-                                        DiagramError::MissingBoundary(
-                                            symbol.to_string(),
-                                            activity.to_string(),
-                                        )
-                                    })?
-                            } else {
-                                // Continue from subprocess
-                                maybe_fork!(outputs, activity)
-                            }
-                        }
-                    }
-                }
-                Bpmn::Gateway(
-                    gateway @ Gateway {
-                        gateway_type,
-                        func_idx,
-                        outputs,
-                        inputs,
-                        ..
-                    },
-                ) => {
-                    debug!("{gateway}");
-                    match gateway_type {
-                        _ if outputs.len() == 0 => Err(DiagramError::MissingOutput(format!(
-                            "{} has no outputs",
-                            gateway
-                        )))?,
-                        // Handle 1 to 1, probably a temporary design or mistake
-                        _ if outputs.len() == 1 && *inputs == 1 => outputs.first().unwrap(),
-                        GatewayType::Exclusive if outputs.len() == 1 => outputs.first().unwrap(),
-                        GatewayType::Exclusive => {
-                            match func_idx
-                                .map(|index| self.handler.run_exclusive(index, input.data))
-                                .ok_or_else(|| {
-                                    RuntimeError::Engine(format!("missing function {:?}", gateway))
-                                })?? {
-                                Exclusive::Flow(value) => {
-                                    input.find_flow(&value, outputs, gateway)?
-                                }
-                                Exclusive::Default => gateway.default_path()?,
-                                Exclusive::Panic(e) => Err(RuntimeError::Panic(e))?,
-                            }
-                        }
-                        // Handle a regular Join or a JoinFork. In both cases, we need to wait for all tokens.
-                        GatewayType::Parallel | GatewayType::Inclusive if *inputs > 1 => {
-                            return Ok(Return::Join(gateway));
-                        }
-                        GatewayType::Parallel => {
-                            return Ok(Return::Fork(Cow::Borrowed(outputs.ids())));
-                        }
-                        GatewayType::Inclusive => {
-                            return Ok(Return::Fork(
-                                self.handle_inclusive_gateway(input, gateway)?,
-                            ));
-                        }
-                        GatewayType::EventBased => {
-                            match func_idx
-                                .map(|index| self.handler.run_eventbased(index, input.data))
-                                .ok_or_else(|| {
-                                    RuntimeError::Engine(format!("missing function {:?}", gateway))
-                                })?? {
-                                IntermediateEvent::Catch(name, symbol) => input
-                                    .process
-                                    .find_by_intermediate_event(&name, symbol, outputs)
-                                    .ok_or_else(|| {
-                                        DiagramError::MissingIntermediateEvent(
-                                            gateway.to_string(),
-                                            format!("({name},{symbol})"),
-                                        )
-                                    })?,
-                                IntermediateEvent::Panic(e) => Err(RuntimeError::Panic(e))?,
-                            }
-                        }
-                    }
-                }
-                Bpmn::SequenceFlow {
+    // One step forward for selected flow
+    fn flow<'a>(
+        &'a self,
+        mut current_id: usize,
+        input: &ExecuteInput<'a, T>,
+    ) -> Result<Return<'a>, RuntimeError>
+    where
+        T: Send + Sync,
+    {
+        current_id = *match input.process.get(current_id).ok_or_else(|| {
+            RuntimeError::Engine(format!(
+                "could not fetch bpmn data with index {}",
+                current_id
+            ))
+        })? {
+            Bpmn::Event(
+                event @ Event {
+                    event_type,
+                    symbol,
                     id,
                     name,
-                    target_ref,
+                    outputs,
                     ..
-                } => {
-                    debug!("SequenceFlow `{}`", name.as_deref().unwrap_or(id.bpmn()));
-                    target_ref.local()
+                },
+            ) => {
+                debug!("{event}");
+                match event_type {
+                    EventType::Start | EventType::Boundary => {
+                        maybe_fork!(outputs, event)
+                    }
+                    EventType::IntermediateCatch => {
+                        if !matches!(symbol, Symbol::Link)
+                            && let Some(index) = self.intermediate_catch_callback
+                        {
+                            self.handler
+                                .run_end_or_intermediate(
+                                    index,
+                                    input.data,
+                                    name.as_deref(),
+                                    *symbol,
+                                )?
+                                .map_err(RuntimeError::Panic)?;
+                        }
+
+                        maybe_fork!(outputs, event)
+                    }
+                    EventType::IntermediateThrow => match (name.as_ref(), symbol) {
+                        (Some(name), Symbol::Link) => {
+                            input.process.events.catch_event_link(name)?
+                        }
+                        (None, Symbol::Link) => Err(
+                            DiagramError::MissingIntermediateThrowEventName(id.bpmn().into()),
+                        )?,
+                        _ => {
+                            if let Some(index) = self.intermediate_throw_callback {
+                                self.handler
+                                    .run_end_or_intermediate(
+                                        index,
+                                        input.data,
+                                        name.as_deref(),
+                                        *symbol,
+                                    )?
+                                    .map_err(RuntimeError::Panic)?;
+                            }
+                            maybe_fork!(outputs, event)
+                        }
+                    },
+                    EventType::End => {
+                        if !matches!(symbol, Symbol::None)
+                            && let Some(index) = self.end_callback
+                        {
+                            self.handler
+                                .run_end_or_intermediate(
+                                    index,
+                                    input.data,
+                                    name.as_deref(),
+                                    *symbol,
+                                )?
+                                .map_err(RuntimeError::Panic)?;
+                        }
+
+                        return Ok(Return::End(event));
+                    }
                 }
-            };
-        }
+            }
+            Bpmn::Activity(
+                activity @ Activity {
+                    activity_type,
+                    id,
+                    func_idx,
+                    data_index,
+                    outputs,
+                    ..
+                },
+            ) => {
+                debug!("{activity}");
+                match activity_type {
+                    ActivityType::Task
+                    | ActivityType::ScriptTask
+                    | ActivityType::UserTask
+                    | ActivityType::ServiceTask
+                    | ActivityType::CallActivity
+                    | ActivityType::ReceiveTask
+                    | ActivityType::SendTask
+                    | ActivityType::ManualTask
+                    | ActivityType::BusinessRuleTask => {
+                        match func_idx
+                            .map(|index| self.handler.run_task(index, input.data))
+                            .ok_or_else(|| {
+                                RuntimeError::Engine(format!("missing function {:?}", activity))
+                            })?? {
+                            Task::Boundary(name, symbol) => input
+                                .process
+                                .events
+                                .boundary(id, symbol, name.as_deref())
+                                .ok_or_else(|| {
+                                    DiagramError::MissingBoundary(
+                                        format!("({name:?},{symbol})"),
+                                        activity.to_string(),
+                                    )
+                                })?,
+                            Task::Default => maybe_fork!(outputs, activity),
+                            Task::Panic(e) => Err(RuntimeError::Panic(e))?,
+                        }
+                    }
+                    ActivityType::SubProcess => {
+                        let subprocess = match data_index {
+                            Some(index) => self.diagram.get_process(*index)?,
+                            _ => Err(RuntimeError::Engine(format!(
+                                "missing subprocess index {:?}",
+                                activity
+                            )))?,
+                        };
+
+                        if let Event {
+                            event_type: EventType::End,
+                            symbol:
+                                symbol @ (Symbol::Cancel
+                                | Symbol::Error
+                                | Symbol::Escalation
+                                | Symbol::Signal),
+
+                            name,
+                            ..
+                        } = self.execute(ExecuteInput::new(subprocess, true, input.data))?
+                        {
+                            // Jump to boundary
+                            input
+                                .process
+                                .events
+                                .boundary(id, *symbol, name.as_deref())
+                                .ok_or_else(|| {
+                                    DiagramError::MissingBoundary(
+                                        symbol.to_string(),
+                                        activity.to_string(),
+                                    )
+                                })?
+                        } else {
+                            // Continue from subprocess
+                            maybe_fork!(outputs, activity)
+                        }
+                    }
+                }
+            }
+            Bpmn::Gateway(
+                gateway @ Gateway {
+                    gateway_type,
+                    func_idx,
+                    outputs,
+                    inputs,
+                    ..
+                },
+            ) => {
+                debug!("{gateway}");
+                match gateway_type {
+                    _ if outputs.len() == 0 => Err(DiagramError::MissingOutput(format!(
+                        "{} has no outputs",
+                        gateway
+                    )))?,
+                    // Handle 1 to 1, probably a temporary design or mistake
+                    _ if outputs.len() == 1 && *inputs == 1 => outputs.first().unwrap(),
+                    GatewayType::Exclusive if outputs.len() == 1 => outputs.first().unwrap(),
+                    GatewayType::Exclusive => {
+                        match func_idx
+                            .map(|index| self.handler.run_exclusive(index, input.data))
+                            .ok_or_else(|| {
+                                RuntimeError::Engine(format!("missing function {:?}", gateway))
+                            })?? {
+                            Exclusive::Flow(value) => input.find_flow(&value, outputs, gateway)?,
+                            Exclusive::Default => gateway.default_path()?,
+                            Exclusive::Panic(e) => Err(RuntimeError::Panic(e))?,
+                        }
+                    }
+                    // Handle a regular Join or a JoinFork. In both cases, we need to wait for all tokens.
+                    GatewayType::Parallel | GatewayType::Inclusive if *inputs > 1 => {
+                        return Ok(Return::Join(gateway));
+                    }
+                    GatewayType::Parallel => {
+                        return Ok(Return::Fork(Cow::Borrowed(outputs.ids())));
+                    }
+                    GatewayType::Inclusive => {
+                        return Ok(Return::Fork(self.handle_inclusive_gateway(input, gateway)?));
+                    }
+                    GatewayType::EventBased => {
+                        match func_idx
+                            .map(|index| self.handler.run_eventbased(index, input.data))
+                            .ok_or_else(|| {
+                                RuntimeError::Engine(format!("missing function {:?}", gateway))
+                            })?? {
+                            IntermediateEvent::Catch(name, symbol) => input
+                                .process
+                                .find_by_intermediate_event(&name, symbol, outputs)
+                                .ok_or_else(|| {
+                                    DiagramError::MissingIntermediateEvent(
+                                        gateway.to_string(),
+                                        format!("({name},{symbol})"),
+                                    )
+                                })?,
+                            IntermediateEvent::Panic(e) => Err(RuntimeError::Panic(e))?,
+                        }
+                    }
+                }
+            }
+            Bpmn::SequenceFlow {
+                id,
+                name,
+                target_ref,
+                ..
+            } => {
+                debug!("SequenceFlow `{}`", name.as_deref().unwrap_or(id.bpmn()));
+                target_ref.local()
+            }
+        };
+        Ok(Return::Continue(current_id))
     }
 
     fn handle_inclusive_gateway<'a>(
